@@ -1,0 +1,81 @@
+@startuml
+title Non-Functional Study - Interoperability, Scalability, Cost, Security
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontColor #1F2937
+skinparam packageBorderColor #374151
+skinparam packageBackgroundColor #F9FAFB
+skinparam componentBorderColor #374151
+skinparam componentBackgroundColor #FFFFFF
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #D97706
+skinparam arrowColor #374151
+
+left to right direction
+
+note as Purpose
+  Purpose:
+  Summarizes the main non-functional design considerations for
+  the documentation phase. It explains how the selected ESP32,
+  MQTT, local sensor wiring, and optional RS485 path affect
+  interoperability, scalability, cost, and security.
+end note
+
+component "Recommended Core Design\nESP32 per machine + local wired sensors + MQTT over Wi-Fi" as Core
+
+package "Interoperability" {
+  component "Use standard MQTT topics\nfactory/{machineId}/telemetry" as I1
+  component "Tag every record with\nmachineId, sensorId, timestamp" as I2
+  component "Keep sensor interfaces documented\n1-Wire, I2C, SPI, UART" as I3
+  component "Gateway can be local PC,\nRaspberry Pi, or cloud broker" as I4
+}
+
+package "Scalability" {
+  component "Repeat one ESP32 node\nfor each new machine" as S1
+  component "Topic naming separates\nmachine data streams" as S2
+  component "Local buffering handles\nbrief network loss" as S3
+  component "RS485/Modbus path for\nfuture industrial field bus" as S4
+}
+
+package "Cost" {
+  component "ESP32 is low cost and\nhas built-in Wi-Fi" as C1
+  component "Prototype sensors are affordable\nDS18B20 + ADXL345/MPU6050" as C2
+  component "One node per machine costs more\nthan one central ESP32" as C3
+  component "Lower wiring complexity can\nreduce installation effort" as C4
+}
+
+package "Security" {
+  component "Use Wi-Fi credentials and\nseparate factory network" as Sec1
+  component "Use MQTT username/password\nand TLS where supported" as Sec2
+  component "Restrict dashboard access\nby user role" as Sec3
+  component "Validate incoming telemetry\nbefore storage/analysis" as Sec4
+}
+
+Core --> I1
+Core --> I2
+Core --> I3
+Core --> I4
+Core --> S1
+Core --> S2
+Core --> S3
+Core --> S4
+Core --> C1
+Core --> C2
+Core --> C3
+Core --> C4
+Core --> Sec1
+Core --> Sec2
+Core --> Sec3
+Core --> Sec4
+
+legend bottom
+|= Area |= What it evaluates |
+| Interoperability | Whether sensors, ESP32 nodes, gateway, and cloud can exchange data through clear standards |
+| Scalability | How easily the design grows from one machine to many machines |
+| Cost | Hardware, wiring, setup, and maintenance effort tradeoffs |
+| Security | Protection for device access, network traffic, dashboard use, and stored data |
+| Core design | The recommended documentation baseline used by all diagrams |
+endlegend
+@enduml

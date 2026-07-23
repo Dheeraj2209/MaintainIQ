@@ -1,0 +1,62 @@
+Simple GenAI Tools List
+Accessed: 11 June 2026
+
+1. OpenAI Codex
+   - A coding agent that can read, edit, run, and explain code.
+   - Useful for project coding, bug fixing, code review, and documentation support.
+
+2. Codex CLI
+   - A local command-line tool for working with Codex inside a codebase.
+   - Useful when developers want AI help directly from the terminal.
+
+3. MCP Servers
+   - Model Context Protocol servers connect AI tools to files, APIs, databases, and other services.
+   - They allow AI systems to use external tools in a structured and secure way.
+
+4. Codex Plugins
+   - Plugin bundles can include skills, app integrations, and MCP servers for reusable workflows.
+   - They extend Codex with extra abilities for design, documents, browser testing, or productivity work.
+
+5. Skills
+   - Skills are reusable instruction files that guide Codex through specific tasks.
+   - Examples include document creation, spreadsheet work, presentation creation, debugging, and testing.
+
+6. Apps / Connectors
+   - Connectors let AI tools work with external services such as GitHub, Figma, Google Drive, and Slack.
+   - They help the AI interact with real project tools instead of only giving text answers.
+
+7. ChatGPT
+   - A general GenAI assistant for brainstorming, drafting, summarizing, and explaining concepts.
+   - Useful for idea generation, report writing, learning support, and quick explanations.
+
+8. Figma Plugin
+   - Helps Codex read, create, and update Figma designs.
+   - Useful for UI mockups, design systems, diagrams, app screens, and design-to-code workflows.
+
+9. Browser Plugin
+   - Lets Codex open and test websites or local web apps in a browser.
+   - Useful for checking layouts, clicking through pages, taking screenshots, and verifying frontend changes.
+
+10. Documents Plugin
+   - Helps create and edit Word-style documents.
+   - Useful for reports, SRS documents, project notes, references, and formatted academic documents.
+
+11. Presentations Plugin
+   - Helps create and edit slide decks.
+   - Useful for project presentations, pitch decks, academic reviews, and technical explanation slides.
+
+12. Spreadsheets Plugin
+   - Helps create, edit, and analyze spreadsheet files.
+   - Useful for tables, calculations, project tracking, charts, and data summaries.
+
+13. Creative Production Plugin
+   - Helps explore visual ideas, mood boards, ads, scenes, logos, and image directions.
+   - Useful for branding, campaign ideas, presentation visuals, and concept exploration.
+
+14. GitHub Connector
+   - Lets Codex work with GitHub repositories and development workflows.
+   - Useful for code review, issue handling, pull requests, and project collaboration.
+
+15. Google Drive Connector
+   - Helps connect documents and files from Google Drive.
+   - Useful for importing, exporting, and managing project documents.

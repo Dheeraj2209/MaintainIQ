@@ -1,0 +1,88 @@
+@startuml
+title Factory Scenario Description - Multi-Machine Predictive Maintenance
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontColor #1F2937
+skinparam rectangleBorderColor #374151
+skinparam rectangleBackgroundColor #F9FAFB
+skinparam nodeBorderColor #2563EB
+skinparam nodeBackgroundColor #EFF6FF
+skinparam cloudBorderColor #7C3AED
+skinparam cloudBackgroundColor #F5F3FF
+skinparam databaseBorderColor #059669
+skinparam databaseBackgroundColor #ECFDF5
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #D97706
+skinparam arrowColor #374151
+
+left to right direction
+
+note as Purpose
+  Purpose:
+  Defines the project's factory use case in a visual form.
+  A small factory floor monitors multiple machine types using
+  one ESP32 sensor node per machine, then sends machine health
+  telemetry to a gateway/cloud for alerts and maintenance decisions.
+end note
+
+actor "Maintenance\nOperator" as Operator
+
+rectangle "Factory Floor Scenario" as Factory {
+  node "Machine 1\nCNC motor" as M1 {
+    component "Temp sensor" as M1T
+    component "Vibration sensor" as M1V
+    node "ESP32 Node M1" as E1
+  }
+
+  node "Machine 2\nConveyor motor" as M2 {
+    component "Temp sensor" as M2T
+    component "Vibration sensor" as M2V
+    node "ESP32 Node M2" as E2
+  }
+
+  node "Machine 3\nCompressor" as M3 {
+    component "Temp sensor" as M3T
+    component "Vibration sensor" as M3V
+    node "ESP32 Node M3" as E3
+  }
+}
+
+cloud "Factory Wi-Fi" as Wifi
+node "Gateway / MQTT Broker" as Gateway
+database "Cloud / Server\nTelemetry + Alerts + Trends" as CloudStore
+component "Dashboard / Report" as Dashboard
+
+M1T --> E1 : short wired link
+M1V --> E1 : short wired link
+M2T --> E2 : short wired link
+M2V --> E2 : short wired link
+M3T --> E3 : short wired link
+M3V --> E3 : short wired link
+
+E1 --> Wifi : MQTT telemetry\nmachineId=M1
+E2 --> Wifi : MQTT telemetry\nmachineId=M2
+E3 --> Wifi : MQTT telemetry\nmachineId=M3
+
+Wifi --> Gateway : publish telemetry topics
+Gateway --> CloudStore : store time-series records
+CloudStore --> Dashboard : status, trends, KPIs
+Dashboard --> Operator : alerts and maintenance view
+Operator --> Dashboard : acknowledge / inspect
+
+Gateway --> Wifi : alert topic per machine
+Wifi --> E1 : alert/command if needed
+Wifi --> E2 : alert/command if needed
+Wifi --> E3 : alert/command if needed
+
+legend bottom
+|= Element |= Meaning |
+| Machine 1..3 | Example factory assets monitored independently |
+| Temp + vibration sensors | Physical measurements attached to each machine |
+| ESP32 Node | Local edge device placed near one machine |
+| MQTT telemetry | Machine data sent upstream using Wi-Fi |
+| Alert topic | Message path from gateway/cloud back to the selected ESP32 |
+| Operator | Human user who reviews alerts and plans maintenance |
+endlegend
+@enduml

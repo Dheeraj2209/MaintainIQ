@@ -1,0 +1,37 @@
+@startuml
+title Communication Protocol Comparison
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontColor #1F2937
+skinparam noteBackgroundColor #F9FAFB
+skinparam noteBorderColor #374151
+
+note top
+Purpose:
+Compares communication choices for moving machine data from ESP32 sensor nodes
+to a gateway/cloud and for sending alerts back to the edge device.
+end note
+
+legend center
+|= Protocol / Link |= Where It Fits |= Duplex Capability |= Strengths |= Tradeoffs |= Recommendation |
+| MQTT over Wi-Fi | ESP32 sensor node to gateway/cloud | Full duplex using publish/subscribe topics | Lightweight, IoT-friendly, supports many machine nodes, natural alert-back channel | Needs Wi-Fi coverage and broker setup; secure deployment should use MQTT over TLS | Recommended main design |
+| HTTP/REST over Wi-Fi | ESP32 to server/cloud API | Mostly request/response; cloud-to-edge needs polling or extra channel | Easy to understand, common web APIs, simple ingestion endpoint | Less efficient for frequent telemetry; not ideal for real-time alert push | Good fallback, not first choice |
+| WebSocket over Wi-Fi | ESP32 or gateway to server | Full duplex persistent connection | Real-time bidirectional communication | More complex connection management than MQTT for IoT fleets | Useful for dashboards or special real-time cases |
+| Bluetooth / BLE | Sensor node to nearby phone/gateway | Bidirectional, short range | Low power, no Wi-Fi needed, good for local setup/config | Short range, weaker for multi-machine factory monitoring | Mention as local configuration option |
+| Serial / UART | Sensor module to local PC/gateway | Bidirectional wired link | Simple, reliable for lab demo and debugging | Short distance; not scalable across many machines without extra hardware | Good for testing/prototype debugging |
+| RS485 / Modbus RTU | Machine area field wiring to gateway | Bidirectional half-duplex typical | Industrial, long cable runs, noise-resistant, supports many nodes on bus | Needs RS485 transceiver and protocol handling; less plug-and-play than Wi-Fi | Future industrial scalability path |
+| LoRa / LoRaWAN | Long-range low-data-rate telemetry | Limited downlink; not ideal for continuous high-rate vibration | Long range, low power | Low bandwidth, not suited for detailed vibration streams | Not recommended for this prototype |
+endlegend
+
+note bottom
+Recommended communication design:
+ESP32 nodes publish telemetry to MQTT topics over Wi-Fi.
+The cloud/gateway publishes alerts back to each node on a machine-specific topic,
+creating the required full-duplex behavior.
+
+Legend:
+Full duplex means both directions are supported: telemetry upstream and alert/command downstream.
+RS485/Modbus is kept as the industrial wired scalability alternative.
+end note
+@enduml

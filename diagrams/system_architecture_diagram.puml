@@ -1,0 +1,99 @@
+@startuml
+title System Architecture Diagram - Edge to Cloud Predictive Maintenance
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontColor #1F2937
+skinparam packageBorderColor #374151
+skinparam packageBackgroundColor #F9FAFB
+skinparam componentBorderColor #374151
+skinparam componentBackgroundColor #FFFFFF
+skinparam nodeBorderColor #2563EB
+skinparam nodeBackgroundColor #EFF6FF
+skinparam databaseBorderColor #059669
+skinparam databaseBackgroundColor #ECFDF5
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #D97706
+skinparam arrowColor #374151
+
+left to right direction
+
+note as Purpose
+  Purpose:
+  Presents the full layered architecture from physical machines
+  to sensors, ESP32 edge nodes, MQTT gateway, cloud processing,
+  storage, alerting, and dashboard/reporting.
+end note
+
+package "1. Machine Layer" {
+  node "Machine A" as MachineA
+  node "Machine B" as MachineB
+  node "Machine C" as MachineC
+}
+
+package "2. Sensor + Edge Layer" {
+  component "Temperature\nSensor" as Temp
+  component "Vibration\nSensor" as Vib
+  node "ESP32 Sensor Node\nper machine" as ESP32 {
+    component "Sensor Reading" as Read
+    component "Timestamp + Machine ID" as Tag
+    component "Optional Buffer" as Buffer
+    component "MQTT Client" as Client
+  }
+}
+
+package "3. Communication Layer" {
+  cloud "Wi-Fi Network" as Wifi
+  node "Gateway /\nMQTT Broker" as Broker
+}
+
+package "4. Cloud / Processing Layer" {
+  component "Ingestion Service" as Ingest
+  component "Preprocessing" as Preprocess
+  component "Feature Extraction\nRMS, mean, peaks" as Feature
+  component "Health Analysis\nrules / ML model" as Model
+  component "Alert Service" as Alert
+}
+
+package "5. Storage + Application Layer" {
+  database "Telemetry History" as TelemetryDB
+  database "Alert + Maintenance\nRecords" as AlertDB
+  component "Dashboard / Report" as UI
+}
+
+MachineA --> Temp : heat
+MachineA --> Vib : vibration
+MachineB ..> ESP32 : same repeated node pattern
+MachineC ..> ESP32 : same repeated node pattern
+Temp --> Read : local wired input
+Vib --> Read : local wired input
+Read --> Tag : raw reading
+Tag --> Buffer : tagged record
+Buffer --> Client : publish queue
+Client --> Wifi : MQTT over Wi-Fi
+Wifi --> Broker : telemetry topic
+Broker --> Ingest : subscribed stream
+Ingest --> TelemetryDB : raw / tagged records
+Ingest --> Preprocess : clean data
+Preprocess --> Feature : features
+Feature --> Model : feature vector
+Model --> Alert : health state + risk score
+Model --> TelemetryDB : processed results
+Alert --> AlertDB : alert event
+Alert --> Broker : machine-specific alert topic
+Broker --> Wifi : downstream alert
+Wifi --> Client : subscribed alert
+TelemetryDB --> UI : trends + KPIs
+AlertDB --> UI : alert history
+
+legend bottom
+|= Layer / Symbol |= Meaning |
+| Machine Layer | Physical assets: motors, pumps, fans, compressors, conveyors |
+| Sensor + Edge Layer | Local ESP32 node reads wired sensors and tags records |
+| Communication Layer | MQTT over Wi-Fi carries telemetry and alert topics |
+| Cloud / Processing Layer | Cleans data, extracts features, predicts health, creates alerts |
+| Storage + Application Layer | Stores history and presents dashboard/report outputs |
+| Dashed arrows | Repeated pattern for additional machines |
+endlegend
+@enduml

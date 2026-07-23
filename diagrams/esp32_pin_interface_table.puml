@@ -1,0 +1,36 @@
+@startuml
+title ESP32 Pin / Interface Table
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontColor #1F2937
+skinparam noteBackgroundColor #F9FAFB
+skinparam noteBorderColor #374151
+
+note top
+Purpose:
+Documents how each sensor or communication module can connect to the ESP32.
+The pins are suggested defaults for design documentation, not final board-specific wiring.
+end note
+
+legend center
+|= Module / Signal |= Suggested ESP32 Interface |= Example ESP32 Pins |= Direction |= Design Notes |
+| DS18B20 temperature sensor | 1-Wire digital | GPIO 4 + 4.7k pull-up to 3.3V | Sensor to ESP32 | Good prototype choice; one GPIO can support multiple DS18B20 sensors if needed |
+| ADXL345 vibration sensor | I2C | SDA GPIO 21, SCL GPIO 22 | Sensor to ESP32 | Short local wiring preferred; use 3.3V logic; address can be changed on many modules |
+| MPU6050 vibration/motion sensor | I2C | SDA GPIO 21, SCL GPIO 22 | Sensor to ESP32 | Alternative to ADXL345; useful if MPU6050 module is easier to obtain |
+| Thermocouple module MAX6675/MAX31855 | SPI | SCK GPIO 18, MISO GPIO 19, CS GPIO 5 | Sensor module to ESP32 | Future/high-temperature option; uses more pins than DS18B20 |
+| Local debug/programming | USB serial / UART0 | USB cable, TX0/RX0 | PC to ESP32 | Used for programming, logs, and synthetic-data testing |
+| Optional RS485 transceiver | UART | TX GPIO 17, RX GPIO 16, DE/RE GPIO 25 | ESP32 to industrial bus | Future industrial alternative for wired long-distance communication |
+| Wi-Fi telemetry | 2.4 GHz Wi-Fi | Built-in ESP32 radio | ESP32 to gateway/cloud | Carries MQTT telemetry and alert topics; no external data pins needed |
+| Status LED / alert indicator | Digital GPIO | GPIO 2 or external GPIO | ESP32 to indicator | Optional local feedback for connectivity or critical alert |
+endlegend
+
+note bottom
+Pin numbers are suggested documentation defaults, not fixed requirements.
+Final pin choice should avoid ESP32 boot-strapping pins and match the exact development board.
+
+Legend:
+GPIO means general-purpose digital pin. ADC means analog input.
+I2C and SPI are digital sensor buses. UART is used for serial/RS485 links.
+end note
+@enduml

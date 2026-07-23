@@ -1,0 +1,163 @@
+@startuml
+title Multi-Machine Predictive Maintenance UML/Class Diagram
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam classFontColor #1F2937
+skinparam classBorderColor #374151
+skinparam classBackgroundColor #F9FAFB
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #D97706
+skinparam arrowColor #374151
+
+note as Purpose
+  Purpose:
+  Shows the main software/domain classes and relationships for
+  a factory with multiple monitored machines. It documents why
+  the design uses one ESP32 sensor node per machine and how
+  telemetry and alerts move through MQTT, gateway, cloud, and dashboard.
+end note
+
+class Factory {
+  +factoryId: String
+  +name: String
+  +location: String
+}
+
+class Machine {
+  +machineId: String
+  +name: String
+  +type: MachineType
+  +healthState: HealthState
+}
+
+class SensorModule {
+  +moduleId: String
+  +machineId: String
+  +samplingRate: Hz
+  +publishTelemetry()
+  +receiveAlert()
+}
+
+class ESP32SensorNode {
+  +nodeId: String
+  +wifiMac: String
+  +firmwareVersion: String
+  +readSensors()
+  +tagRecord()
+  +bufferIfOffline()
+}
+
+class "Temperature\nSensor" as TemperatureSensor {
+  +sensorId: String
+  +valueC: Float
+  +interface: 1-Wire/SPI/ADC
+  +readTemperature()
+}
+
+class "Vibration\nSensor" as VibrationSensor {
+  +sensorId: String
+  +acceleration: Float
+  +interface: I2C/SPI/ADC
+  +readVibration()
+}
+
+class TelemetryRecord {
+  +recordId: String
+  +timestamp: DateTime
+  +machineId: String
+  +temperature: Float
+  +vibrationRms: Float
+  +riskScore: Float
+}
+
+class "Gateway" as Gateway {
+  +gatewayId: String
+  +networkType: String
+  +forwardTelemetry()
+  +routeAlert()
+}
+
+class "MQTT\nBroker" as MQTTBroker {
+  +brokerUrl: String
+  +telemetryTopic: String
+  +alertTopic: String
+}
+
+class "Cloud\nPlatform" as CloudPlatform {
+  +ingestTelemetry()
+  +storeHistory()
+  +analyzeMachineHealth()
+}
+
+class "Alert\nService" as AlertService {
+  +evaluateSeverity()
+  +generateAlert()
+  +publishEdgeCommand()
+}
+
+class "Dashboard" as Dashboard {
+  +showMachineStatus()
+  +showTrends()
+  +acknowledgeAlert()
+}
+
+enum MachineType {
+  Motor
+  Pump
+  Fan
+  Compressor
+  Conveyor
+}
+
+enum HealthState {
+  Healthy
+  Degrading
+  Faulty
+  Critical
+}
+
+Factory "1" o-- "1..*" Machine : contains
+Machine "1" *-- "1" SensorModule : monitored by
+SensorModule "1" *-- "1" ESP32SensorNode : controller
+SensorModule "1" *-- "1" TemperatureSensor : local wired sensor
+SensorModule "1" *-- "1" VibrationSensor : local wired sensor
+SensorModule "1" --> "0..*" TelemetryRecord : creates
+
+ESP32SensorNode --> Gateway : MQTT over Wi-Fi\ntelemetry publish
+Gateway --> MQTTBroker : forwards messages
+MQTTBroker --> CloudPlatform : telemetry topic
+CloudPlatform --> AlertService : abnormal state
+AlertService --> MQTTBroker : alert/command topic
+MQTTBroker --> Gateway : alert route
+Gateway --> ESP32SensorNode : edge alert\nfull-duplex path
+CloudPlatform --> Dashboard : status, trends, KPIs
+Dashboard --> AlertService : acknowledgement
+
+note right of SensorModule
+  Recommended design:
+  one ESP32 sensor node per machine.
+
+  Sensors are wired locally to the ESP32,
+  while machine data is sent upstream using
+  MQTT over Wi-Fi.
+end note
+
+note bottom of Gateway
+  Industrial scalability option:
+  RS485/Modbus can replace or complement
+  Wi-Fi where wired, noise-resistant field
+  communication is required.
+end note
+
+legend bottom
+|= UML Symbol / Arrow |= Meaning in this diagram |
+| 1, 1..*, 0..* | Multiplicity: exactly one, one or more, zero or more |
+| o-- | Aggregation: factory contains machines as assets |
+| *-- | Composition: machine owns its monitoring module; module owns its local parts |
+| --> | Communication, creation, or data/control dependency |
+| MQTT over Wi-Fi | Primary telemetry path from ESP32 node to gateway/cloud |
+| edge alert path | Return path for alert/command messages back to ESP32 |
+endlegend
+@enduml

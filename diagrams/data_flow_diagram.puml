@@ -1,0 +1,70 @@
+@startuml
+title Data Flow Diagram - Sensor Reading to Alert and Dashboard
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontColor #1F2937
+skinparam componentBorderColor #374151
+skinparam componentBackgroundColor #FFFFFF
+skinparam databaseBorderColor #059669
+skinparam databaseBackgroundColor #ECFDF5
+skinparam actorBorderColor #374151
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #D97706
+skinparam arrowColor #374151
+
+left to right direction
+
+note as Purpose
+  Purpose:
+  Shows how data moves through the system: sensor readings become
+  tagged telemetry, telemetry becomes processed features, features
+  become health decisions, and abnormal decisions become alerts.
+end note
+
+actor "Machine" as Machine
+component "P1 Capture Sensor Data\nESP32 reads temp + vibration" as P1
+component "P2 Tag + Validate\nmachineId, sensorId, timestamp" as P2
+component "P3 Publish Telemetry\nMQTT over Wi-Fi" as P3
+component "P4 Ingest + Store\nGateway/cloud receiver" as P4
+component "P5 Process + Extract Features\nclean, RMS, average, peaks" as P5
+component "P6 Analyze Health\nrules / ML model" as P6
+component "P7 Generate Alert\nseverity + recommendation" as P7
+component "P8 Display Dashboard\ntrends, KPIs, alerts" as P8
+actor "Maintenance\nOperator" as Operator
+
+database "D1 Raw Telemetry" as D1
+database "D2 Processed Features" as D2
+database "D3 Predictions + Alerts" as D3
+database "D4 Maintenance History" as D4
+
+Machine --> P1 : heat + vibration signals
+P1 --> P2 : raw sensor values
+P2 --> P3 : valid tagged record
+P3 --> P4 : MQTT topic\nfactory/{machineId}/telemetry
+P4 --> D1 : save raw records
+P4 --> P5 : telemetry stream
+P5 --> D2 : save feature windows
+P5 --> P6 : feature vector
+P6 --> D3 : health state + risk score
+P6 --> P7 : degrading / faulty / critical state
+P7 --> D3 : alert event
+P7 --> P3 : MQTT alert topic\nfactory/{machineId}/alert
+P8 --> D1 : query readings
+P8 --> D2 : query trends
+P8 --> D3 : query alerts
+P8 --> D4 : query maintenance status
+P8 --> Operator : machine status + action cue
+Operator --> P8 : acknowledge alert\nupdate maintenance action
+Operator --> D4 : inspection / repair note
+
+legend bottom
+|= DFD Element |= Meaning |
+| P1..P8 | Processing step in the telemetry-to-alert pipeline |
+| D1..D4 | Data store used by dashboard, analytics, or maintenance review |
+| MQTT telemetry topic | Upstream machine readings from ESP32 to gateway/cloud |
+| MQTT alert topic | Downstream alert or command from cloud/gateway to ESP32 |
+| Operator flow | Human acknowledgement and maintenance feedback loop |
+endlegend
+@enduml

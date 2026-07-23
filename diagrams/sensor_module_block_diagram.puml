@@ -1,0 +1,99 @@
+@startuml
+title Sensor Module Block Diagram - One ESP32 Node Per Machine
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontColor #1F2937
+skinparam rectangleBorderColor #374151
+skinparam rectangleBackgroundColor #F9FAFB
+skinparam nodeBorderColor #2563EB
+skinparam nodeBackgroundColor #EFF6FF
+skinparam cloudBorderColor #7C3AED
+skinparam cloudBackgroundColor #F5F3FF
+skinparam databaseBorderColor #059669
+skinparam databaseBackgroundColor #ECFDF5
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #D97706
+skinparam arrowColor #374151
+
+left to right direction
+
+note as Purpose
+  Purpose:
+  Shows the internal blocks of one machine-level sensor module
+  and how multiple ESP32 sensor nodes connect to the gateway/cloud.
+  It separates local wired sensor links from wireless MQTT telemetry.
+end note
+
+node "Machine A\n(motor / pump / fan)" as MachineA {
+  rectangle "Mechanical body\nbearing / motor casing" as BodyA
+  component "Temperature sensor\nDS18B20 or thermocouple" as TempA
+  component "Vibration sensor\nADXL345 or MPU6050" as VibA
+
+  node "ESP32 Sensor Node A" as EspA {
+    component "Sensor readers\n1-Wire + I2C" as ReaderA
+    component "Timestamp + machine ID tagging" as TaggerA
+    component "Local buffer\noptional" as BufferA
+    component "MQTT client" as MqttA
+  }
+}
+
+node "Machine B\n(second monitored asset)" as MachineB {
+  component "Temperature sensor" as TempB
+  component "Vibration sensor" as VibB
+  node "ESP32 Sensor Node B" as EspB
+}
+
+cloud "Wi-Fi Network" as Wifi
+node "Gateway / MQTT Broker\n(local PC, Raspberry Pi, router-hosted broker,\nor cloud broker)" as Gateway
+database "Cloud / Server Storage\ntelemetry, alerts, trends" as CloudStore
+component "Analytics / Rule Engine\nhealth state + alert decision" as Analytics
+component "Dashboard / Report" as Dashboard
+
+BodyA --> TempA : heat transfer
+BodyA --> VibA : mechanical vibration
+TempA --> ReaderA : short wired local link\n1-Wire / analog
+VibA --> ReaderA : short wired local link\nI2C / SPI
+ReaderA --> TaggerA : raw readings
+TaggerA --> BufferA : telemetry record
+BufferA --> MqttA : publish queue
+MqttA --> Wifi : MQTT over Wi-Fi
+
+TempB --> EspB : short wired local link
+VibB --> EspB : short wired local link
+EspB --> Wifi : MQTT over Wi-Fi
+
+Wifi --> Gateway : telemetry topics\nfactory/{machineId}/telemetry
+Gateway --> CloudStore : store readings
+Gateway --> Analytics : forward stream
+Analytics --> Dashboard : machine status\nrisk score\nroot cause clue
+Analytics --> Gateway : alert topic\nfactory/{machineId}/alert
+Gateway --> Wifi : alert/command
+Wifi --> MqttA : subscribed alert topic
+
+note bottom of EspA
+  Local sensor wiring means the sensor cables
+  stay near the machine. This reduces noise,
+  simplifies machine identification, and keeps
+  each machine independent.
+end note
+
+note right of Wifi
+  Future industrial alternative:
+  ESP32 can hand off to an RS485/Modbus field bus
+  through a transceiver when long wired runs and
+  electrical noise resistance are more important
+  than wireless convenience.
+end note
+
+legend bottom
+|= Symbol / Link |= Meaning |
+| Blue node boundary | Physical machine area or ESP32 node boundary |
+| Component box | Functional block inside the sensor module or cloud side |
+| Short wired local link | Cable from sensor to nearby ESP32 |
+| MQTT over Wi-Fi | Wireless publish/subscribe telemetry link |
+| Alert topic | Cloud/gateway message sent back to a specific ESP32 node |
+| Machine A / Machine B | Multi-machine scaling pattern: repeat one node per machine |
+endlegend
+@enduml

@@ -1,0 +1,37 @@
+@startuml
+title Sensor Selection Table
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontColor #1F2937
+skinparam noteBackgroundColor #F9FAFB
+skinparam noteBorderColor #374151
+
+note top
+Purpose:
+Compares candidate temperature and vibration sensors for the ESP32-based
+predictive maintenance node, including interface type, best use, strengths,
+and tradeoffs for documentation-stage selection.
+end note
+
+legend center
+|= Sensor |= Type |= ESP32 Interface |= Best Use |= Strengths |= Tradeoffs / Notes |
+| DS18B20 | Temperature | 1-Wire digital GPIO + pull-up resistor | Prototype surface/contact temperature | Simple wiring, digital output, low cost, supports multiple sensors on one bus | Moderate response speed; needs correct physical mounting for good surface readings |
+| MAX6675 / MAX31855 + K-type thermocouple | Temperature | SPI | Hot motor body, high-temperature industrial-style use case | Better for high temperatures; more credible for industrial machines | Costs more and needs thermocouple probe/module |
+| LM35 | Temperature | Analog ADC | Simple low-cost lab temperature measurement | Very simple and cheap | Analog signal is more noise-sensitive; ADC calibration may be needed |
+| ADXL345 | Vibration / acceleration | I2C or SPI | Recommended vibration sensor for prototype | Digital accelerometer, common, easy ESP32 interface, useful acceleration readings | Placement and sampling rate affect vibration quality |
+| MPU6050 | Vibration / motion | I2C | Low-cost vibration approximation and motion experiments | Cheap, widely available, includes accelerometer and gyroscope | Not an industrial vibration sensor; needs filtering for cleaner analysis |
+| SW-420 | Vibration detection | Digital output GPIO | Basic vibration/no-vibration demo only | Very cheap and simple | Not suitable for detailed vibration analysis or RMS/frequency features |
+| Industrial piezo vibration sensor | Vibration | Analog with signal conditioning or industrial interface | More realistic industrial condition monitoring | Better vibration fidelity and ruggedness | Higher cost, more complex circuit, may need amplifier/ADC module |
+endlegend
+
+note bottom
+Recommended academic prototype choice:
+DS18B20 for temperature and ADXL345 or MPU6050 for vibration.
+Mention thermocouple and industrial piezo sensors as future industrial upgrades.
+
+Legend:
+Rows marked as prototype-friendly are easier to explain, wire, and test.
+Industrial options improve realism but increase cost and circuit complexity.
+end note
+@enduml

@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Predictive Maintenance - System Context Diagram</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f7f4ee;
+      --ink: #17212b;
+      --muted: #5f6f80;
+      --line: #d8dee6;
+      --teal: #0b7a75;
+      --teal-soft: #d8f0ec;
+      --blue: #2b5f9e;
+      --amber: #d98c00;
+      --white: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    header {
+      padding: 32px 40px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .kicker {
+      color: var(--teal);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 980px;
+      margin: 10px 0 8px;
+      font-size: 34px;
+      line-height: 1.12;
+    }
+
+    .subtitle {
+      max-width: 980px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    main {
+      padding: 28px 40px 42px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--ink);
+      padding: 9px 13px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--teal);
+      color: var(--teal);
+    }
+
+    .diagram-wrap {
+      width: 100%;
+      overflow: auto;
+      background: var(--white);
+      border: 1px solid var(--line);
+      padding: 28px;
+    }
+
+    .diagram-scale {
+      min-width: 1120px;
+      transform-origin: top left;
+      transition: transform 140ms ease;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .source-panel {
+      margin-top: 24px;
+      background: #111827;
+      color: #d1d5db;
+      border: 1px solid #263241;
+    }
+
+    .source-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #263241;
+    }
+
+    .source-header strong {
+      color: var(--white);
+      font-size: 14px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre;
+    }
+
+    .note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media print {
+      header,
+      main {
+        padding: 18px;
+      }
+
+      .toolbar,
+      .source-panel,
+      .note {
+        display: none;
+      }
+
+      .diagram-wrap {
+        border: 0;
+        padding: 0;
+        overflow: visible;
+      }
+
+      .diagram-scale {
+        min-width: auto;
+        transform: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="kicker">Standalone System Context Diagram</div>
+    <h1>Smart Predictive Maintenance System Using Vibration Data</h1>
+    <p class="subtitle">
+      A single-page view of the actors, monitored machine environment, internal system components,
+      data stores, and user-facing outputs.
+    </p>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <button type="button" id="zoomOut">Zoom out</button>
+      <button type="button" id="zoomIn">Zoom in</button>
+      <button type="button" id="resetZoom">Reset</button>
+      <button type="button" id="copyMermaid">Copy Mermaid</button>
+      <button type="button" onclick="window.print()">Print / Save PDF</button>
+    </div>
+
+    <section class="diagram-wrap" aria-label="Rendered system context diagram">
+      <div class="diagram-scale" id="diagramScale">
+        <pre class="mermaid" id="diagram">
+flowchart LR
+    subgraph actors["External Actors"]
+        operator["Maintenance Operator"]
+        supervisor["Supervisor / Professor"]
+        developer["Student Developer"]
+    end
+
+    subgraph field["Machine Environment"]
+        machine["Machine Under Monitoring"]
+        sensor["Vibration Sensor / Accelerometer"]
+        gateway["Microcontroller / IoT Gateway"]
+        machine -->|"mechanical vibration"| sensor
+        sensor -->|"raw acceleration readings"| gateway
+    end
+
+    subgraph system["Smart Predictive Maintenance System"]
+        ingestion["Data Ingestion Module"]
+        preprocessing["Preprocessing Module"]
+        features["Feature Extraction Module"]
+        prediction["ML / Rule-Based Prediction Module"]
+        severity["Severity and Recommendation Module"]
+        alerting["Alert Management Module"]
+        dashboard["Dashboard / Report Interface"]
+
+        ingestion -->|"validated readings"| preprocessing
+        preprocessing -->|"cleaned signal windows"| features
+        features -->|"RMS, peak, mean, std, optional FFT"| prediction
+        prediction -->|"healthy, degrading, faulty + confidence"| severity
+        severity -->|"abnormal condition"| alerting
+        severity -->|"current status"| dashboard
+        alerting -->|"alert status"| dashboard
+    end
+
+    subgraph stores["System Data Stores"]
+        rawStore[("Raw Vibration History")]
+        featureStore[("Feature and Prediction Results")]
+        alertStore[("Alert and Acknowledgement Log")]
+    end
+
+    subgraph channels["Output Channels"]
+        notification["Dashboard / Email / SMS / Mobile Alert"]
+        report["Historical Trend Report"]
+    end
+
+    gateway -->|"Serial / Wi-Fi / MQTT / HTTP / Bluetooth"| ingestion
+    developer -->|"configure sensor, dataset, model"| ingestion
+    ingestion --> rawStore
+    features --> featureStore
+    severity --> featureStore
+    alerting --> alertStore
+    featureStore --> dashboard
+    alertStore --> dashboard
+    dashboard --> report
+    alerting --> notification
+
+    operator -->|"view status and acknowledge alerts"| dashboard
+    supervisor -->|"review trends and maintenance priority"| dashboard
+    notification --> operator
+    report --> supervisor
+        </pre>
+      </div>
+    </section>
+
+    <p class="note">
+      The diagram is rendered with Mermaid in the browser. If it does not appear, check your internet
+      connection because the Mermaid library is loaded from a CDN.
+    </p>
+
+    <section class="source-panel" aria-label="Mermaid source code">
+      <div class="source-header">
+        <strong>Mermaid source</strong>
+        <span id="copyStatus">Editable in any Mermaid-compatible tool</span>
+      </div>
+      <pre id="mermaidSource">flowchart LR
+    subgraph actors["External Actors"]
+        operator["Maintenance Operator"]
+        supervisor["Supervisor / Professor"]
+        developer["Student Developer"]
+    end
+
+    subgraph field["Machine Environment"]
+        machine["Machine Under Monitoring"]
+        sensor["Vibration Sensor / Accelerometer"]
+        gateway["Microcontroller / IoT Gateway"]
+        machine -->|"mechanical vibration"| sensor
+        sensor -->|"raw acceleration readings"| gateway
+    end
+
+    subgraph system["Smart Predictive Maintenance System"]
+        ingestion["Data Ingestion Module"]
+        preprocessing["Preprocessing Module"]
+        features["Feature Extraction Module"]
+        prediction["ML / Rule-Based Prediction Module"]
+        severity["Severity and Recommendation Module"]
+        alerting["Alert Management Module"]
+        dashboard["Dashboard / Report Interface"]
+
+        ingestion -->|"validated readings"| preprocessing
+        preprocessing -->|"cleaned signal windows"| features
+        features -->|"RMS, peak, mean, std, optional FFT"| prediction
+        prediction -->|"healthy, degrading, faulty + confidence"| severity
+        severity -->|"abnormal condition"| alerting
+        severity -->|"current status"| dashboard
+        alerting -->|"alert status"| dashboard
+    end
+
+    subgraph stores["System Data Stores"]
+        rawStore[("Raw Vibration History")]
+        featureStore[("Feature and Prediction Results")]
+        alertStore[("Alert and Acknowledgement Log")]
+    end
+
+    subgraph channels["Output Channels"]
+        notification["Dashboard / Email / SMS / Mobile Alert"]
+        report["Historical Trend Report"]
+    end
+
+    gateway -->|"Serial / Wi-Fi / MQTT / HTTP / Bluetooth"| ingestion
+    developer -->|"configure sensor, dataset, model"| ingestion
+    ingestion --> rawStore
+    features --> featureStore
+    severity --> featureStore
+    alerting --> alertStore
+    featureStore --> dashboard
+    alertStore --> dashboard
+    dashboard --> report
+    alerting --> notification
+
+    operator -->|"view status and acknowledge alerts"| dashboard
+    supervisor -->|"review trends and maintenance priority"| dashboard
+    notification --> operator
+    report --> supervisor</pre>
+    </section>
+  </main>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: "strict",
+      theme: "base",
+      themeVariables: {
+        background: "#ffffff",
+        primaryColor: "#d8f0ec",
+        primaryBorderColor: "#0b7a75",
+        primaryTextColor: "#17212b",
+        secondaryColor: "#e4effa",
+        tertiaryColor: "#fff0d2",
+        lineColor: "#657487",
+        fontFamily: "Segoe UI, Arial, sans-serif",
+        clusterBkg: "#f7f4ee",
+        clusterBorder: "#d8dee6",
+        edgeLabelBackground: "#ffffff"
+      },
+      flowchart: {
+        htmlLabels: false,
+        curve: "basis",
+        nodeSpacing: 46,
+        rankSpacing: 58
+      }
+    });
+
+    const diagramScale = document.getElementById("diagramScale");
+    const copyStatus = document.getElementById("copyStatus");
+    let scale = 1;
+
+    function updateScale() {
+      diagramScale.style.transform = `scale(${scale})`;
+      diagramScale.style.width = `${100 / scale}%`;
+    }
+
+    document.getElementById("zoomIn").addEventListener("click", () => {
+      scale = Math.min(1.6, Number((scale + 0.1).toFixed(2)));
+      updateScale();
+    });
+
+    document.getElementById("zoomOut").addEventListener("click", () => {
+      scale = Math.max(0.6, Number((scale - 0.1).toFixed(2)));
+      updateScale();
+    });
+
+    document.getElementById("resetZoom").addEventListener("click", () => {
+      scale = 1;
+      updateScale();
+    });
+
+    document.getElementById("copyMermaid").addEventListener("click", async () => {
+      const source = document.getElementById("mermaidSource").textContent;
+      await navigator.clipboard.writeText(source);
+      copyStatus.textContent = "Copied Mermaid source";
+      setTimeout(() => {
+        copyStatus.textContent = "Editable in any Mermaid-compatible tool";
+      }, 1600);
+    });
+  </script>
+</body>
+</html>
+

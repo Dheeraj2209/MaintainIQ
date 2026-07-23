@@ -1,0 +1,110 @@
+@startuml
+title Offline Training, Runtime Inference, Upstream Telemetry, and Downstream Alerts
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam defaultFontColor #1F2937
+skinparam packageBorderColor #374151
+skinparam packageBackgroundColor #F9FAFB
+skinparam componentBorderColor #374151
+skinparam componentBackgroundColor #FFFFFF
+skinparam nodeBorderColor #2563EB
+skinparam nodeBackgroundColor #EFF6FF
+skinparam cloudBorderColor #7C3AED
+skinparam cloudBackgroundColor #F5F3FF
+skinparam databaseBorderColor #059669
+skinparam databaseBackgroundColor #ECFDF5
+skinparam artifactBorderColor #059669
+skinparam artifactBackgroundColor #ECFDF5
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #D97706
+skinparam arrowColor #374151
+
+top to bottom direction
+
+package "TOP: Cloud / Backend Runtime" as CloudLayer {
+  cloud "MQTT Broker" as Broker
+  component "Backend MQTT Subscriber\nlong-running listener" as Worker
+  component "FastAPI ML Service\nruns inference per window/batch" as API
+  component "Preprocess + Feature Extraction\nsame feature logic as training" as Features
+  artifact "Deployed Trained Model\nmodel.pkl / joblib / ONNX" as Model
+  component "Alert Decision Logic\nhealth state, severity,\nprobable root cause" as AlertLogic
+  database "Telemetry + Prediction Store" as Store
+  component "Dashboard / Report" as Dashboard
+
+  Broker --> Worker : subscribed telemetry stream
+  Worker --> Store : save raw telemetry
+  Worker --> Features : reading window / batch
+  Features --> API : feature vector
+  API --> Model : load / call model
+  API --> AlertLogic : prediction + confidence
+  AlertLogic --> Store : save prediction + alert
+  AlertLogic --> Dashboard : status, trend, alert
+  AlertLogic --> Broker : publish alert topic
+}
+
+package "LOCAL: Offline Training" as TrainingLayer {
+  node "Student Laptop" as Laptop
+  database "Collected / Dataset-Based\nSensor Data" as Dataset
+  component "Training Notebook / Script\nPython + ML libraries" as Training
+  artifact "Saved Model Artifact" as SavedModel
+
+  Dataset --> Training : historical samples
+  Training --> SavedModel : train offline\nand export
+}
+
+package "BOTTOM: Machine + Sensors + ESP32" as FieldLayer {
+  node "Machine\nmotor / pump / fan" as Machine
+  component "Temperature Sensor\nDS18B20 / thermocouple" as Temp
+  component "Vibration Sensor\nADXL345 / MPU6050" as Vib
+  node "ESP32 Sensor Node" as ESP32 {
+    component "Read Sensors" as Read
+    component "Tag + Buffer Record\nmachineId, sensorId, timestamp" as Tag
+    component "MQTT Client" as Client
+    component "Serial Debug Logs\nUSB to laptop" as Serial
+    component "Optional Local Alert\nLED / buzzer" as LocalAlert
+  }
+
+  Machine --> Temp : heat
+  Machine --> Vib : vibration
+  Temp --> Read : sensor value
+  Vib --> Read : sensor value
+  Read --> Tag : raw readings
+  Tag --> Client : valid JSON telemetry
+  Client --> LocalAlert : alert display\nif downstream alert arrives
+}
+
+actor "Operator / Professor Review" as User
+
+SavedModel -[#059669,dashed]-> Model : deploy trained model\nto backend
+Serial -[#D97706,dashed]-> Laptop : serial debugging:\nsensor values, payload format,\nWi-Fi/MQTT errors
+
+Client -[#2563EB,thickness=2]-> Broker : UPSTREAM telemetry\nMQTT topic:\nfactory/{machineId}/telemetry
+Broker -[#FF6B35,thickness=2]-> Client : DOWNSTREAM alert\nMQTT topic:\nfactory/{machineId}/alert
+Dashboard --> User : dashboard alert,\ntrend, recommendation
+User --> Dashboard : acknowledge / inspect /\nrecord maintenance action
+
+note right of API
+  FastAPI does not keep one request open forever.
+  The backend listener receives MQTT messages,
+  groups readings into windows or batches,
+  then calls inference repeatedly.
+end note
+
+note left of TrainingLayer
+  Training is offline on the local machine.
+  Runtime inference happens later in the backend
+  using the exported model artifact.
+end note
+
+legend bottom
+|= Term |= Meaning in our design |
+| Upstream | ESP32 sends machine telemetry to MQTT/cloud |
+| Downstream | Backend sends alert/command back to ESP32 and dashboard |
+| Training | Offline local process that creates the model artifact |
+| Inference | Repeated backend prediction on incoming windows/batches |
+| Serial | USB debugging path before trusting Wi-Fi/MQTT/cloud output |
+endlegend
+@enduml
