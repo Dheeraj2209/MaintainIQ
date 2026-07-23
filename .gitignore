@@ -17,3 +17,6 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# Generated build artifacts (pptx exports, inspect logs, etc.) — not source design docs
+outputs/

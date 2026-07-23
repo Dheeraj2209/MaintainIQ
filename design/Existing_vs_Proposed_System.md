@@ -1,3 +1,5 @@
+> **Superseded:** This comparison predates the multi-sensor (vibration + temperature), multi-machine, root-cause, and maintenance-history scope expansion. See [`DESIGN_BASELINE.md`](DESIGN_BASELINE.md) for the current scope. Kept for historical reference — the comparative analysis of reactive/scheduled/manual/threshold/industrial methods is still valid.
+
 # Existing Systems vs Proposed System
 
 ## Smart Predictive Maintenance System Using Vibration Data

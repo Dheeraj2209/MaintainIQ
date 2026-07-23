@@ -1,3 +1,5 @@
+> **Superseded:** This presentation draft predates the multi-sensor (vibration + temperature), multi-machine, root-cause, and maintenance-history scope expansion. See [`DESIGN_BASELINE.md`](DESIGN_BASELINE.md) for the current scope. Kept for historical reference and reusable slide structure.
+
 # Academic Project Presentation
 
 ## Smart Predictive Maintenance System Using Vibration Data

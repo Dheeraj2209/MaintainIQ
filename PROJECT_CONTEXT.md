@@ -1,3 +1,5 @@
+> **Superseded:** This document describes the original single-machine, vibration-only idea. The scope has since expanded to multi-sensor (vibration + temperature), multi-machine monitoring with root cause identification and maintenance history tracking. See [`design/DESIGN_BASELINE.md`](design/DESIGN_BASELINE.md) for the current scope and [`design/SRS_Document.md`](design/SRS_Document.md) for the full spec. Kept here for historical reference.
+
 # Project Context: Smart Predictive Maintenance Using Vibration Data
 
 ## Project Idea
