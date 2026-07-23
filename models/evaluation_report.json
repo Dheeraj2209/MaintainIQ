@@ -1,0 +1,184 @@
+{
+  "winner": "logistic_regression",
+  "feature_columns": [
+    "vibration_h_mean",
+    "vibration_h_std",
+    "vibration_h_rms",
+    "vibration_h_peak",
+    "vibration_h_peak_to_peak",
+    "vibration_h_kurtosis",
+    "vibration_h_skewness",
+    "vibration_h_crest_factor",
+    "vibration_h_shape_factor",
+    "vibration_h_dominant_freq",
+    "vibration_h_spectral_centroid",
+    "vibration_h_spectral_energy",
+    "vibration_h_low_band_energy_ratio",
+    "vibration_h_mid_band_energy_ratio",
+    "vibration_h_high_band_energy_ratio",
+    "temperature_c"
+  ],
+  "exported_at": "2026-07-23T09:18:16.575536+00:00",
+  "candidates": {
+    "random_forest": {
+      "accuracy": 0.7903846153846154,
+      "false_alarm_count": 9,
+      "missed_fault_count": 406,
+      "mean_confidence": 0.8495095429438029,
+      "confusion_matrix": [
+        [
+          2559,
+          231,
+          0,
+          0
+        ],
+        [
+          283,
+          842,
+          7,
+          2
+        ],
+        [
+          11,
+          260,
+          22,
+          33
+        ],
+        [
+          8,
+          127,
+          19,
+          276
+        ]
+      ],
+      "labels": [
+        "healthy",
+        "degrading",
+        "faulty",
+        "critical"
+      ]
+    },
+    "gradient_boosting": {
+      "accuracy": 0.7256410256410256,
+      "false_alarm_count": 153,
+      "missed_fault_count": 447,
+      "mean_confidence": 0.971550226773514,
+      "confusion_matrix": [
+        [
+          2550,
+          240,
+          0,
+          0
+        ],
+        [
+          377,
+          604,
+          153,
+          0
+        ],
+        [
+          54,
+          159,
+          112,
+          1
+        ],
+        [
+          13,
+          221,
+          66,
+          130
+        ]
+      ],
+      "labels": [
+        "healthy",
+        "degrading",
+        "faulty",
+        "critical"
+      ]
+    },
+    "logistic_regression": {
+      "accuracy": 0.7959401709401709,
+      "false_alarm_count": 99,
+      "missed_fault_count": 273,
+      "mean_confidence": 0.9256921732638219,
+      "confusion_matrix": [
+        [
+          2352,
+          438,
+          0,
+          0
+        ],
+        [
+          5,
+          1030,
+          99,
+          0
+        ],
+        [
+          1,
+          135,
+          181,
+          9
+        ],
+        [
+          4,
+          133,
+          131,
+          162
+        ]
+      ],
+      "labels": [
+        "healthy",
+        "degrading",
+        "faulty",
+        "critical"
+      ]
+    },
+    "svm": {
+      "accuracy": 0.782051282051282,
+      "false_alarm_count": 120,
+      "missed_fault_count": 159,
+      "mean_confidence": 0.851143185690702,
+      "confusion_matrix": [
+        [
+          2470,
+          317,
+          3,
+          0
+        ],
+        [
+          91,
+          926,
+          112,
+          5
+        ],
+        [
+          0,
+          137,
+          160,
+          29
+        ],
+        [
+          0,
+          22,
+          304,
+          104
+        ]
+      ],
+      "labels": [
+        "healthy",
+        "degrading",
+        "faulty",
+        "critical"
+      ]
+    }
+  },
+  "confidence_threshold_analysis": {
+    "available": true,
+    "median_confidence_correct": 0.9700139384330745,
+    "median_confidence_incorrect": 0.9995946148549285,
+    "n_correct": 3725,
+    "n_incorrect": 955,
+    "suggested_threshold": 0.985
+  }
+}

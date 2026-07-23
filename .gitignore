@@ -18,5 +18,11 @@ __pycache__/
 .venv/
 venv/
 
-# Generated build artifacts (pptx exports, inspect logs, etc.) — not source design docs
-outputs/
+# Generated build artifacts (pptx exports, inspect logs, etc.) — not source design docs.
+# Anchored to root so it doesn't also match research/**/outputs/, which holds
+# committed reference data (cached feature CSVs), not disposable build output.
+/outputs/
+
+# Runtime SQLite DB produced by src/training/run_pipeline.py — regenerate by
+# re-running the pipeline, not a source artifact to track.
+/maintainiq.db
