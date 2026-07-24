@@ -19,12 +19,15 @@ of columns every downstream module actually filters or sorts on
 real columns for queryability.
 """
 import json
+import os
 import sqlite3
 from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "maintainiq.db"
+# Overridable via MAINTAINIQ_DB_PATH (e.g. to point at a mounted volume in
+# Docker) since the file lives outside the repo tree in that case.
+DEFAULT_DB_PATH = Path(os.environ.get("MAINTAINIQ_DB_PATH", str(Path(__file__).resolve().parents[2] / "maintainiq.db")))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS machines (
