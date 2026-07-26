@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+/* Health-state palette exposed as Tailwind theme tokens so components can use
+   bg-healthy / text-critical / border-degrading etc. Kept consistent with the
+   backend's four states + unknown. */
+@theme {
+  --color-healthy: #16a34a;
+  --color-degrading: #f59e0b;
+  --color-faulty: #ea580c;
+  --color-critical: #dc2626;
+  --color-unknown: #6b7280;
+}
+
+body {
+  margin: 0;
+  background-color: #f1f5f9;
+  color: #0f172a;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
