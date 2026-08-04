@@ -42,6 +42,8 @@ class Alert(BaseModel):
     message: Optional[str] = None
     status: str
     source: Optional[str] = None
+    acknowledged_at: Optional[str] = None
+    acknowledged_by: Optional[int] = None
 
 
 class MaintenanceRecord(BaseModel):
