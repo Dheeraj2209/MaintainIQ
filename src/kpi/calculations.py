@@ -178,6 +178,21 @@ def _maintenance_for_machine(conn, machine_id: str) -> dict:
         durations.append((resolved - opened).total_seconds() / 3600.0)
     avg_resolution_hours = round(sum(durations) / len(durations), 2) if durations else None
 
+    cur = conn.execute(
+        """SELECT opened_at, acknowledged_at FROM alerts
+           WHERE machine_id = ? AND acknowledged_at IS NOT NULL""",
+        (machine_id,),
+    )
+    ack_durations = []
+    for row in cur.fetchall():
+        try:
+            opened = datetime.fromisoformat(row["opened_at"])
+            acknowledged = datetime.fromisoformat(row["acknowledged_at"])
+        except (ValueError, TypeError):
+            continue
+        ack_durations.append((acknowledged - opened).total_seconds() / 3600.0)
+    avg_acknowledgement_hours = round(sum(ack_durations) / len(ack_durations), 2) if ack_durations else None
+
     return {
         "machine_id": machine_id,
         "last_maintenance_at": last_maintenance_at(conn, machine_id),
@@ -185,6 +200,7 @@ def _maintenance_for_machine(conn, machine_id: str) -> dict:
         "completed_maintenance_count": completed,
         "unresolved_alert_count": unresolved,
         "avg_alert_resolution_hours": avg_resolution_hours,
+        "avg_alert_acknowledgement_hours": avg_acknowledgement_hours,
         # "Due for inspection" is a demo heuristic: never serviced, or an
         # unresolved alert is open. A real deployment would use per-machine
         # maintenance intervals (not available in the dataset).

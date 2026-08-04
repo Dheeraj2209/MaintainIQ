@@ -55,6 +55,17 @@ class MaintenanceRecord(BaseModel):
     created_at: str
 
 
+class MaintenanceSummary(BaseModel):
+    machine_id: str
+    last_maintenance_at: Optional[str] = None
+    days_since_last_maintenance: Optional[int] = None
+    completed_maintenance_count: int
+    unresolved_alert_count: int
+    avg_alert_resolution_hours: Optional[float] = None
+    avg_alert_acknowledgement_hours: Optional[float] = None
+    due_for_inspection: bool
+
+
 class MaintenanceCreate(BaseModel):
     machine_id: str
     performed_at: str
@@ -64,7 +75,7 @@ class MaintenanceCreate(BaseModel):
 
 class MachineDetail(BaseModel):
     health: MachineSummary
-    maintenance: dict
+    maintenance: MaintenanceSummary
     alerts: list[Alert]
     maintenance_history: list[MaintenanceRecord]
 

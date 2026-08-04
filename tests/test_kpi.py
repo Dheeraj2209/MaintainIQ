@@ -75,3 +75,20 @@ def test_summary_rollup(conn):
     assert s["health_state_counts"] == {"critical": 1, "healthy": 1}
     assert s["open_alert_count"] == 1
     assert s["machines_due_for_inspection"] == 2
+
+
+def test_maintenance_kpis_avg_acknowledgement_hours_none_when_unacknowledged(conn):
+    m1 = kpi.maintenance_kpis(conn, "m1")[0]
+    assert m1["avg_alert_acknowledgement_hours"] is None  # neither seeded alert is acknowledged
+
+
+def test_maintenance_kpis_avg_acknowledgement_hours_computed(conn):
+    from datetime import datetime, timezone
+    # Acknowledge the open alert (id 2, opened 2003-10-22T13:00:00+00:00) 30 minutes later.
+    conn.execute(
+        "UPDATE alerts SET acknowledged_at = ?, acknowledged_by = 1 WHERE id = 2",
+        ("2003-10-22T13:30:00+00:00",),
+    )
+    conn.commit()
+    m1 = kpi.maintenance_kpis(conn, "m1")[0]
+    assert m1["avg_alert_acknowledgement_hours"] == round(30 / 60, 2)
