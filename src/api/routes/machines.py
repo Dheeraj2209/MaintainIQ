@@ -38,7 +38,8 @@ def get_machine(machine_id: str, db=Depends(get_db)):
 
     alert_rows = db.execute(
         """SELECT id, machine_id, opened_at, resolved_at, severity, health_state,
-                  probable_cause, message, status, source
+                  probable_cause, message, status, source,
+                  acknowledged_at, acknowledged_by
            FROM alerts WHERE machine_id = ? ORDER BY opened_at DESC""",
         (machine_id,),
     ).fetchall()

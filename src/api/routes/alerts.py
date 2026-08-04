@@ -32,7 +32,8 @@ def list_alerts(
 
     rows = db.execute(
         f"""SELECT id, machine_id, opened_at, resolved_at, severity, health_state,
-                   probable_cause, message, status, source
+                   probable_cause, message, status, source,
+                   acknowledged_at, acknowledged_by
             FROM alerts {where}
             ORDER BY (status = 'open') DESC, opened_at DESC
             LIMIT ?""",

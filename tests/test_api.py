@@ -120,3 +120,21 @@ def test_acknowledge_alert_allows_all_three_roles(auth_client):
 
 def test_acknowledge_alert_requires_login(anon_client):
     assert anon_client.post("/api/alerts/2/acknowledge").status_code == 401
+
+
+def test_list_alerts_surfaces_acknowledgement(client):
+    client.post("/api/alerts/2/acknowledge")
+    resp = client.get("/api/alerts")
+    assert resp.status_code == 200
+    body = {a["id"]: a for a in resp.json()}
+    assert body[2]["acknowledged_at"] is not None
+    assert body[2]["acknowledged_by"] is not None
+
+
+def test_machine_detail_surfaces_acknowledgement(client):
+    client.post("/api/alerts/2/acknowledge")
+    resp = client.get("/api/machines/m1")
+    assert resp.status_code == 200
+    alerts = {a["id"]: a for a in resp.json()["alerts"]}
+    assert alerts[2]["acknowledged_at"] is not None
+    assert alerts[2]["acknowledged_by"] is not None
