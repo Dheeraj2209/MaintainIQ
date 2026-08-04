@@ -78,7 +78,9 @@ CREATE TABLE IF NOT EXISTS alerts (
     message TEXT,
     status TEXT NOT NULL DEFAULT 'open',
     source TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    acknowledged_at TEXT,
+    acknowledged_by INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_machine_status ON alerts(machine_id, status);
 
@@ -136,6 +138,11 @@ def get_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    for column in ("acknowledged_at TEXT", "acknowledged_by INTEGER"):
+        try:
+            conn.execute(f"ALTER TABLE alerts ADD COLUMN {column}")
+        except sqlite3.OperationalError:
+            pass  # column already exists (fresh DB created via SCHEMA above)
     conn.commit()
 
 
