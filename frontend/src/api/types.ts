@@ -35,6 +35,8 @@ export interface Alert {
   message: string | null
   status: string
   source: string | null
+  acknowledged_at: string | null
+  acknowledged_by: number | null
 }
 
 export interface MaintenanceRecord {
@@ -60,6 +62,7 @@ export interface MaintenanceSummary {
   completed_maintenance_count: number
   unresolved_alert_count: number
   avg_alert_resolution_hours: number | null
+  avg_alert_acknowledgement_hours: number | null
   due_for_inspection: boolean
 }
 
@@ -144,7 +147,7 @@ export interface SimulateFaultResponse {
 }
 
 // Wire shape broadcast over /api/ws (src/realtime/manager.py).
-export type LiveEventType = 'alert_created' | 'alert_escalated' | 'alert_resolved'
+export type LiveEventType = 'alert_created' | 'alert_escalated' | 'alert_resolved' | 'alert_acknowledged'
 
 export interface LiveEvent {
   type: LiveEventType

@@ -77,6 +77,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  acknowledgeAlert: (id: number) =>
+    request<Alert>(`/alerts/${id}/acknowledge`, { method: 'POST' }),
 
   listUsers: () => request<UserOut[]>('/users'),
   createUser: (payload: UserCreate) =>
