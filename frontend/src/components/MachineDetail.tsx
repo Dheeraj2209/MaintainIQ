@@ -122,6 +122,11 @@ export function MachineDetail({ machineId, onLogged }: Props) {
               value={maintenance.avg_alert_resolution_hours != null ? maintenance.avg_alert_resolution_hours.toFixed(2) : '—'}
               mono
             />
+            <Fact
+              label="Avg acknowledgement (h)"
+              value={maintenance.avg_alert_acknowledgement_hours != null ? maintenance.avg_alert_acknowledgement_hours.toFixed(2) : '—'}
+              mono
+            />
           </dl>
           {maintenance.due_for_inspection && (
             <p className="mt-1 text-xs font-medium text-accent-2">Due for inspection</p>
