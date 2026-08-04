@@ -5,6 +5,8 @@ import { healthClasses, healthLabel } from './healthStyles'
 import { TrendChart } from './TrendChart'
 import { AlertsPanel } from './AlertsPanel'
 import { MaintenanceForm } from './MaintenanceForm'
+import { Badge } from './ui/badge'
+import { Select } from './ui/input'
 
 interface Props {
   machineId: string
@@ -51,14 +53,14 @@ export function MachineDetail({ machineId, onLogged }: Props) {
 
   if (error) {
     return (
-      <section className="rounded-lg border border-critical/40 bg-critical/5 p-4 text-critical">
+      <section className="rounded-2xl border border-critical/40 bg-critical/10 p-4 text-critical backdrop-blur">
         {error}
       </section>
     )
   }
 
   if (!detail) {
-    return <section className="rounded-lg border border-slate-200 bg-white p-4 text-slate-500">Loading…</section>
+    return <section className="glass rounded-2xl p-4 text-text-muted">Loading…</section>
   }
 
   const { health, maintenance, alerts, maintenance_history } = detail
@@ -72,37 +74,32 @@ export function MachineDetail({ machineId, onLogged }: Props) {
   }
 
   return (
-    <section className={`rounded-lg border border-l-4 ${hc.border} border-slate-200 bg-white p-4 shadow-sm`}>
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-slate-800">{health.machine_id}</h2>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${hc.badge}`}>
-          {healthLabel(health.health_state)}
-        </span>
+    <section className={`glass relative overflow-hidden rounded-2xl border-l-2 ${hc.border} p-5`}>
+      <div aria-hidden className={`pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full opacity-20 blur-3xl ${hc.dot}`} />
+      <header className="relative flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-mono text-lg font-semibold text-text">{health.machine_id}</h2>
+        <Badge variant={health.health_state}>{healthLabel(health.health_state)}</Badge>
       </header>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
         <Fact label="Probable cause" value={health.probable_cause ?? '—'} />
-        <Fact label="Risk score" value={String(health.risk_score)} />
-        <Fact label="Confidence" value={health.confidence != null ? `${Math.round(health.confidence * 100)}%` : '—'} />
+        <Fact label="Risk score" value={String(health.risk_score)} mono />
+        <Fact label="Confidence" value={health.confidence != null ? `${Math.round(health.confidence * 100)}%` : '—'} mono />
         <Fact label="Vibration" value={health.vibration_severity} />
         <Fact label="Temperature" value={health.temperature_severity} />
-        <Fact label="Last reading" value={health.last_reading_at ?? '—'} />
+        <Fact label="Last reading" value={health.last_reading_at ?? '—'} mono />
       </dl>
 
       <div className="mt-4">
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <label className="flex items-center gap-2 text-sm text-text-muted">
           Metric
-          <select
-            value={metric}
-            onChange={(e) => setMetric(e.target.value)}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
-          >
+          <Select value={metric} onChange={(e) => setMetric(e.target.value)}>
             {METRICS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <div className="mt-2">
           <TrendChart metric={metric} points={points} />
@@ -111,27 +108,29 @@ export function MachineDetail({ machineId, onLogged }: Props) {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-700">Maintenance</h3>
+          <h3 className="text-sm font-semibold text-text">Maintenance</h3>
           <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <Fact label="Last serviced" value={maintenance.last_maintenance_at ?? 'never'} />
+            <Fact label="Last serviced" value={maintenance.last_maintenance_at ?? 'never'} mono />
             <Fact
               label="Days since"
               value={maintenance.days_since_last_maintenance != null ? String(maintenance.days_since_last_maintenance) : '—'}
+              mono
             />
-            <Fact label="Records" value={String(maintenance.completed_maintenance_count)} />
+            <Fact label="Records" value={String(maintenance.completed_maintenance_count)} mono />
             <Fact
               label="Avg resolution (h)"
               value={maintenance.avg_alert_resolution_hours != null ? maintenance.avg_alert_resolution_hours.toFixed(2) : '—'}
+              mono
             />
           </dl>
           {maintenance.due_for_inspection && (
-            <p className="mt-1 text-xs font-medium text-faulty">Due for inspection</p>
+            <p className="mt-1 text-xs font-medium text-accent-2">Due for inspection</p>
           )}
           <MaintenanceForm machineId={health.machine_id} onSubmit={handleLog} />
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-slate-700">Alerts</h3>
+          <h3 className="text-sm font-semibold text-text">Alerts</h3>
           <div className="mt-1">
             <AlertsPanel alerts={alerts} onSelect={() => {}} />
           </div>
@@ -140,10 +139,10 @@ export function MachineDetail({ machineId, onLogged }: Props) {
 
       {maintenance_history.length > 0 && (
         <div className="mt-4">
-          <h3 className="text-sm font-semibold text-slate-700">Maintenance history</h3>
+          <h3 className="text-sm font-semibold text-text">Maintenance history</h3>
           <table className="mt-1 w-full text-left text-sm">
             <thead>
-              <tr className="text-xs uppercase text-slate-400">
+              <tr className="text-xs uppercase text-text-muted">
                 <th className="py-1 pr-3">When</th>
                 <th className="py-1 pr-3">Description</th>
                 <th className="py-1">Technician</th>
@@ -151,8 +150,8 @@ export function MachineDetail({ machineId, onLogged }: Props) {
             </thead>
             <tbody>
               {maintenance_history.map((r) => (
-                <tr key={r.id} className="border-t border-slate-100">
-                  <td className="py-1 pr-3">{r.performed_at}</td>
+                <tr key={r.id} className="border-t border-border">
+                  <td className="py-1 pr-3 font-mono">{r.performed_at}</td>
                   <td className="py-1 pr-3">{r.description ?? '—'}</td>
                   <td className="py-1">{r.technician ?? '—'}</td>
                 </tr>
@@ -165,11 +164,11 @@ export function MachineDetail({ machineId, onLogged }: Props) {
   )
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="text-slate-700">{value}</dd>
+      <dt className="text-xs uppercase tracking-wide text-text-muted">{label}</dt>
+      <dd className={mono ? 'font-mono text-text' : 'text-text'}>{value}</dd>
     </div>
   )
 }

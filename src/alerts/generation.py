@@ -30,7 +30,7 @@ SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3}
 ABNORMAL_STATES = set(SEVERITY_BY_STATE)
 
 
-def _message(machine_id: str, health_state: str, probable_cause) -> str:
+def format_alert_message(machine_id: str, health_state: str, probable_cause) -> str:
     cause = probable_cause if probable_cause else "unknown"
     return f"Machine {machine_id} is {health_state} (probable cause: {cause})"
 
@@ -65,7 +65,7 @@ def generate_alerts(long_df) -> list:
                         "severity": severity,
                         "health_state": state,
                         "probable_cause": row.probable_cause,
-                        "message": _message(machine_id, state, row.probable_cause),
+                        "message": format_alert_message(machine_id, state, row.probable_cause),
                         "status": "open",
                         "source": row.source,
                         "created_at": now,
@@ -76,7 +76,7 @@ def generate_alerts(long_df) -> list:
                     open_alert["severity"] = severity
                     open_alert["health_state"] = state
                     open_alert["probable_cause"] = row.probable_cause
-                    open_alert["message"] = _message(machine_id, state, row.probable_cause)
+                    open_alert["message"] = format_alert_message(machine_id, state, row.probable_cause)
             elif open_alert is not None:
                 open_alert["resolved_at"] = timestamp
                 open_alert["status"] = "resolved"

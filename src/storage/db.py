@@ -91,13 +91,45 @@ CREATE TABLE IF NOT EXISTS maintenance_records (
     technician TEXT,
     created_at TEXT NOT NULL
 );
+
+-- Auth + RBAC. Only 3 roles are supported (see src/auth/ — derived from
+-- SRS 2.3's Maintenance Operator / Supervisor user classes plus an admin
+-- role for user management); enforced with a CHECK rather than a separate
+-- roles table since the set is fixed and small.
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    hashed_password TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('admin','supervisor','operator')),
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
+-- One row per email actually sent (not per alert), so this table doubles as
+-- both the Mailpit-backing audit log and the /notifications page's data
+-- source without a join fan-out.
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_id INTEGER REFERENCES alerts(id),
+    recipient_email TEXT NOT NULL,
+    recipient_role TEXT,
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'sent',
+    created_at TEXT NOT NULL
+);
 """
 
 _FEATURE_PREFIX = ("vibration_h_", "vibration_v_")
 
 
 def get_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    # check_same_thread=False: FastAPI runs sync endpoints and dependency
+    # teardown across an AnyIO threadpool, so a single request's connection may
+    # be created, used, and closed on different threads. Each request still gets
+    # its own connection (no concurrent sharing), so this is safe.
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -147,6 +179,26 @@ def insert_readings(conn: sqlite3.Connection, long_df: pd.DataFrame) -> None:
         rows,
     )
     conn.commit()
+
+
+def insert_single_reading(conn: sqlite3.Connection, reading: dict) -> int:
+    """Single-row counterpart to insert_readings, for the live/demo path
+    (src/prediction/live.py) where there is one new reading, not a batch
+    dataframe. `reading` keys: machine_id, timestamp (ISO string), sensor_id,
+    vibration_h_rms, vibration_h_kurtosis, vibration_h_high_band_energy_ratio,
+    temperature_c, temperature_is_synthetic, rul_hours. Returns the new row's id."""
+    cur = conn.execute(
+        """INSERT INTO readings
+           (machine_id, timestamp, sensor_id, vibration_h_rms, vibration_h_kurtosis,
+            vibration_h_high_band_energy_ratio, temperature_c, temperature_is_synthetic,
+            rul_hours, features_json)
+           VALUES (:machine_id, :timestamp, :sensor_id, :vibration_h_rms, :vibration_h_kurtosis,
+                   :vibration_h_high_band_energy_ratio, :temperature_c, :temperature_is_synthetic,
+                   :rul_hours, '{}')""",
+        reading,
+    )
+    conn.commit()
+    return cur.lastrowid
 
 
 def get_reading_id_map(conn: sqlite3.Connection) -> dict:

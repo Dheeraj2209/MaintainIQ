@@ -88,3 +88,67 @@ export interface KpiSummary {
   machines_due_for_inspection: number
   prediction: PredictionKpi
 }
+
+export type Role = 'admin' | 'supervisor' | 'operator'
+
+export interface UserOut {
+  id: number
+  email: string
+  name: string
+  role: Role
+  is_active: boolean
+  created_at: string
+}
+
+export interface UserCreate {
+  email: string
+  name: string
+  password: string
+  role: Role
+}
+
+export interface UserUpdate {
+  name?: string
+  role?: Role
+  is_active?: boolean
+  password?: string
+}
+
+export interface NotificationOut {
+  id: number
+  alert_id: number | null
+  recipient_email: string
+  recipient_role: string | null
+  subject: string
+  body: string
+  status: string
+  created_at: string
+}
+
+// Demand-triggered fault simulation (src/api/routes/demo.py) — the "no
+// hardware needed" realtime demo. `severity` maps to health_state directly,
+// not to the Alert.severity (low/medium/high) scale.
+export type DemoSeverity = 'healthy' | 'degrading' | 'faulty' | 'critical'
+
+export interface SimulateFaultRequest {
+  machine_id: string
+  severity: DemoSeverity
+}
+
+export interface SimulateFaultResponse {
+  machine_id: string
+  health_state: string
+  probable_cause: string | null
+  alert: Alert | null
+  emails_sent: number
+}
+
+// Wire shape broadcast over /api/ws (src/realtime/manager.py).
+export type LiveEventType = 'alert_created' | 'alert_escalated' | 'alert_resolved'
+
+export interface LiveEvent {
+  type: LiveEventType
+  machine_id: string
+  alert: Alert
+  at: string
+}

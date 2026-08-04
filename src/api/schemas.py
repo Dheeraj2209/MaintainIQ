@@ -5,9 +5,11 @@ module mixes "available" payloads with `{"status": "not_applicable", ...}`
 markers (see src/kpi/calculations.py), and pinning every nested shape here
 would duplicate that logic without adding safety for a demo dashboard.
 """
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
+
+Role = Literal["admin", "supervisor", "operator"]
 
 
 class MachineSummary(BaseModel):
@@ -71,3 +73,58 @@ class KpiSummary(BaseModel):
     open_alert_count: int
     machines_due_for_inspection: int
     prediction: dict
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    name: str
+    role: Role
+    is_active: bool
+    created_at: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserCreate(BaseModel):
+    email: str
+    name: str
+    password: str
+    role: Role
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[Role] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+
+
+class NotificationOut(BaseModel):
+    id: int
+    alert_id: Optional[int] = None
+    recipient_email: str
+    recipient_role: Optional[str] = None
+    subject: str
+    body: str
+    status: str
+    created_at: str
+
+
+Severity = Literal["healthy", "degrading", "faulty", "critical"]
+
+
+class SimulateFaultRequest(BaseModel):
+    machine_id: str
+    severity: Severity
+
+
+class SimulateFaultResponse(BaseModel):
+    machine_id: str
+    health_state: str
+    probable_cause: Optional[str] = None
+    alert: Optional[Alert] = None
+    emails_sent: int

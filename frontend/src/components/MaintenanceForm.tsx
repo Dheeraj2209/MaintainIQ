@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 import type { MaintenanceCreate } from '../api/types'
+import { Input, Label } from './ui/input'
+import { Button } from './ui/button'
 
 interface Props {
   machineId: string
@@ -15,7 +18,7 @@ export function MaintenanceForm({ machineId, onSubmit }: Props) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [busy, setBusy] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setStatus({ kind: 'idle' })
@@ -39,47 +42,29 @@ export function MaintenanceForm({ machineId, onSubmit }: Props) {
     }
   }
 
-  const field = 'rounded border border-slate-300 px-2 py-1 text-sm'
-
   return (
     <form onSubmit={handleSubmit} className="mt-3 grid gap-2">
-      <strong className="text-sm text-slate-700">Log a maintenance record</strong>
-      <label className="grid gap-0.5 text-xs text-slate-500">
+      <strong className="text-sm text-text">Log a maintenance record</strong>
+      <Label>
         When
-        <input
-          type="datetime-local"
-          required
-          value={when}
-          onChange={(e) => setWhen(e.target.value)}
-          className={field}
-        />
-      </label>
-      <label className="grid gap-0.5 text-xs text-slate-500">
+        <Input type="datetime-local" required value={when} onChange={(e) => setWhen(e.target.value)} />
+      </Label>
+      <Label>
         Description
-        <input
+        <Input
           type="text"
           value={description}
           placeholder="e.g. re-greased bearing"
           onChange={(e) => setDescription(e.target.value)}
-          className={field}
         />
-      </label>
-      <label className="grid gap-0.5 text-xs text-slate-500">
+      </Label>
+      <Label>
         Technician
-        <input
-          type="text"
-          value={technician}
-          onChange={(e) => setTechnician(e.target.value)}
-          className={field}
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={busy}
-        className="justify-self-start rounded bg-healthy px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
-      >
+        <Input type="text" value={technician} onChange={(e) => setTechnician(e.target.value)} />
+      </Label>
+      <Button type="submit" variant="accent" size="sm" disabled={busy} className="justify-self-start">
         Log maintenance
-      </button>
+      </Button>
       {status.kind !== 'idle' && (
         <p className={`text-xs ${status.kind === 'ok' ? 'text-healthy' : 'text-critical'}`}>{status.message}</p>
       )}

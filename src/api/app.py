@@ -11,17 +11,30 @@ frontend development, run ``npm run dev`` instead — the Vite dev server proxie
 """
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.api.routes import alerts, kpis, machines, maintenance
+from src.api.routes import alerts, auth, demo, kpis, machines, maintenance, notifications, users
+from src.auth.deps import get_current_user
+from src.realtime.routes import realtime
 
-app = FastAPI(title="MaintainIQ API", version="0.4.0")
+app = FastAPI(title="MaintainIQ API", version="0.5.0")
 
-# API routers share the /api prefix so the dashboard mount at "/" below does
-# not shadow them.
+# auth.router is reachable while logged out (you can't require a session to
+# create one). users.router, notifications.router, demo.router, and
+# realtime.router bake their own role requirement in via `dependencies=` on
+# the APIRouter itself (admin-only, admin+supervisor, admin-only, session-only
+# respectively). Every other API router just requires get_current_user. API
+# routers share the /api prefix so the SPA catch-all below does not shadow
+# them.
+app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(realtime.router, prefix="/api")
+app.include_router(demo.router, prefix="/api")
 for module in (machines, alerts, maintenance, kpis):
-    app.include_router(module.router, prefix="/api")
+    app.include_router(module.router, prefix="/api", dependencies=[Depends(get_current_user)])
 
 
 @app.get("/api/health", tags=["meta"])
@@ -30,12 +43,27 @@ def health_check():
 
 
 # Built React SPA at the site root. StaticFiles ships with Starlette (a FastAPI
-# dependency) — no extra requirement. Mounted last so /api/* wins. Prefer the
-# Vite build output; fall back to the legacy vanilla dashboard if it has not
-# been built yet (``cd frontend && npm run build``).
+# dependency) — no extra requirement. Registered last so /api/* wins. Prefer
+# the Vite build output; fall back to the legacy vanilla dashboard if it has
+# not been built yet (``cd frontend && npm run build``).
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SPA_DIR = _REPO_ROOT / "frontend" / "dist"
 _LEGACY_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "static"
 _WEB_DIR = _SPA_DIR if _SPA_DIR.exists() else _LEGACY_DIR
+
 if _WEB_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="dashboard")
+    _ASSETS_DIR = _WEB_DIR / "assets"
+    if _ASSETS_DIR.exists():
+        app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets")
+
+    # Catch-all so client-side routes (e.g. /machines/m1) survive a hard
+    # refresh or direct link: StaticFiles(html=True) alone only falls back to
+    # index.html for directory-like paths, not arbitrary sub-routes. Anything
+    # that matches a real file (favicon, manifest, etc.) is served directly;
+    # everything else gets index.html and React Router takes over client-side.
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str):
+        candidate = _WEB_DIR / full_path
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_WEB_DIR / "index.html")

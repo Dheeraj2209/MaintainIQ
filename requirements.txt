@@ -9,3 +9,5 @@ pydantic
 joblib
 pytest
 httpx
+bcrypt
+pyjwt

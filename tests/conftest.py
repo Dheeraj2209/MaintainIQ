@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 
 import pytest
 
+from src.auth.security import hash_password
+from src.auth.seed import DEMO_USERS
 from src.storage.db import SCHEMA
 
 
@@ -17,6 +19,10 @@ def _iso(y, mo, d, h=0, mi=0, s=0):
 
 
 NOW = datetime.now(timezone.utc).isoformat()
+
+# Hashed once at import time — bcrypt is deliberately slow, and re-hashing
+# for every test's fresh DB would noticeably slow the suite down.
+_DEMO_USER_ROWS = [(email, name, hash_password(pw), role) for email, name, pw, role in DEMO_USERS]
 
 
 def _populate(conn: sqlite3.Connection) -> None:
@@ -75,6 +81,12 @@ def _populate(conn: sqlite3.Connection) -> None:
              "critical", "bearing_wear", "m1 critical", "open", "ml", NOW),
         ],
     )
+
+    conn.executemany(
+        """INSERT INTO users (email, name, hashed_password, role, is_active, created_at)
+           VALUES (?, ?, ?, ?, 1, ?)""",
+        [(email, name, hashed, role, NOW) for email, name, hashed, role in _DEMO_USER_ROWS],
+    )
     conn.commit()
 
 
@@ -97,15 +109,17 @@ def conn(db_path):
 
 
 @pytest.fixture
-def client(db_path):
-    """TestClient with get_db overridden to use the temp DB."""
-    from fastapi.testclient import TestClient
-
+def _db_override(db_path):
+    """Registers get_db override onto the temp DB; cleans up after the test."""
     from src.api.app import app
     from src.api.deps import get_db
 
     def _override():
-        c = sqlite3.connect(db_path)
+        # check_same_thread=False: matches src.storage.db.get_connection — the
+        # websocket route resolves this sync dependency via AnyIO's threadpool
+        # but uses the connection from its own async endpoint body, so creation
+        # and use can land on different threads.
+        c = sqlite3.connect(db_path, check_same_thread=False)
         c.row_factory = sqlite3.Row
         try:
             yield c
@@ -113,6 +127,57 @@ def client(db_path):
             c.close()
 
     app.dependency_overrides[get_db] = _override
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(_db_override):
+    """TestClient pre-authenticated as admin. Most existing tests exercise
+    business logic (machines/alerts/kpis), not auth itself, so they should not
+    need to care that routes are now behind a login — RBAC-specific tests use
+    `auth_client`/`anon_client` instead."""
+    from fastapi.testclient import TestClient
+
+    from src.api.app import app
+
+    with TestClient(app) as test_client:
+        email, _name, password, _role = DEMO_USERS[0]  # admin
+        resp = test_client.post("/api/auth/login", json={"email": email, "password": password})
+        assert resp.status_code == 200, resp.text
+        yield test_client
+
+
+@pytest.fixture
+def auth_client(_db_override):
+    """Factory fixture: auth_client("supervisor") -> TestClient logged in as
+    the demo user for that role."""
+    from fastapi.testclient import TestClient
+
+    from src.api.app import app
+
+    created = []
+
+    def _make(role: str):
+        email, _name, password, _role = next(u for u in DEMO_USERS if u[3] == role)
+        test_client = TestClient(app)
+        resp = test_client.post("/api/auth/login", json={"email": email, "password": password})
+        assert resp.status_code == 200, resp.text
+        created.append(test_client)
+        return test_client
+
+    yield _make
+
+    for test_client in created:
+        test_client.close()
+
+
+@pytest.fixture
+def anon_client(_db_override):
+    """TestClient with no session cookie, for testing the unauthenticated path."""
+    from fastapi.testclient import TestClient
+
+    from src.api.app import app
+
     with TestClient(app) as test_client:
         yield test_client
-    app.dependency_overrides.clear()

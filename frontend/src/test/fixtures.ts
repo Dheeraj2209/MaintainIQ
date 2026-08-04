@@ -6,7 +6,9 @@ import type {
   KpiSummary,
   MachineDetail,
   MachineSummary,
+  NotificationOut,
   TrendPoint,
+  UserOut,
 } from '../api/types'
 
 export const machineSummaries: MachineSummary[] = [
@@ -88,3 +90,55 @@ export const machineDetail: MachineDetail = {
   alerts: openAlerts,
   maintenance_history: [],
 }
+
+export const adminUser: UserOut = {
+  id: 1,
+  email: 'admin@maintainiq.local',
+  name: 'Ada Admin',
+  role: 'admin',
+  is_active: true,
+  created_at: '2026-01-01T00:00:00+00:00',
+}
+
+export const supervisorUser: UserOut = {
+  id: 2,
+  email: 'supervisor@maintainiq.local',
+  name: 'Sam Supervisor',
+  role: 'supervisor',
+  is_active: true,
+  created_at: '2026-01-01T00:00:00+00:00',
+}
+
+export const operatorUser: UserOut = {
+  id: 3,
+  email: 'operator@maintainiq.local',
+  name: 'Ollie Operator',
+  role: 'operator',
+  is_active: true,
+  created_at: '2026-01-01T00:00:00+00:00',
+}
+
+export const users: UserOut[] = [adminUser, supervisorUser, operatorUser]
+
+export const notifications: NotificationOut[] = [
+  {
+    id: 1,
+    alert_id: 2,
+    recipient_email: 'admin@maintainiq.local',
+    recipient_role: 'admin',
+    subject: 'MaintainIQ CRITICAL: m1 needs attention',
+    body: 'Machine: m1\nHealth state: critical\n',
+    status: 'sent',
+    created_at: '2003-10-22T13:00:05+00:00',
+  },
+  {
+    id: 2,
+    alert_id: 2,
+    recipient_email: 'supervisor@maintainiq.local',
+    recipient_role: 'supervisor',
+    subject: 'MaintainIQ CRITICAL: m1 needs attention',
+    body: 'Machine: m1\nHealth state: critical\n',
+    status: 'failed',
+    created_at: '2003-10-22T13:00:05+00:00',
+  },
+]
