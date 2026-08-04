@@ -21,7 +21,7 @@ describe('MachineDetail', () => {
 
     const select = await screen.findByLabelText(/metric/i)
     expect(select).toBeInTheDocument()
-    expect(await screen.findByRole('img', { name: /vibration_rms/i })).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: /vibration_h_rms/i })).toBeInTheDocument()
   })
 
   it('refetches trends when the metric changes', async () => {

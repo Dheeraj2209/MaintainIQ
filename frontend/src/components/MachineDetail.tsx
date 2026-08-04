@@ -14,16 +14,16 @@ interface Props {
 }
 
 const METRICS = [
-  { value: 'vibration_rms', label: 'Vibration RMS' },
-  { value: 'kurtosis', label: 'Kurtosis' },
-  { value: 'band_energy_ratio', label: 'Band energy ratio' },
+  { value: 'vibration_h_rms', label: 'Vibration RMS' },
+  { value: 'vibration_h_kurtosis', label: 'Kurtosis' },
+  { value: 'vibration_h_high_band_energy_ratio', label: 'Band energy ratio' },
   { value: 'temperature_c', label: 'Temperature (°C)' },
 ]
 
 export function MachineDetail({ machineId, onLogged }: Props) {
   const [detail, setDetail] = useState<Detail | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [metric, setMetric] = useState('vibration_rms')
+  const [metric, setMetric] = useState('vibration_h_rms')
   const [points, setPoints] = useState<TrendPoint[]>([])
   const [reloadKey, setReloadKey] = useState(0)
 
