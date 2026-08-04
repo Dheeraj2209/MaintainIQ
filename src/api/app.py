@@ -43,13 +43,11 @@ def health_check():
 
 
 # Built React SPA at the site root. StaticFiles ships with Starlette (a FastAPI
-# dependency) — no extra requirement. Registered last so /api/* wins. Prefer
-# the Vite build output; fall back to the legacy vanilla dashboard if it has
-# not been built yet (``cd frontend && npm run build``).
+# dependency) — no extra requirement. Registered last so /api/* wins. Requires
+# the Vite build to exist (``cd frontend && npm run build``); until then, only
+# /api/* routes are served.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_SPA_DIR = _REPO_ROOT / "frontend" / "dist"
-_LEGACY_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "static"
-_WEB_DIR = _SPA_DIR if _SPA_DIR.exists() else _LEGACY_DIR
+_WEB_DIR = _REPO_ROOT / "frontend" / "dist"
 
 if _WEB_DIR.exists():
     _ASSETS_DIR = _WEB_DIR / "assets"

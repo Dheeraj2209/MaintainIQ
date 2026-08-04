@@ -15,6 +15,7 @@ export function DemoPage() {
   const [machineId, setMachineId] = useState('')
   const [severity, setSeverity] = useState<DemoSeverity>('critical')
   const [busy, setBusy] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [log, setLog] = useState<LogEntry[]>([])
 
@@ -51,6 +52,23 @@ export function DemoPage() {
       setError(err instanceof Error ? err.message : 'Failed to simulate fault')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleReset() {
+    if (!machineId) return
+    setResetting(true)
+    setError(null)
+    try {
+      const result = await api.resetMachine(machineId)
+      setLog((prev) => [
+        { ...result, requested_severity: 'healthy', at: new Date().toLocaleTimeString() },
+        ...prev,
+      ])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset machine')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -103,15 +121,25 @@ export function DemoPage() {
             </label>
             <p className="text-xs text-text-muted">
               No effect if the machine is already at or above this severity — pick a lower severity
-              or a different machine to see a new alert/email.
+              or a different machine to see a new alert/email, or reset the machine below.
             </p>
-            <button
-              type="submit"
-              disabled={busy || !machineId}
-              className="mt-1 justify-self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-black transition hover:bg-accent-hover disabled:opacity-50"
-            >
-              {busy ? 'Simulating…' : 'Simulate reading'}
-            </button>
+            <div className="mt-1 flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={busy || !machineId}
+                className="justify-self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-black transition hover:bg-accent-hover disabled:opacity-50"
+              >
+                {busy ? 'Simulating…' : 'Simulate reading'}
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={resetting || !machineId}
+                className="justify-self-start rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-text transition hover:bg-white/10 disabled:opacity-50"
+              >
+                {resetting ? 'Resetting…' : 'Reset machine'}
+              </button>
+            </div>
           </form>
         </section>
 

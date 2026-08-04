@@ -67,3 +67,48 @@ async def simulate_fault(payload: SimulateFaultRequest, db=Depends(get_db)):
         alert=alert_out,
         emails_sent=emails_sent,
     )
+
+
+@router.post("/reset-machine/{machine_id}", response_model=SimulateFaultResponse)
+async def reset_machine(machine_id: str, db=Depends(get_db)):
+    """Resolve machine_id's open alert (if any) by replaying a 'healthy'
+    reading through the same state machine simulate_fault uses. Lets a demo
+    re-trigger a fresh email for a machine without waiting for a real
+    escalation — apply_reading's escalate-only-mid-episode rule otherwise
+    makes repeat same/lower-severity simulations on an already-open alert a
+    silent no-op (see src/alerts/live.py)."""
+    if not _machine_exists(db, machine_id):
+        raise HTTPException(status_code=404, detail=f"unknown machine: {machine_id}")
+
+    try:
+        prediction = evaluate_new_reading(db, machine_id, "healthy")
+    except UnknownMachineError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    result = apply_reading(
+        db,
+        machine_id=machine_id,
+        health_state=prediction["health_state"],
+        probable_cause=prediction["probable_cause"],
+        source="demo",
+        timestamp=prediction["timestamp"],
+    )
+
+    alert_out = None
+    if result is not None:
+        event_type, alert = result
+        alert_out = Alert(**alert)
+        await manager.broadcast({
+            "type": event_type,
+            "machine_id": machine_id,
+            "alert": alert,
+            "at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    return SimulateFaultResponse(
+        machine_id=machine_id,
+        health_state=prediction["health_state"],
+        probable_cause=prediction["probable_cause"],
+        alert=alert_out,
+        emails_sent=0,
+    )

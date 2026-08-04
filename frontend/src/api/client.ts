@@ -92,4 +92,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  resetMachine: (machineId: string) =>
+    request<SimulateFaultResponse>(`/demo/reset-machine/${encodeURIComponent(machineId)}`, {
+      method: 'POST',
+    }),
 }
