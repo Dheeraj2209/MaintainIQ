@@ -78,6 +78,22 @@ describe('LiveEventsProvider', () => {
     expect(toast.success).toHaveBeenCalled()
   })
 
+  it('raises a warning toast for an acknowledged alert', async () => {
+    renderProvider()
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+    const socket = MockWebSocket.instances[0]
+    socket.emitOpen()
+
+    socket.emitMessage({
+      type: 'alert_acknowledged',
+      machine_id: 'm1',
+      alert: { severity: 'high', health_state: 'critical' },
+    })
+
+    expect(await screen.findByText('alert_acknowledged')).toBeInTheDocument()
+    expect(toast.warning).toHaveBeenCalled()
+  })
+
   it('reconnects with backoff after the socket closes', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {

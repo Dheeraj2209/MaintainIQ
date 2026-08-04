@@ -68,6 +68,8 @@ export const openAlerts: Alert[] = [
     message: 'm1 critical',
     status: 'open',
     source: 'ml',
+    acknowledged_at: null,
+    acknowledged_by: null,
   },
 ]
 
@@ -85,6 +87,7 @@ export const machineDetail: MachineDetail = {
     completed_maintenance_count: 0,
     unresolved_alert_count: 1,
     avg_alert_resolution_hours: 0.08,
+    avg_alert_acknowledgement_hours: null,
     due_for_inspection: true,
   },
   alerts: openAlerts,

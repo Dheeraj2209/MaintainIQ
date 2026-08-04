@@ -15,6 +15,7 @@ export function AlertsPage() {
   const [status, setStatus] = useState<StatusFilter>('open')
   const [sortKey, setSortKey] = useState<SortKey>('opened_at')
   const [error, setError] = useState<string | null>(null)
+  const [acknowledgingId, setAcknowledgingId] = useState<number | null>(null)
   const navigate = useNavigate()
   const { lastEvent } = useLiveEvents()
 
@@ -43,6 +44,19 @@ export function AlertsPage() {
     }
     return copy
   }, [alerts, sortKey])
+
+  async function handleAcknowledge(e: React.MouseEvent, alertId: number) {
+    e.stopPropagation()
+    setAcknowledgingId(alertId)
+    try {
+      await api.acknowledgeAlert(alertId)
+      load(status)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to acknowledge alert')
+    } finally {
+      setAcknowledgingId(null)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -96,6 +110,7 @@ export function AlertsPage() {
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Opened</th>
                 <th className="px-3 py-2">Resolved</th>
+                <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -116,6 +131,20 @@ export function AlertsPage() {
                   <td className="px-3 py-2 text-text-muted">{a.status}</td>
                   <td className="px-3 py-2 text-text-muted">{a.opened_at}</td>
                   <td className="px-3 py-2 text-text-muted">{a.resolved_at ?? '—'}</td>
+                  <td className="px-3 py-2">
+                    {a.acknowledged_at ? (
+                      <span className="text-xs text-text-muted">Acknowledged</span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={acknowledgingId === a.id}
+                        onClick={(e) => handleAcknowledge(e, a.id)}
+                        className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-text backdrop-blur hover:bg-surface-hover disabled:opacity-50"
+                      >
+                        {acknowledgingId === a.id ? 'Acknowledging…' : 'Acknowledge'}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

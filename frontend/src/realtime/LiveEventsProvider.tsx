@@ -33,6 +33,8 @@ function describe(event: LiveEvent): string {
       return `${event.machine_id}: alert escalated to ${event.alert.severity}`
     case 'alert_resolved':
       return `${event.machine_id}: alert resolved`
+    case 'alert_acknowledged':
+      return `${event.machine_id}: alert acknowledged`
     default:
       return `${event.machine_id}: update`
   }

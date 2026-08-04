@@ -13,6 +13,23 @@ function MachineDetailPlaceholder() {
   return <div>Selected machine: {id}</div>
 }
 
+function openAlertsFixtureAcknowledged(): Alert {
+  return {
+    id: 2,
+    machine_id: 'm1',
+    opened_at: '2003-10-22T13:00:00+00:00',
+    resolved_at: null,
+    severity: 'high',
+    health_state: 'critical',
+    probable_cause: 'bearing_wear',
+    message: 'm1 critical',
+    status: 'open',
+    source: 'ml',
+    acknowledged_at: '2026-08-04T00:00:00+00:00',
+    acknowledged_by: 1,
+  }
+}
+
 function harness() {
   return (
     <MemoryRouter initialEntries={['/alerts']}>
@@ -60,6 +77,8 @@ describe('AlertsPage', () => {
         message: 'm1 high',
         status: 'open',
         source: 'ml',
+        acknowledged_at: null,
+        acknowledged_by: null,
       },
       {
         id: 2,
@@ -72,6 +91,8 @@ describe('AlertsPage', () => {
         message: 'm2 low',
         status: 'open',
         source: 'ml',
+        acknowledged_at: null,
+        acknowledged_by: null,
       },
     ]
     server.use(http.get('/api/alerts', () => HttpResponse.json(alerts)))
@@ -96,5 +117,31 @@ describe('AlertsPage', () => {
     if (!row) throw new Error('row not found')
     await userEvent.click(row)
     expect(await screen.findByText('Selected machine: m1')).toBeInTheDocument()
+  })
+
+  it('acknowledges an alert and updates the row without navigating', async () => {
+    render(harness())
+    await screen.findByText(/m1 critical/i)
+
+    const row = (await screen.findByText(/m1 critical/i)).closest('tr')
+    if (!row) throw new Error('row not found')
+    const button = within(row).getByRole('button', { name: /acknowledge/i })
+    await userEvent.click(button)
+
+    expect(await within(row).findByText(/acknowledged/i)).toBeInTheDocument()
+    // Clicking the button must not trigger the row's navigate-on-click handler.
+    expect(screen.queryByText(/selected machine: m1/i)).not.toBeInTheDocument()
+  })
+
+  it('does not show an acknowledge button for an already-acknowledged alert', async () => {
+    server.use(
+      http.get('/api/alerts', () =>
+        HttpResponse.json([{ ...openAlertsFixtureAcknowledged() }]),
+      ),
+    )
+    render(harness())
+    const row = (await screen.findByText(/m1 critical/i)).closest('tr')
+    if (!row) throw new Error('row not found')
+    expect(within(row).queryByRole('button', { name: /acknowledge/i })).not.toBeInTheDocument()
   })
 })

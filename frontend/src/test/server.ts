@@ -26,6 +26,15 @@ export const handlers = [
   http.get('/api/machines/:id', () => HttpResponse.json(machineDetail)),
   http.get('/api/machines/:id/trends', () => HttpResponse.json(trendPoints)),
   http.get('/api/alerts', () => HttpResponse.json(openAlerts)),
+  http.post('/api/alerts/:id/acknowledge', ({ params }) => {
+    const alert = openAlerts.find((a) => a.id === Number(params.id)) ?? openAlerts[0]
+    // Mutate in place so a subsequent GET /api/alerts (triggered by the page's
+    // post-acknowledge reload) reflects the acknowledged state instead of
+    // silently reverting to the pristine fixture.
+    alert.acknowledged_at = '2026-08-04T00:00:00+00:00'
+    alert.acknowledged_by = 1
+    return HttpResponse.json(alert)
+  }),
   http.get('/api/maintenance/:id', () => HttpResponse.json([])),
   http.post('/api/maintenance', async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>
