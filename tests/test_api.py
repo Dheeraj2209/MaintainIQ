@@ -89,3 +89,34 @@ def test_kpi_detail_has_all_categories(client):
 
 def test_kpi_per_machine_404(client):
     assert client.get("/api/kpis/ghost").status_code == 404
+
+
+def test_acknowledge_alert_sets_fields_and_broadcasts(client):
+    resp = client.post("/api/alerts/2/acknowledge")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == 2
+    assert body["acknowledged_at"] is not None
+    assert body["acknowledged_by"] is not None
+
+
+def test_acknowledge_alert_is_idempotent(client):
+    first = client.post("/api/alerts/2/acknowledge").json()
+    second = client.post("/api/alerts/2/acknowledge").json()
+    assert second["acknowledged_at"] == first["acknowledged_at"]
+    assert second["acknowledged_by"] == first["acknowledged_by"]
+
+
+def test_acknowledge_alert_unknown_id_404(client):
+    assert client.post("/api/alerts/9999/acknowledge").status_code == 404
+
+
+def test_acknowledge_alert_allows_all_three_roles(auth_client):
+    for role in ("admin", "supervisor", "operator"):
+        c = auth_client(role)
+        resp = c.post("/api/alerts/2/acknowledge")
+        assert resp.status_code == 200, f"{role} should be able to acknowledge"
+
+
+def test_acknowledge_alert_requires_login(anon_client):
+    assert anon_client.post("/api/alerts/2/acknowledge").status_code == 401
