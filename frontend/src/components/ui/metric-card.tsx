@@ -38,7 +38,7 @@ const TONE_SPARKLINE: Record<Tone, string> = {
   healthy: '#3ddc84',
   degrading: '#f0a93a',
   faulty: '#ff7a45',
-  critical: '#ff2d6a',
+  critical: '#ff5470',
   unknown: '#7a7a7a',
 }
 

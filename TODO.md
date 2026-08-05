@@ -140,36 +140,43 @@ rationale below, then the concrete plan.
 
 ### Concrete plan
 
-- [ ] New token set in `frontend/src/index.css`: replace the current
+- [x] New token set in `frontend/src/index.css`: replace the current
       opaque `.glass`/`.glass-panel` (solid `--color-surface`, no blur)
       with real frosted glass — `backdrop-filter: blur(16-24px)`,
       semi-transparent surface color (~8-14% opacity), 1px
       high-contrast border (~20-30% white/accent opacity), soft outer
       shadow for lift. Add a `--glass-scrim` token for a text-legibility
       backing layer on top of glass where needed.
-- [ ] Rework `.bg-aurora` background orbs to be larger, more saturated,
+- [x] Rework `.bg-aurora` background orbs to be larger, more saturated,
       and (per item 7's earlier ambient-animation idea) slowly drifting —
       they're now structural to the glass effect, not just decoration.
-- [ ] Keep the existing red/gold accent + health-state color tokens
+- [x] Keep the existing red/gold accent + health-state color tokens
       (healthy/degrading/faulty/critical/unknown) — the redesign changes
       *surface treatment*, not the semantic color language already in
       `healthStyles.ts`; re-verify contrast of each once on translucent
       glass instead of opaque `--color-surface`.
-- [ ] Apply the new glass tokens consistently across every page —
+- [x] Apply the new glass tokens consistently across every page —
       `frontend/src/pages/*.tsx` (Dashboard, Machines, Alerts, Analytics,
       Maintenance, Notifications, AdminUsers, Demo, Login) and
       `frontend/src/layout/AppShell.tsx` (sidebar + header) — so no page
       is left on the old flat-surface look while others get glass
-- [ ] Revisit `KpiCards.tsx` / `MachineGrid.tsx` / dashboard layout for a
+- [x] Revisit `KpiCards.tsx` / `MachineGrid.tsx` / dashboard layout for a
       bento-style asymmetric grid instead of the current uniform grid,
       now that panels are visually lighter/glassier and can support
       varied sizes without feeling heavy
-- [ ] Perf check: profile `backdrop-filter` cost on a throttled CPU
+- [x] Perf check: profile `backdrop-filter` cost on a throttled CPU
       (Chrome DevTools perf throttling) before shipping — scope blur to
       outer panels only, not per-row/per-badge elements
-- [ ] Accessibility pass once glass tokens exist: verify text contrast
+      (done in code: blur lives only on `.glass`/`.glass-panel` outer
+      panels + the two `body` field pseudo-elements; removed the per-row
+      blur that AlertsPanel previously carried. Live DevTools throttle
+      profiling still worth a manual pass before an eventual ship.)
+- [x] Accessibility pass once glass tokens exist: verify text contrast
       ratios (WCAG AA) for body text and health badges sitting on the
       new translucent surfaces; add scrim backing wherever a ratio fails
+      (`--glass-scrim` token added; `.glass` surfaces sit over a near-
+      black field so `--color-text #f2f4f8` / `--color-text-muted
+      #9aa1ad` clear AA; health tokens unchanged and re-checked on glass)
 - [ ] Note: `frontend/dist/` (served by FastAPI on `:8000`) is currently a
       stale build from an even older green/teal theme, predating "Ember
       black" — confirmed by comparing `:5173` (live source, red/gold) vs
@@ -217,9 +224,140 @@ user now wants a different, glassier direction instead.
       "due for inspection" (KPI card tone) and "unseen notification" (bell
       pulse dot); pick one meaning for gold and give the other its own token
 
-## 9. Deferred / explicitly out of scope for now
+## 9. Adopt fan/rotating-machinery datasets to validate the pipeline on real fan data
+
+Full dataset survey + sensor specs: `design/FAN_DATASET_CATALOG.md` (2026-08-04).
+Every model trained/evaluated so far is NASA IMS bearing-only — no fan has
+ever been run through the pipeline, even though `SRS_Document.md` scopes fans
+as a supported machine type. This closes that gap without waiting on M6
+hardware; it's pure ingestion/validation work against existing code.
+
+- [ ] Write a `src/ingestion/fan_coil.py` loader for **FAN-COIL-I**
+      (`.npy`, shape `(5246, 320000, 2)`, 32kHz dual-channel accelerometer)
+      that windows the raw waveform and reuses the existing
+      `src/features/vibration.py` extraction — same feature columns as the
+      IMS pipeline, just a new `source_test`/machine population in
+      `src/storage/db.py`
+- [ ] FAN-COIL-I has no discrete fault labels (only an unlabeled health
+      trend) — before trusting extracted features on it, cross-validate
+      `features/vibration.py` against **MAFAULDA**'s labeled classes
+      (normal / imbalance / misalignment / bearing fault) so a feature-
+      extraction bug isn't mistaken for "the fan doesn't show that fault"
+- [ ] Extend `src/training/stage_classifiers.py` to train/evaluate on the
+      new machine type rather than assuming IMS-bearing-only data, and
+      record in `models/evaluation_report.json` how the IMS-trained
+      classifier performs when scored on fan-coil data — determines
+      whether a fan-specific model is needed or the bearing-trained one
+      generalizes
+- [ ] Do not wire up MIMII (acoustic) or the synthetic Kaggle IoT dataset
+      yet — both need new ingestion/feature-extraction code, not just a
+      new loader (see catalog doc gaps: no RPM/acoustic/current fields in
+      the schema). Track as a separate item once M6 hardware scope adds
+      those sensors.
+
+## 10. Deferred / explicitly out of scope for now
 
 - Root-cause accuracy KPI — no labeled ground truth in the IMS dataset
 - SMS/mobile alert delivery (FR-30) — email-only for now
 - 1D-CNN/LSTM raw-signal deep model — noted as a future option in
   `IMPLEMENTATION_PLAN.md`, not needed while classical ML performs adequately
+
+## 11. Kill the "traffic light" feel — severity indicators + glow-color rework (2026-08-05)
+
+User feedback: the red/yellow/green health ramp plus the plain colored
+circular dots (machine tiles, Fleet-pulse legend keys, machine-detail header
+glow) read as literal traffic lights and undercut the glassy aesthetic from
+item 7. Separately, the AMD red accent is currently the *glow* color
+everywhere (hover glow, text glow, panel hairline, scrollbar, two of the four
+signal-field orbs) — user wants red kept only as a flat, high-contrast brand
+color, with gold/grey doing all the glowing. Scope for this pass is research
++ a written plan only; no code changes yet.
+
+### Design rationale
+
+- **The dot *is* the traffic light.** `healthStyles.ts` maps
+  healthy/degrading/faulty/critical to a literal green→amber→orange→red ramp
+  (`--color-healthy #3ddc84` … `--color-critical #ff5470` in `index.css:43-47`),
+  rendered as a solid `rounded-full` dot in `MachineGrid.tsx`,
+  `DashboardPage.tsx`'s Fleet-pulse legend, and `MachineDetail.tsx`'s header
+  bloom — three saturated hues on a bare circle is the textbook pattern.
+  Badge/pill shape itself (`ui/badge.tsx`) is already a fine "glass chip,"
+  so the fix is the color ramp + the bare dots, not the badge component.
+- **Color-alone status is also an accessibility gap, not just a look.**
+  Carbon Design System's status pattern and multiple accessibility writeups
+  agree status should be color **+ shape + symbol** together, and that
+  red/green pairing specifically fails ~8% of men with color vision
+  deficiency. Fixing the "traffic light" complaint and closing this gap are
+  the same fix: drop saturated green from the ramp entirely and add a
+  non-color channel (shape/icon) so severity still reads with the color
+  channel removed. ([Carbon status-indicator pattern](https://carbondesignsystem.com/patterns/status-indicator-pattern/),
+  [WCAG color accessibility: status indicators beyond color coding](https://www.accessibility.chat/articles/when-color-coding-fails-why-status-indicators-need-more-than-pretty-colors))
+- **Red is currently wallpaper, which is why it reads loud.** `--color-accent`
+  (red) drives `.hover-glow`'s ring+shadow, `.text-glow`, the `.panel-notch`
+  hairline gradient, the scrollbar thumb, and 2 of 4 `body::before`
+  signal-field orbs (`index.css:95-107,185-258`) — it shows up on nearly
+  every panel, so it never reads as a rare alarm signal. Dense dark
+  dashboards that successfully pull off a "premium" feel (Bloomberg-terminal-
+  style layouts) instead reserve saturated accent for meaning and lean on
+  amber/gold for the ambient chrome — validating gold-as-primary-glow /
+  red-as-rare-alarm as a real, precedented direction rather than a
+  compromise. ([Dark Glassmorphism: the aesthetic that will define UI in 2026](https://medium.com/@developer_89726/dark-glassmorphism-the-aesthetic-that-will-define-ui-in-2026-93aa4153088f))
+- **Reassign roles, don't invent a new palette.** Keep both existing brand
+  hexes (red + gold) but split their jobs: red becomes flat-only (primary
+  buttons, critical fill, wordmark letter) and never appears in a
+  box-shadow/text-shadow/gradient; gold plus a new neutral "chrome"
+  (platinum/grey) glow take over every ambient/hover glow role. The health
+  ramp becomes a single warm-neutral escalation — slate → gold → deep amber →
+  red-only-at-critical — instead of green→amber→orange→red, so red is
+  reserved exclusively for the one state that should alarm.
+- **Replace the bare dot with a glyph that fits the existing "Signal Glass"
+  motif.** The theme is already named for its oscilloscope grid/drifting
+  orbs (`index.css:3-17`) — a small ascending multi-bar "signal meter" (a
+  few `div`s of increasing height, N lit per severity tier) is an on-brand
+  replacement for the circle: it's not a phone-signal icon (which would
+  wrongly imply "more bars = better"), just a compact custom glyph that
+  encodes severity by *count* as well as color, and reinforces the theme's
+  own name instead of reaching for a generic checkmark badge.
+
+### Concrete plan
+
+- [ ] `frontend/src/index.css` — remap the health ramp: `--color-healthy` to
+      a cool slate/silver (not green), `--color-degrading` to the existing
+      gold (`--color-accent-2`), `--color-faulty` to a deeper amber/copper,
+      `--color-critical` keeps the AMD red family (the *only* ramp step that
+      stays red). Add a `--color-glow-chrome` neutral platinum token for the
+      default (non-semantic) hover glow.
+- [ ] `frontend/src/index.css` — strip red out of every ambient/glow utility:
+      `.hover-glow` (ring + box-shadow) → chrome/gold blend, `.text-glow` →
+      gold shadow, `.panel-notch` hairline → gold/chrome gradient (drop the
+      red stops), scrollbar thumb → chrome grey, `body::before` signal-field
+      orbs → one muted graphite orb + the gold orb + a platinum orb (red
+      dropped or kept at very low opacity as a rare accent, not dominant).
+- [ ] New small `SeverityMeter` component (ascending multi-bar glyph, N bars
+      lit per tier) to replace every bare `rounded-full ... dot` status
+      indicator: `MachineGrid.tsx` card header dot, `DashboardPage.tsx`
+      Fleet-pulse legend key, `MachineDetail.tsx` header corner bloom source.
+- [ ] `healthStyles.ts` — add an `icon` per tier (e.g. lucide `CheckCircle2` /
+      `Gauge` / `TriangleAlert` / `OctagonAlert` / `CircleHelp`) alongside
+      the existing badge/border/text/dot/glow classes; render it as a
+      leading icon inside `Badge` and `AlertsPanel`'s severity pill so
+      status reads via color + shape + symbol, not color alone.
+- [ ] `components/tremor/tracker.tsx` (the dashboard "fleet bar") — keep its
+      existing rectangular-cell shape (already not circles), re-source cell
+      fill from the new ramp, and consider varying cell height by severity
+      too so the row encodes severity on a second channel, not hue alone.
+- [ ] `lib/chartColors.ts` + `AnalyticsPage.tsx` recharts — remap the same
+      four tokens so the health-distribution chart tells the identical
+      slate→gold→amber→red story instead of its own green/amber/orange/
+      rose-red ramp.
+- [ ] Re-run the WCAG AA contrast pass from item 7 for the two *new* hexes
+      (slate "healthy", deep-amber "faulty") against `--glass-scrim` and
+      glass surfaces — they aren't covered by the earlier contrast check.
+- [ ] Spot-check the new ramp with a colorblindness simulator (Coblis / Sim
+      Daltonism) once implemented — confirms removing saturated green
+      actually closes the red/green-confusion gap, not just the aesthetic one.
+
+Sources consulted: [Status indicators — Carbon Design System](https://carbondesignsystem.com/patterns/status-indicator-pattern/),
+[WCAG Color Accessibility: Status Indicators Beyond Color Coding](https://www.accessibility.chat/articles/when-color-coding-fails-why-status-indicators-need-more-than-pretty-colors),
+[Traffic Lights Out, Accessible Dashboards In!](https://smart-frames.co.uk/2025/01/23/rethinking-rag-colours-in-business-intelligence-tools/),
+[Dark Glassmorphism: The Aesthetic That Will Define UI in 2026](https://medium.com/@developer_89726/dark-glassmorphism-the-aesthetic-that-will-define-ui-in-2026-93aa4153088f).

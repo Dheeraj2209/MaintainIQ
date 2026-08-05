@@ -1,50 +1,69 @@
 @import 'tailwindcss';
 
 /* ============================================================================
-   "Ember black" theme — a solid near-black environment with AMD-flavored red
-   as the primary interactive accent and warm gold as the secondary/CTA accent.
-   Chrome is flat and mostly unlit at rest (solid cards, no blur) so it never
-   competes with the SATURATED health-state signal colors, which stay reserved
-   for status (healthy / degrading / faulty / critical) and always ship with a
-   label or badge — never color alone.
+   "Signal Glass" theme — a maintenance console that reads like a precision
+   instrument. Frosted-glass panels float over a slow-drifting SIGNAL FIELD
+   (ambient red/gold/teal orbs + a faint oscilloscope grid), so the glass has
+   real structure behind it to refract instead of sitting on flat black.
+
+   The AMD-flavored red stays the brand/interactive accent; warm gold is the
+   secondary "attention / due" accent. The SATURATED health ramp
+   (healthy → degrading → faulty → critical) is reserved for status only and
+   always ships with a label or badge — never color alone.
 
    Token *names* are kept identical to the previous theme so every existing
-   `bg-surface` / `text-accent` utility, the chartColors reader, and healthStyles
-   keep resolving — only the values and the surface treatments changed.
+   `bg-surface` / `text-accent` utility, the chartColors reader, and
+   healthStyles keep resolving — only the values and surface treatments change.
    ========================================================================== */
 @theme {
-  --color-bg: #050505;
-  --color-surface: #131313;
-  --color-surface-hover: #1e1e1e;
-  --color-border: #2a2a2a;
+  --color-bg: #070809;
+  /* Solid surface, kept opaque on purpose: native <select> option popups,
+     recharts tooltips, and table bands need a real fill (glass/blur can't
+     apply there). Cooler than before to sit under the glass chrome. */
+  --color-surface: #12141a;
+  --color-surface-hover: #1b1e26;
+  --color-border: #2b2f39;
 
-  --color-text: #f2f0ec;
-  --color-text-muted: #9a9690;
+  --color-text: #f2f4f8;
+  --color-text-muted: #9aa1ad;
 
   /* Primary accent: AMD-flavored red (interactive / brand). */
   --color-accent: #e23a3a;
   --color-accent-hover: #ff5c52;
   --color-accent-soft: #2a0f0d;
 
-  /* Secondary accent: warm gold — complementary CTA / "due" / attention. */
+  /* Secondary accent: warm gold — "due for inspection / attention". */
   --color-accent-2: #d4af37;
   --color-accent-2-hover: #eccb6b;
   --color-accent-2-soft: #2e2408;
 
-  /* Reserved status ramp (temperature: good → hot). Distinct from the muted
-     chrome by being fully saturated, and from the brand red by hue, so an
-     alarm badge is never mistaken for interactive chrome. */
+  /* Reserved status ramp (heat: good → hottest). Critical is a hot rose-red,
+     kept distinct from the brand red by lightness/hue so an alarm badge is
+     never mistaken for interactive chrome. */
   --color-healthy: #3ddc84;
   --color-degrading: #f0a93a;
   --color-faulty: #ff7a45;
-  --color-critical: #ff2d6a;
+  --color-critical: #ff5470;
   --color-unknown: #7a7a7a;
 
-  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Consolas, monospace;
+  --font-display: 'Space Grotesk', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
 }
 
+/* Glass mechanics live as plain custom properties so the surface treatment is
+   tunable in one place and reused by every `.glass` / `.glass-panel`. */
 :root {
   color-scheme: dark;
+
+  --glass-bg: rgba(255, 255, 255, 0.055);
+  --glass-bg-strong: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.07);
+  --glass-blur: 20px;
+  /* Opaque scrim for text that must stay legible regardless of what drifts
+     behind the glass — apply with the `.glass-scrim` helper where a contrast
+     check fails. */
+  --glass-scrim: rgba(8, 10, 14, 0.72);
 }
 
 body {
@@ -55,37 +74,107 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Headings carry the display face; body text stays on the neutral system
+   stack. Applied globally so pages get the treatment without per-file edits. */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
 /* ---------------------------------------------------------------------------
-   Ember backdrop: mostly flat black, with only a faint red/gold ember glow at
-   the edges so the app reads as solid dark chrome (not a lit gradient) while
-   keeping a hint of depth. Fixed attachment so it stays put behind scrolling
-   content. `.bg-blueprint` is kept as an alias so older references keep working.
+   THE SIGNAL FIELD — the one signature element. Rendered on fixed body
+   pseudo-elements so it sits behind all app content and is present on every
+   route (including login), giving the frosted panels something to refract.
+
+   `::before` = drifting ambient orbs (red brand, gold attention, cool teal for
+   depth variety). `::after` = a faint oscilloscope grid + horizontal baseline.
+   ------------------------------------------------------------------------- */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20% -10%;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(38% 42% at 24% 18%, rgba(226, 58, 58, 0.20), transparent 70%),
+    radial-gradient(32% 36% at 82% 12%, rgba(212, 175, 55, 0.14), transparent 70%),
+    radial-gradient(46% 48% at 88% 88%, rgba(45, 130, 150, 0.16), transparent 72%),
+    radial-gradient(40% 44% at 8% 92%, rgba(226, 58, 58, 0.10), transparent 72%);
+  animation: signal-drift 42s ease-in-out infinite alternate;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    /* faint oscilloscope baseline through the vertical middle */
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05));
+  background-size:
+    44px 44px,
+    44px 44px,
+    100% 1px;
+  background-position:
+    center,
+    center,
+    center 52%;
+  background-repeat: repeat, repeat, no-repeat;
+  -webkit-mask-image: radial-gradient(120% 120% at 50% 40%, black, transparent 92%);
+  mask-image: radial-gradient(120% 120% at 50% 40%, black, transparent 92%);
+}
+
+@keyframes signal-drift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(2%, 2%, 0) scale(1.08);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Frosted card surface: translucent white over the signal field, real blur,
+   a high-contrast hairline edge, a top inner highlight (the "glass lip"), and
+   a soft outer shadow for lift. `.bg-aurora` is now transparent so the body
+   field shows through; `.bg-blueprint` is kept as an alias for older refs.
    ------------------------------------------------------------------------- */
 .bg-aurora,
 .bg-blueprint {
-  background-color: var(--color-bg);
-  background-image:
-    radial-gradient(120% 90% at 50% -20%, rgba(226, 58, 58, 0.07), transparent 55%),
-    radial-gradient(70% 60% at 85% 8%, rgba(212, 175, 55, 0.05), transparent 55%),
-    radial-gradient(80% 70% at 5% 100%, rgba(226, 58, 58, 0.05), transparent 60%);
-  background-attachment: fixed;
+  background-color: transparent;
 }
 
-/* ---------------------------------------------------------------------------
-   Solid card surface. Flat and opaque (no blur/translucency) with a crisp
-   hairline border and a soft drop shadow for depth, matching a dashboard
-   built from solid dark panels rather than frosted glass.
-   ------------------------------------------------------------------------- */
 .glass {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.8);
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 16px 44px -20px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 0 var(--glass-highlight);
 }
 
-/* Slightly heavier panel for top-level chrome / the app sidebar. */
+/* Heavier panel for top-level chrome (sidebar / header): a touch more blur so
+   scrolling content behind it stays readable. */
 .glass-panel {
-  background-color: var(--color-surface);
-  border-color: var(--color-border);
+  background-color: var(--glass-bg-strong);
+  backdrop-filter: blur(26px) saturate(140%);
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  border-color: var(--glass-border);
+  box-shadow:
+    0 16px 44px -24px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 0 var(--glass-highlight);
+}
+
+/* Opaque legibility backing for text sitting on glass where contrast fails. */
+.glass-scrim {
+  background-color: var(--glass-scrim);
 }
 
 /* ---------------------------------------------------------------------------
@@ -101,8 +190,9 @@ body {
   border-color: rgba(226, 58, 58, 0.5);
   box-shadow:
     0 0 0 1px rgba(226, 58, 58, 0.35),
-    0 16px 40px -14px rgba(0, 0, 0, 0.75),
-    0 0 30px -6px rgba(212, 175, 55, 0.45);
+    0 20px 48px -16px rgba(0, 0, 0, 0.75),
+    0 0 34px -6px rgba(212, 175, 55, 0.4),
+    inset 0 1px 0 0 var(--glass-highlight);
 }
 
 /* ---------------------------------------------------------------------------
@@ -137,10 +227,8 @@ body {
 
 /* ---------------------------------------------------------------------------
    Native <select> popups render <option> rows with OS-default styling
-   (usually black-on-white) regardless of the Tailwind classes on the parent
-   <select> — browsers don't apply arbitrary backgrounds/opacity to the
-   dropdown popup. Force it to match the dark theme everywhere so no select
-   ends up with unreadable light-on-light or dark-on-white text.
+   regardless of Tailwind classes on the parent <select> — force them to match
+   the dark theme so no select ends up unreadable.
    ------------------------------------------------------------------------- */
 select {
   color-scheme: dark;
@@ -167,4 +255,15 @@ select option {
 }
 *::-webkit-scrollbar-thumb:hover {
   background-color: rgba(226, 58, 58, 0.4);
+}
+
+/* ---------------------------------------------------------------------------
+   Respect reduced-motion: freeze the drifting signal field (the grid + orbs
+   stay, they just stop moving). Component-level motion uses framer-motion's
+   own reduced-motion handling.
+   ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+  }
 }

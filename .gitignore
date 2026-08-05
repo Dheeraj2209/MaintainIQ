@@ -8,6 +8,7 @@ Desktop.ini
 # Editor and local workspace settings
 .vscode/
 .idea/
+.claude/
 *.tmp
 *.bak
 
@@ -45,3 +46,6 @@ frontend/.env.local
 /tmp/
 /models/xjtu_rul_model_v1.joblib
 /models/xjtu_rul_evaluation_v1.json
+
+# Local credentials scratch file — demo/dev logins, never committed.
+/credentials.txt
