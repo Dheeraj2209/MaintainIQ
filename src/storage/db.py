@@ -91,7 +91,9 @@ CREATE TABLE IF NOT EXISTS maintenance_records (
     performed_at TEXT NOT NULL,
     description TEXT,
     technician TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    alert_id INTEGER REFERENCES alerts(id),
+    type TEXT CHECK(type IN ('preventive','corrective'))
 );
 
 -- Auth + RBAC. Only 3 roles are supported (see src/auth/ — derived from
@@ -141,6 +143,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for column in ("acknowledged_at TEXT", "acknowledged_by INTEGER"):
         try:
             conn.execute(f"ALTER TABLE alerts ADD COLUMN {column}")
+        except sqlite3.OperationalError:
+            pass  # column already exists (fresh DB created via SCHEMA above)
+    for column in (
+        "alert_id INTEGER REFERENCES alerts(id)",
+        "type TEXT CHECK(type IN ('preventive','corrective'))",
+    ):
+        try:
+            conn.execute(f"ALTER TABLE maintenance_records ADD COLUMN {column}")
         except sqlite3.OperationalError:
             pass  # column already exists (fresh DB created via SCHEMA above)
     conn.commit()
