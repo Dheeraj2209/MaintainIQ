@@ -138,3 +138,43 @@ def test_machine_detail_surfaces_acknowledgement(client):
     alerts = {a["id"]: a for a in resp.json()["alerts"]}
     assert alerts[2]["acknowledged_at"] is not None
     assert alerts[2]["acknowledged_by"] is not None
+
+
+def test_maintenance_post_with_alert_and_type_round_trips(client):
+    resp = client.post("/api/maintenance", json={
+        "machine_id": "m1",
+        "performed_at": "2026-07-20T10:00:00",
+        "alert_id": 2,
+        "type": "corrective",
+    })
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["alert_id"] == 2
+    assert body["type"] == "corrective"
+
+
+def test_maintenance_post_alert_from_other_machine_400(client):
+    resp = client.post("/api/maintenance", json={
+        "machine_id": "m2", "performed_at": "2026-07-20T10:00:00", "alert_id": 2,
+    })
+    assert resp.status_code == 400
+
+
+def test_maintenance_history_pagination(client):
+    for i in range(3):
+        client.post("/api/maintenance", json={
+            "machine_id": "m1", "performed_at": f"2026-07-{10 + i:02d}T10:00:00",
+        })
+    page1 = client.get("/api/maintenance/m1?limit=2&offset=0").json()
+    page2 = client.get("/api/maintenance/m1?limit=2&offset=2").json()
+    assert len(page1) == 2
+    assert len(page2) == 1
+
+
+def test_machine_detail_maintenance_history_capped_at_ten(client):
+    for i in range(12):
+        client.post("/api/maintenance", json={
+            "machine_id": "m1", "performed_at": f"2026-07-{i + 1:02d}T10:00:00",
+        })
+    resp = client.get("/api/machines/m1")
+    assert len(resp.json()["maintenance_history"]) == 10

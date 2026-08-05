@@ -53,6 +53,8 @@ class MaintenanceRecord(BaseModel):
     description: Optional[str] = None
     technician: Optional[str] = None
     created_at: str
+    alert_id: Optional[int] = None
+    type: Optional[Literal["preventive", "corrective"]] = None
 
 
 class MaintenanceSummary(BaseModel):
@@ -71,6 +73,8 @@ class MaintenanceCreate(BaseModel):
     performed_at: str
     description: Optional[str] = None
     technician: Optional[str] = None
+    alert_id: Optional[int] = None
+    type: Optional[Literal["preventive", "corrective"]] = None
 
 
 class MachineDetail(BaseModel):

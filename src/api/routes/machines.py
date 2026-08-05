@@ -45,7 +45,7 @@ def get_machine(machine_id: str, db=Depends(get_db)):
     ).fetchall()
     alerts = [Alert(**dict(row)) for row in alert_rows]
 
-    history = [MaintenanceRecord(**rec) for rec in maintenance.get_history(db, machine_id)]
+    history = [MaintenanceRecord(**rec) for rec in maintenance.get_history(db, machine_id, limit=10)]
 
     return MachineDetail(
         health=MachineSummary(**health),
