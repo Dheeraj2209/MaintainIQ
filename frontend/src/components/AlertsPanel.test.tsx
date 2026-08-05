@@ -15,10 +15,15 @@ describe('AlertsPanel', () => {
     expect(screen.getByText(/no open alerts/i)).toBeInTheDocument()
   })
 
-  it('calls onSelect with the machine id when an alert is clicked', async () => {
+  it('calls onSelect with the full alert object when an alert is clicked', async () => {
     const onSelect = vi.fn()
     render(<AlertsPanel alerts={openAlerts} onSelect={onSelect} />)
     await userEvent.click(screen.getByText('m1 critical'))
-    expect(onSelect).toHaveBeenCalledWith('m1')
+    expect(onSelect).toHaveBeenCalledWith(openAlerts[0])
+  })
+
+  it('visually marks the selected alert', () => {
+    render(<AlertsPanel alerts={openAlerts} onSelect={() => {}} selectedAlertId={openAlerts[0].id} />)
+    expect(screen.getByRole('button', { name: /m1 critical/i })).toHaveClass('ring-2')
   })
 })

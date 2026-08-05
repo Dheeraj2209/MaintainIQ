@@ -4,10 +4,11 @@ import { severityClasses } from './healthStyles'
 
 interface Props {
   alerts: Alert[]
-  onSelect: (machineId: string) => void
+  onSelect: (alert: Alert) => void
+  selectedAlertId?: number | null
 }
 
-export function AlertsPanel({ alerts, onSelect }: Props) {
+export function AlertsPanel({ alerts, onSelect, selectedAlertId = null }: Props) {
   if (alerts.length === 0) {
     return <p className="py-4 text-sm text-text-muted">No open alerts.</p>
   }
@@ -19,8 +20,8 @@ export function AlertsPanel({ alerts, onSelect }: Props) {
           <motion.li key={a.id} layout initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
             <motion.button
               type="button"
-              onClick={() => onSelect(a.machine_id)}
-              className="glass w-full overflow-hidden rounded-xl border-l-2 p-3 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
+              onClick={() => onSelect(a)}
+              className={`glass w-full overflow-hidden rounded-xl border-l-2 p-3 text-left transition hover:border-white/20 hover:bg-white/[0.07] ${a.id === selectedAlertId ? 'ring-2 ring-accent/60' : ''}`}
               style={{ borderLeftColor: 'var(--color-' + severityBorder(a.severity) + ')' }}
               initial={{ backgroundColor: 'rgba(212,175,55,0.14)' }}
               animate={{ backgroundColor: 'rgba(19,19,19,1)' }}
