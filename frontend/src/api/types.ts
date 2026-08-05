@@ -46,6 +46,8 @@ export interface MaintenanceRecord {
   description: string | null
   technician: string | null
   created_at: string
+  alert_id?: number | null
+  type?: 'preventive' | 'corrective' | null
 }
 
 export interface MaintenanceCreate {
@@ -53,6 +55,8 @@ export interface MaintenanceCreate {
   performed_at: string
   description?: string | null
   technician?: string | null
+  alert_id?: number | null
+  type?: 'preventive' | 'corrective' | null
 }
 
 export interface MaintenanceSummary {

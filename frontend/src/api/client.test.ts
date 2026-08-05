@@ -52,4 +52,30 @@ describe('api client', () => {
       api.logMaintenance({ machine_id: 'ghost', performed_at: '2026-07-20T10:00:00' }),
     ).rejects.toThrow('unknown machine_id')
   })
+
+  it('fetches maintenance history with limit/offset as query params', async () => {
+    let capturedUrl = ''
+    server.use(
+      http.get('/api/maintenance/:id', ({ request }) => {
+        capturedUrl = request.url
+        return HttpResponse.json([])
+      }),
+    )
+    await api.getMaintenanceHistory('m1', { limit: 5, offset: 10 })
+    expect(capturedUrl).toContain('limit=5')
+    expect(capturedUrl).toContain('offset=10')
+  })
+
+  it('defaults maintenance history limit/offset when omitted', async () => {
+    let capturedUrl = ''
+    server.use(
+      http.get('/api/maintenance/:id', ({ request }) => {
+        capturedUrl = request.url
+        return HttpResponse.json([])
+      }),
+    )
+    await api.getMaintenanceHistory('m1')
+    expect(capturedUrl).toContain('limit=20')
+    expect(capturedUrl).toContain('offset=0')
+  })
 })

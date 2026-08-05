@@ -70,8 +70,8 @@ export const api = {
     ),
   getAlerts: (status?: string) =>
     request<Alert[]>(`/alerts${status ? `?status=${encodeURIComponent(status)}` : ''}`),
-  getMaintenanceHistory: (id: string) =>
-    request<MaintenanceRecord[]>(`/maintenance/${encodeURIComponent(id)}`),
+  getMaintenanceHistory: (id: string, { limit = 20, offset = 0 }: { limit?: number; offset?: number } = {}) =>
+    request<MaintenanceRecord[]>(`/maintenance/${encodeURIComponent(id)}?limit=${limit}&offset=${offset}`),
   logMaintenance: (payload: MaintenanceCreate) =>
     request<MaintenanceRecord>('/maintenance', {
       method: 'POST',
