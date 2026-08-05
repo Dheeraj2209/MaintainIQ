@@ -46,7 +46,7 @@ function SortableWidget({ id, children }: { id: WidgetId; children: ReactNode })
       <button
         type="button"
         aria-label="Drag to reorder widget"
-        className="absolute right-1 top-1 z-10 cursor-grab touch-none rounded-md p-1 text-text-muted transition hover:bg-surface-hover hover:text-accent-2 active:cursor-grabbing"
+        className="absolute right-1 top-1 z-10 cursor-grab touch-none rounded-md p-1 text-text-muted transition hover:bg-white/10 hover:text-accent-2 active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
@@ -116,6 +116,13 @@ export function DashboardPage() {
     ),
   }
 
+  const healthCounts = machines.reduce<Record<string, number>>((acc, m) => {
+    acc[m.health_state] = (acc[m.health_state] ?? 0) + 1
+    return acc
+  }, {})
+  const needsAttention = (healthCounts.critical ?? 0) + (healthCounts.faulty ?? 0)
+  const legend = ['healthy', 'degrading', 'faulty', 'critical'] as const
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -129,20 +136,57 @@ export function DashboardPage() {
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-critical/40 bg-critical/10 p-3 text-sm text-critical backdrop-blur">{error}</div>
+        <div className="glass rounded-2xl border-critical/40 p-4">
+          <p className="text-sm font-semibold text-critical">Couldn’t load fleet data</p>
+          <p className="mt-1 text-sm text-text-muted">{error}</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={loadFleet}>
+            Try again
+          </Button>
+        </div>
       )}
 
       {machines.length > 0 && (
-        <section aria-label="Fleet pulse" className="glass rounded-2xl p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Fleet pulse</h2>
-          <Tracker
-            cells={machines.map((m) => ({
-              key: m.machine_id,
-              className: healthClasses(m.health_state).dot,
-              tooltip: `${m.machine_id} — ${healthLabel(m.health_state)}`,
-              onClick: () => goToMachine(m.machine_id),
-            }))}
-          />
+        <section aria-label="Fleet pulse" className="panel-notch glass relative overflow-hidden rounded-3xl p-6">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted">Fleet pulse</p>
+              <div className="mt-2 flex items-end gap-3">
+                <span className="font-mono text-5xl font-semibold leading-none tabular-nums text-text">
+                  {machines.length}
+                </span>
+                <span className="pb-1 text-sm text-text-muted">machines under live monitoring</span>
+              </div>
+              {needsAttention > 0 ? (
+                <p className="mt-2.5 text-sm text-text-muted">
+                  <span className="font-semibold text-critical">{healthCounts.critical ?? 0} critical</span>
+                  {' · '}
+                  <span className="text-faulty">{healthCounts.faulty ?? 0} faulty</span>
+                  {' — inspect before failure'}
+                </p>
+              ) : (
+                <p className="mt-2.5 text-sm text-healthy">All machines reading nominal</p>
+              )}
+            </div>
+            <dl className="flex flex-wrap gap-x-6 gap-y-2">
+              {legend.map((s) => (
+                <div key={s} className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${healthClasses(s).dot}`} aria-hidden />
+                  <dt className="text-xs text-text-muted">{healthLabel(s)}</dt>
+                  <dd className="font-mono text-sm tabular-nums text-text">{healthCounts[s] ?? 0}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <div className="mt-6">
+            <Tracker
+              cells={machines.map((m) => ({
+                key: m.machine_id,
+                className: healthClasses(m.health_state).dot,
+                tooltip: `${m.machine_id} — ${healthLabel(m.health_state)}`,
+                onClick: () => goToMachine(m.machine_id),
+              }))}
+            />
+          </div>
         </section>
       )}
 

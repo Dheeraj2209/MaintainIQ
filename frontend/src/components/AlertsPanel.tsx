@@ -21,10 +21,10 @@ export function AlertsPanel({ alerts, onSelect, selectedAlertId = null }: Props)
             <motion.button
               type="button"
               onClick={() => onSelect(a)}
-              className={`glass w-full overflow-hidden rounded-xl border-l-2 p-3 text-left transition hover:border-white/20 hover:bg-white/[0.07] ${a.id === selectedAlertId ? 'ring-2 ring-accent/60' : ''}`}
+              className={`w-full overflow-hidden rounded-xl border border-white/10 border-l-2 bg-white/[0.03] p-3 text-left transition hover:border-white/20 hover:bg-white/[0.07] ${a.id === selectedAlertId ? 'ring-2 ring-accent/60' : ''}`}
               style={{ borderLeftColor: 'var(--color-' + severityBorder(a.severity) + ')' }}
-              initial={{ backgroundColor: 'rgba(212,175,55,0.14)' }}
-              animate={{ backgroundColor: 'rgba(19,19,19,1)' }}
+              initial={{ backgroundColor: 'rgba(212,175,55,0.16)' }}
+              animate={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
               transition={{ duration: 1.1, ease: 'easeOut' }}
             >
               <div className="flex items-center justify-between gap-2">

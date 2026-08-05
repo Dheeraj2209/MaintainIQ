@@ -8,6 +8,7 @@ Desktop.ini
 # Editor and local workspace settings
 .vscode/
 .idea/
+.claude/
 *.tmp
 *.bak
 
@@ -39,3 +40,6 @@ frontend/dist/
 .env.local
 frontend/.env
 frontend/.env.local
+
+# Local credentials scratch file — demo/dev logins, never committed.
+/credentials.txt

@@ -42,7 +42,7 @@ function NotificationBell() {
     <NavLink
       to="/notifications"
       aria-label="Notifications"
-      className="relative rounded-md p-2 text-text-muted transition hover:bg-surface-hover hover:text-text"
+      className="relative rounded-md p-2 text-text-muted transition hover:bg-white/10 hover:text-text"
     >
       <Bell className="h-5 w-5" aria-hidden />
       {hasUnseen && (

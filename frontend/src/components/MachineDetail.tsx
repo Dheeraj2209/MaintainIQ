@@ -184,7 +184,7 @@ export function MachineDetail({ machineId }: Props) {
             </thead>
             <tbody>
               {history.map((r) => (
-                <tr key={r.id} className="border-t border-border">
+                <tr key={r.id} className="border-t border-white/10">
                   <td className="py-1 pr-3 font-mono">{r.performed_at}</td>
                   <td className="py-1 pr-3">{r.type ?? '—'}</td>
                   <td className="py-1 pr-3">{r.description ?? '—'}</td>

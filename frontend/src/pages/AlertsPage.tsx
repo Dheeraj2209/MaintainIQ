@@ -101,7 +101,7 @@ export function AlertsPage() {
       ) : (
         <div className="glass overflow-x-auto rounded-2xl">
           <table className="w-full text-left text-sm">
-            <thead className="bg-surface">
+            <thead className="bg-white/[0.04]">
               <tr className="text-xs uppercase text-text-muted">
                 <th className="px-3 py-2">Machine</th>
                 <th className="px-3 py-2">Severity</th>
@@ -118,7 +118,7 @@ export function AlertsPage() {
                 <tr
                   key={a.id}
                   onClick={() => navigate(`/machines/${encodeURIComponent(a.machine_id)}`)}
-                  className="cursor-pointer border-t border-border bg-surface hover:bg-surface-hover"
+                  className="cursor-pointer border-t border-white/10 transition hover:bg-white/[0.05]"
                 >
                   <td className="px-3 py-2 font-medium text-text">{a.machine_id}</td>
                   <td className="px-3 py-2">
@@ -139,7 +139,7 @@ export function AlertsPage() {
                         type="button"
                         disabled={acknowledgingId === a.id}
                         onClick={(e) => handleAcknowledge(e, a.id)}
-                        className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-text backdrop-blur hover:bg-surface-hover disabled:opacity-50"
+                        className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-text backdrop-blur transition hover:border-accent/50 hover:bg-white/10 disabled:opacity-50"
                       >
                         {acknowledgingId === a.id ? 'Acknowledging…' : 'Acknowledge'}
                       </button>

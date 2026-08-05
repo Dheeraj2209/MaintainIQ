@@ -70,7 +70,7 @@ export function MaintenancePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-border text-xs uppercase text-text-muted">
+                  <tr className="border-b border-white/10 text-xs uppercase text-text-muted">
                     <th className="py-2 pr-3">Machine</th>
                     <th className="py-2 pr-3">Performed</th>
                     <th className="py-2 pr-3">Description</th>
@@ -79,7 +79,7 @@ export function MaintenancePage() {
                 </thead>
                 <tbody>
                   {sorted.map((r) => (
-                    <tr key={r.id} className="border-b border-border last:border-0">
+                    <tr key={r.id} className="border-b border-white/10 last:border-0">
                       <td className="py-2 pr-3">
                         <Link
                           to={`/machines/${encodeURIComponent(r.machine_id)}`}

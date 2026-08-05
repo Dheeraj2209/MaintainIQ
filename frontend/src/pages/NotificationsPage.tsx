@@ -56,7 +56,7 @@ export function NotificationsPage() {
       ) : (
         <div className="panel-notch glass overflow-x-auto rounded-2xl">
           <table className="w-full text-left text-sm">
-            <thead className="bg-surface">
+            <thead className="bg-white/[0.04]">
               <tr className="text-xs uppercase text-text-muted">
                 <th className="px-3 py-2">To</th>
                 <th className="px-3 py-2">Subject</th>
@@ -69,7 +69,7 @@ export function NotificationsPage() {
                 <Fragment key={n.id}>
                   <tr
                     onClick={() => setExpandedId((id) => (id === n.id ? null : n.id))}
-                    className="cursor-pointer border-t border-border bg-surface hover:bg-surface-hover"
+                    className="cursor-pointer border-t border-white/10 transition hover:bg-white/[0.05]"
                   >
                     <td className="px-3 py-2 text-text-muted">
                       {n.recipient_email}
@@ -82,7 +82,7 @@ export function NotificationsPage() {
                     <td className="px-3 py-2 text-text-muted">{n.created_at}</td>
                   </tr>
                   {expandedId === n.id && (
-                    <tr className="border-t border-border bg-bg">
+                    <tr className="border-t border-white/10 bg-black/20">
                       <td colSpan={4} className="whitespace-pre-wrap px-3 py-3 text-text-muted">
                         {n.body}
                       </td>

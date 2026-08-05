@@ -37,17 +37,17 @@ const VAR_MAP: Record<keyof ChartColors, string> = {
 // Sensible fallbacks matching index.css, used until the effect runs (and as
 // a safety net under jsdom, where computed custom properties may read empty).
 const FALLBACK: ChartColors = {
-  bg: '#050505',
-  border: '#2a2a2a',
-  textMuted: '#9a9690',
-  surface: '#131313',
-  text: '#f2f0ec',
+  bg: '#070809',
+  border: '#2b2f39',
+  textMuted: '#9aa1ad',
+  surface: '#12141a',
+  text: '#f2f4f8',
   accent: '#e23a3a',
   accent2: '#d4af37',
   healthy: '#3ddc84',
   degrading: '#f0a93a',
   faulty: '#ff7a45',
-  critical: '#ff2d6a',
+  critical: '#ff5470',
   unknown: '#7a7a7a',
 }
 
