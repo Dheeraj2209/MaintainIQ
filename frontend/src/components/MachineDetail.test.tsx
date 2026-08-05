@@ -8,7 +8,7 @@ import { server } from '../test/server'
 import { api } from '../api/client'
 import { machineDetailWithFullHistory, maintenanceHistoryPage2 } from '../test/fixtures'
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), warning: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
 
 function harness(machineId = 'm1') {
   return (
@@ -113,5 +113,21 @@ describe('MachineDetail', () => {
     // 1 header row + 10 initial + 1 appended
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(12))
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument()
+  })
+
+  it('recovers gracefully when loading more history fails', async () => {
+    server.use(http.get('/api/machines/:id', () => HttpResponse.json(machineDetailWithFullHistory)))
+    server.use(http.get('/api/maintenance/:id', () => HttpResponse.error()))
+    render(harness())
+
+    await screen.findByRole('button', { name: /load more/i })
+    // 1 header row + 10 initial history rows
+    expect(screen.getAllByRole('row')).toHaveLength(11)
+
+    await userEvent.click(screen.getByRole('button', { name: /load more/i }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('row')).toHaveLength(11)
   })
 })

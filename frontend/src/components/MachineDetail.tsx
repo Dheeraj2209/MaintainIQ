@@ -94,6 +94,8 @@ export function MachineDetail({ machineId }: Props) {
       const nextPage = await api.getMaintenanceHistory(machineId, { limit: HISTORY_PAGE_SIZE, offset: history.length })
       setHistory((prev) => [...prev, ...nextPage])
       setHasMoreHistory(nextPage.length >= HISTORY_PAGE_SIZE)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to load more history')
     } finally {
       setLoadingMore(false)
     }
