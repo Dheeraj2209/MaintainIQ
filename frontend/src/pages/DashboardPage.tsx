@@ -111,7 +111,7 @@ export function DashboardPage() {
     alerts: (
       <section aria-label="Open alerts">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Open alerts</h2>
-        <AlertsPanel alerts={alerts} onSelect={goToMachine} />
+        <AlertsPanel alerts={alerts} onSelect={(alert) => goToMachine(alert.machine_id)} />
       </section>
     ),
   }

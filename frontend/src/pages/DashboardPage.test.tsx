@@ -54,6 +54,14 @@ describe('DashboardPage', () => {
     expect(await screen.findByText('Selected machine: m1')).toBeInTheDocument()
   })
 
+  it('navigates to the alert\'s machine detail page when an open alert is clicked', async () => {
+    render(harness())
+    const alertsSection = within(await screen.findByRole('region', { name: /open alerts/i }))
+    await userEvent.click(await alertsSection.findByText(/m1 critical/i))
+
+    expect(await screen.findByText('Selected machine: m1')).toBeInTheDocument()
+  })
+
   it('shows an error banner when fleet data fails to load', async () => {
     server.use(http.get('/api/machines', () => HttpResponse.json({ detail: 'machines unavailable' }, { status: 500 })))
     render(harness())
