@@ -39,23 +39,35 @@ def _parse_timestamp(value: str) -> str:
     return parsed.isoformat()
 
 
+def _alert_exists_for_machine(conn, alert_id: int, machine_id: str) -> bool:
+    cur = conn.execute(
+        "SELECT 1 FROM alerts WHERE id = ? AND machine_id = ?", (alert_id, machine_id)
+    )
+    return cur.fetchone() is not None
+
+
 def log_maintenance(conn, machine_id: str, performed_at: str,
-                    description: str = None, technician: str = None) -> dict:
+                    description: str = None, technician: str = None,
+                    alert_id: int = None, type: str = None) -> dict:
     """Insert one maintenance record and return it as a dict.
 
     Validates that the machine exists and performed_at parses before writing,
-    so a bad request never leaves a partial row.
+    so a bad request never leaves a partial row. If alert_id is given, it must
+    reference an alert that belongs to this machine — otherwise a stale or
+    cross-machine form submission could mislink a record.
     """
     if not _machine_exists(conn, machine_id):
         raise MaintenanceError(f"unknown machine_id: {machine_id!r}")
+    if alert_id is not None and not _alert_exists_for_machine(conn, alert_id, machine_id):
+        raise MaintenanceError(f"alert_id {alert_id} does not belong to machine_id {machine_id!r}")
     performed_at = _parse_timestamp(performed_at)
     created_at = datetime.now(timezone.utc).isoformat()
 
     cur = conn.execute(
         """INSERT INTO maintenance_records
-           (machine_id, performed_at, description, technician, created_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        (machine_id, performed_at, description, technician, created_at),
+           (machine_id, performed_at, description, technician, created_at, alert_id, type)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (machine_id, performed_at, description, technician, created_at, alert_id, type),
     )
     conn.commit()
     return {
@@ -65,18 +77,28 @@ def log_maintenance(conn, machine_id: str, performed_at: str,
         "description": description,
         "technician": technician,
         "created_at": created_at,
+        "alert_id": alert_id,
+        "type": type,
     }
 
 
-def get_history(conn, machine_id: str) -> list:
-    """All maintenance records for a machine, most recent first."""
-    cur = conn.execute(
-        """SELECT id, machine_id, performed_at, description, technician, created_at
-           FROM maintenance_records
-           WHERE machine_id = ?
-           ORDER BY performed_at DESC""",
-        (machine_id,),
-    )
+def get_history(conn, machine_id: str, limit: int = None, offset: int = 0) -> list:
+    """Maintenance records for a machine, most recent first.
+
+    `limit=None` returns everything (today's behavior, still used by
+    src/kpi/calculations.py); a numeric limit paginates for the
+    machine-detail "Load more" UI.
+    """
+    query = """SELECT id, machine_id, performed_at, description, technician,
+                      created_at, alert_id, type
+               FROM maintenance_records
+               WHERE machine_id = ?
+               ORDER BY performed_at DESC"""
+    params = [machine_id]
+    if limit is not None:
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+    cur = conn.execute(query, params)
     return [dict(row) for row in cur.fetchall()]
 
 

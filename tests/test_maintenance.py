@@ -55,3 +55,34 @@ def test_days_since_uses_latest_record(conn):
     m.log_maintenance(conn, "m1", "2026-07-24T10:00:00Z", "new", "t")
     fixed_now = datetime(2026, 7, 25, 10, 0, 0, tzinfo=timezone.utc)
     assert m.days_since_last_maintenance(conn, "m1", now=fixed_now) == 1
+
+
+def test_alert_id_accepted_when_it_belongs_to_the_machine(conn):
+    rec = m.log_maintenance(conn, "m1", "2026-07-20T10:00:00Z", alert_id=2, type="corrective")
+    assert rec["alert_id"] == 2
+    assert rec["type"] == "corrective"
+
+
+def test_alert_id_rejected_when_unknown(conn):
+    with pytest.raises(m.MaintenanceError, match="does not belong"):
+        m.log_maintenance(conn, "m1", "2026-07-20T10:00:00Z", alert_id=9999)
+
+
+def test_alert_id_rejected_when_belongs_to_a_different_machine(conn):
+    with pytest.raises(m.MaintenanceError, match="does not belong"):
+        m.log_maintenance(conn, "m2", "2026-07-20T10:00:00Z", alert_id=2)
+
+
+def test_get_history_pagination(conn):
+    for i in range(3):
+        m.log_maintenance(conn, "m1", f"2026-07-{10 + i:02d}T10:00:00Z", description=str(i))
+    page1 = m.get_history(conn, "m1", limit=2, offset=0)
+    page2 = m.get_history(conn, "m1", limit=2, offset=2)
+    assert len(page1) == 2
+    assert len(page2) == 1
+
+
+def test_get_history_unbounded_when_limit_omitted(conn):
+    for i in range(3):
+        m.log_maintenance(conn, "m1", f"2026-07-{10 + i:02d}T10:00:00Z")
+    assert len(m.get_history(conn, "m1")) == 3
