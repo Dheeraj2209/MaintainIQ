@@ -21,7 +21,7 @@ export function MachineDetailPage() {
       <Link to="/machines" className="text-sm text-accent hover:text-accent-hover">
         ← Back to machines
       </Link>
-      <MachineDetail key={`${id}-${reloadCount}`} machineId={id} onLogged={() => {}} />
+      <MachineDetail key={`${id}-${reloadCount}`} machineId={id} />
     </div>
   )
 }
