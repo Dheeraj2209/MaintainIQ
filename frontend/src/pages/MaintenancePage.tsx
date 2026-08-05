@@ -20,7 +20,7 @@ export function MaintenancePage() {
       const m = await api.getMachines()
       setMachines(m)
       setSelectedMachineId((prev) => prev || m[0]?.machine_id || '')
-      const histories = await Promise.all(m.map((machine) => api.getMaintenanceHistory(machine.machine_id)))
+      const histories = await Promise.all(m.map((machine) => api.getMaintenanceHistory(machine.machine_id, { limit: 200 })))
       setRecords(histories.flat())
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load maintenance history')

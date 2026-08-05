@@ -80,4 +80,17 @@ describe('MaintenancePage', () => {
     expect(screen.getByText('Replaced belt')).toBeInTheDocument()
     expect(screen.queryByText(/no maintenance records logged yet/i)).not.toBeInTheDocument()
   })
+
+  it('requests a high history limit per machine to avoid silent truncation', async () => {
+    let capturedUrl = ''
+    server.use(
+      http.get('/api/maintenance/:id', ({ request, params }) => {
+        if (params.id === 'm1') capturedUrl = request.url
+        return HttpResponse.json([])
+      }),
+    )
+    render(harness())
+    await screen.findByText(/no maintenance records logged yet/i)
+    expect(capturedUrl).toContain('limit=200')
+  })
 })
