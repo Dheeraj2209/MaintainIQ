@@ -93,7 +93,7 @@ def get_history(conn, machine_id: str, limit: int = None, offset: int = 0) -> li
                       created_at, alert_id, type
                FROM maintenance_records
                WHERE machine_id = ?
-               ORDER BY performed_at DESC"""
+               ORDER BY performed_at DESC, id DESC"""
     params = [machine_id]
     if limit is not None:
         query += " LIMIT ? OFFSET ?"

@@ -86,3 +86,22 @@ def test_get_history_unbounded_when_limit_omitted(conn):
     for i in range(3):
         m.log_maintenance(conn, "m1", f"2026-07-{10 + i:02d}T10:00:00Z")
     assert len(m.get_history(conn, "m1")) == 3
+
+
+def test_get_history_pagination_is_stable_with_duplicate_performed_at(conn):
+    """Rows sharing the same performed_at must still page deterministically:
+    the id DESC tie-break means no row appears twice or is skipped across
+    the LIMIT/OFFSET boundary."""
+    ids = []
+    for i in range(6):
+        rec = m.log_maintenance(conn, "m1", "2026-07-20T10:00:00Z", description=str(i))
+        ids.append(rec["id"])
+
+    page1 = m.get_history(conn, "m1", limit=3, offset=0)
+    page2 = m.get_history(conn, "m1", limit=3, offset=3)
+
+    combined_ids = [r["id"] for r in page1] + [r["id"] for r in page2]
+    assert sorted(combined_ids) == sorted(ids)
+    assert len(set(combined_ids)) == len(ids)
+    # stable order: most-recently-inserted id first, consistent across pages
+    assert combined_ids == sorted(ids, reverse=True)
