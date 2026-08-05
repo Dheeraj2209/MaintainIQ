@@ -6,6 +6,7 @@ import type {
   KpiSummary,
   MachineDetail,
   MachineSummary,
+  MaintenanceRecord,
   NotificationOut,
   TrendPoint,
   UserOut,
@@ -145,3 +146,32 @@ export const notifications: NotificationOut[] = [
     created_at: '2003-10-22T13:00:05+00:00',
   },
 ]
+
+export const maintenanceHistoryPage1: MaintenanceRecord[] = Array.from({ length: 10 }, (_, i): MaintenanceRecord => ({
+  id: i + 1,
+  machine_id: 'm1',
+  performed_at: `2026-07-${String(i + 1).padStart(2, '0')}T10:00:00+00:00`,
+  description: `service ${i + 1}`,
+  technician: 'tech1',
+  alert_id: null,
+  type: i % 2 === 0 ? 'preventive' : 'corrective',
+  created_at: '2026-07-01T00:00:00+00:00',
+}))
+
+export const maintenanceHistoryPage2: MaintenanceRecord[] = [
+  {
+    id: 11,
+    machine_id: 'm1',
+    performed_at: '2026-06-01T10:00:00+00:00',
+    description: 'older service',
+    technician: 'tech1',
+    alert_id: null,
+    type: 'preventive',
+    created_at: '2026-06-01T00:00:00+00:00',
+  },
+]
+
+export const machineDetailWithFullHistory: MachineDetail = {
+  ...machineDetail,
+  maintenance_history: maintenanceHistoryPage1,
+}
