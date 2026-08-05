@@ -56,23 +56,24 @@ it, and the Alerts panel on this same page has a dead click handler. This
 overlaps with item 1 (alert acknowledge workflow) — a coherent fix likely
 addresses both together.
 
-- [ ] Wire `AlertsPanel`'s `onSelect` in `MachineDetail.tsx` to something
+- [x] Wire `AlertsPanel`'s `onSelect` in `MachineDetail.tsx` to something
       real instead of `() => {}` (currently a dead click on every alert row)
-- [ ] Let "Log Maintenance" reference/resolve a specific alert: add an
+- [x] Let "Log Maintenance" reference/resolve a specific alert: add an
       optional `alert_id` field to `MaintenanceCreate`/`maintenance_records`
       (`src/api/schemas.py`, `src/storage/db.py`, `src/maintenance/records.py`),
       and pre-fill the form when logging maintenance from an alert row
-- [ ] Tie `technician` to the authenticated user instead of free text —
+- [x] Tie `technician` to the authenticated user instead of free text —
       the app already has `AuthContext`/JWT with user roles; default the
       field to the logged-in user (still editable) instead of an
       unaccountable string
-- [ ] Add a maintenance `type` (preventive/corrective) and optionally
+- [x] Add a maintenance `type` (preventive/corrective) and optionally
       `cost`/`parts_used` fields — currently there's no way to distinguish
       a scheduled inspection from a breakdown repair in the history table
-- [ ] Remove the dead `onLogged` no-op prop plumbing
+      (`type` field done; `cost`/`parts_used` were optional and left out of scope)
+- [x] Remove the dead `onLogged` no-op prop plumbing
       (`MachineDetailPage.tsx` → `MachineDetail.tsx`) or make it do
       something real (e.g. toast/notification) — currently vestigial
-- [ ] Paginate or cap `maintenance_history` on `GET /machines/{id}` —
+- [x] Paginate or cap `maintenance_history` on `GET /machines/{id}` —
       currently returns the full unbounded history array
 
 ## 6. Frontend/backend "two ports" — already integrated, not a gap
