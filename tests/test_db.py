@@ -91,3 +91,58 @@ def test_maintenance_records_type_check_constraint():
             """INSERT INTO maintenance_records (machine_id, performed_at, created_at, type)
                VALUES ('m1', '2026-01-01T00:00:00', '2026-01-01T00:00:00', 'bogus')"""
         )
+
+
+def test_maintenance_records_type_check_constraint_via_alter_upgrade_path():
+    """The `type` column is added via ALTER TABLE for pre-existing DBs (the
+    branch at src/storage/db.py's init_schema that only fires when the column
+    is missing). Simulate that upgrade path — create the table in its
+    old shape (no alert_id/type), run init_schema to add the columns via
+    ALTER, then confirm the CHECK constraint added by that ALTER is enforced
+    exactly like the fresh-SCHEMA path: valid types insert, an invalid type
+    raises IntegrityError."""
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """CREATE TABLE maintenance_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            machine_id TEXT NOT NULL,
+            performed_at TEXT NOT NULL,
+            description TEXT,
+            technician TEXT,
+            created_at TEXT NOT NULL
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE machines (
+            machine_id TEXT PRIMARY KEY,
+            source_test TEXT,
+            bearing TEXT,
+            is_documented_failure INTEGER
+        )"""
+    )
+    conn.commit()
+
+    init_schema(conn)  # must not raise, and must add alert_id/type via ALTER
+
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(maintenance_records)")}
+    assert "type" in cols
+
+    conn.execute(
+        "INSERT INTO machines (machine_id, source_test, bearing, is_documented_failure) VALUES ('m1', 't', 'b', 0)"
+    )
+    conn.commit()
+
+    for valid_type in ("preventive", "corrective"):
+        conn.execute(
+            """INSERT INTO maintenance_records (machine_id, performed_at, created_at, type)
+               VALUES ('m1', '2026-01-01T00:00:00', '2026-01-01T00:00:00', ?)""",
+            (valid_type,),
+        )
+    conn.commit()
+
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            """INSERT INTO maintenance_records (machine_id, performed_at, created_at, type)
+               VALUES ('m1', '2026-01-01T00:00:00', '2026-01-01T00:00:00', 'bogus')"""
+        )
