@@ -8,6 +8,7 @@ A predictive maintenance decision-support system using vibration and temperature
 - [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — milestone-by-milestone build order.
 - [`design/SRS_Document.md`](design/SRS_Document.md) — full requirements specification.
 - [`design/`](design/) — all other design documents, presentations, and architecture diagrams.
+- [`research/XJTU_SY_MODEL_CARD.md`](research/XJTU_SY_MODEL_CARD.md) — RUL dataset choice, training, validation, and real-time limitations.
 
 ## Repository layout
 
@@ -130,6 +131,20 @@ notify → broadcast pipeline a future live telemetry feed would use.
 ### Tests
 
 ```bash
-python -m pytest              # backend (61 tests)
-cd frontend && npm run test   # frontend, Vitest (103 tests)
+python -m pytest              # backend
+cd frontend && npm run test   # frontend, Vitest
 ```
+
+## Train the real run-to-failure RUL model
+
+The older IMS stage classifier remains for the original dashboard demo. For
+an actual remaining-useful-life experiment, use the XJTU-SY pipeline. Download
+and extract the official dataset, then run:
+
+```bash
+python -m src.training.xjtu_rul --data-dir /path/to/XJTU-SY_Bearing_Datasets --rebuild-features
+```
+
+This creates `models/xjtu_rul_model.joblib` and an evaluation report using
+strict leave-one-bearing-out validation. Full details and the real-time API
+contract are in [`research/XJTU_SY_MODEL_CARD.md`](research/XJTU_SY_MODEL_CARD.md).

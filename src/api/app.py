@@ -15,7 +15,17 @@ from fastapi import Depends, FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.api.routes import alerts, auth, demo, kpis, machines, maintenance, notifications, users
+from src.api.routes import (
+    alerts,
+    auth,
+    demo,
+    kpis,
+    machines,
+    maintenance,
+    notifications,
+    predictions,
+    users,
+)
 from src.auth.deps import get_current_user
 from src.realtime.routes import realtime
 
@@ -33,7 +43,7 @@ app.include_router(users.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(demo.router, prefix="/api")
-for module in (machines, alerts, maintenance, kpis):
+for module in (machines, alerts, maintenance, kpis, predictions):
     app.include_router(module.router, prefix="/api", dependencies=[Depends(get_current_user)])
 
 

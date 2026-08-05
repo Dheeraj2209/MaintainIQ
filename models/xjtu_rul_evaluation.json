@@ -1,0 +1,391 @@
+{
+  "dataset": "XJTU-SY",
+  "approach": "two-stage prognostics: classify failure within horizon, then regress RUL",
+  "validation": "leave-one-bearing-out; each of 15 test folds is one completely unseen bearing",
+  "bearing_count": 15,
+  "sample_count": 9216,
+  "classifier_feature_count": 203,
+  "regressor_feature_count": 342,
+  "classifier_ensemble_size": 3,
+  "prognostic_horizon_minutes": 120.0,
+  "failure_probability_threshold": 0.6,
+  "probability_smoothing_window": 3,
+  "warning_persistence_snapshots": 3,
+  "failure_detection": {
+    "precision": 0.7247075017205781,
+    "recall": 0.6343373493975903,
+    "f1": 0.6765178284612914,
+    "average_precision": 0.6225354240421872,
+    "roc_auc": 0.8142943133040368,
+    "false_alarm_count": 400,
+    "missed_failure_window_count": 607
+  },
+  "raw_failure_detection_without_temporal_smoothing": {
+    "precision": 0.717948717948718,
+    "recall": 0.6578313253012048,
+    "average_precision": 0.6238009100047632,
+    "roc_auc": 0.8163570640422994,
+    "false_alarm_count": 429,
+    "missed_failure_window_count": 568
+  },
+  "smoothed_failure_detection_without_persistence": {
+    "precision": 0.723148765843896,
+    "recall": 0.653012048192771,
+    "false_alarm_count": 415,
+    "missed_failure_window_count": 576
+  },
+  "first_warning_events": {
+    "within_horizon_bearings": 10,
+    "early_warning_bearings": 5,
+    "no_warning_bearings": 0,
+    "per_bearing": [
+      {
+        "bearing_id": "Bearing1_1",
+        "actual_rul_minutes_at_first_warning": 120.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing1_2",
+        "actual_rul_minutes_at_first_warning": 158.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing1_3",
+        "actual_rul_minutes_at_first_warning": 95.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing1_4",
+        "actual_rul_minutes_at_first_warning": 58.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing1_5",
+        "actual_rul_minutes_at_first_warning": 13.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_1",
+        "actual_rul_minutes_at_first_warning": 33.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_2",
+        "actual_rul_minutes_at_first_warning": 104.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_3",
+        "actual_rul_minutes_at_first_warning": 402.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing2_4",
+        "actual_rul_minutes_at_first_warning": 7.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_5",
+        "actual_rul_minutes_at_first_warning": 179.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing3_1",
+        "actual_rul_minutes_at_first_warning": 140.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing3_2",
+        "actual_rul_minutes_at_first_warning": 220.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing3_3",
+        "actual_rul_minutes_at_first_warning": 25.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing3_4",
+        "actual_rul_minutes_at_first_warning": 91.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing3_5",
+        "actual_rul_minutes_at_first_warning": 103.0,
+        "timing": "within_horizon"
+      }
+    ]
+  },
+  "within_horizon_rul": {
+    "mae_minutes": 30.845007716580607,
+    "rmse_minutes": 37.75585028414267,
+    "error_90_minutes": 62.764619047619036
+  },
+  "folds": [
+    {
+      "fold": 1,
+      "test_bearings": [
+        "Bearing1_1"
+      ],
+      "samples": 123,
+      "failure_precision": 1.0,
+      "failure_recall": 0.5041322314049587,
+      "within_horizon_rul_mae_minutes": 25.646940574576938
+    },
+    {
+      "fold": 2,
+      "test_bearings": [
+        "Bearing1_2"
+      ],
+      "samples": 161,
+      "failure_precision": 0.7610062893081762,
+      "failure_recall": 1.0,
+      "within_horizon_rul_mae_minutes": 30.63901298701298
+    },
+    {
+      "fold": 3,
+      "test_bearings": [
+        "Bearing1_3"
+      ],
+      "samples": 158,
+      "failure_precision": 1.0,
+      "failure_recall": 0.7933884297520661,
+      "within_horizon_rul_mae_minutes": 27.71172884691067
+    },
+    {
+      "fold": 4,
+      "test_bearings": [
+        "Bearing1_4"
+      ],
+      "samples": 122,
+      "failure_precision": 1.0,
+      "failure_recall": 0.3305785123966942,
+      "within_horizon_rul_mae_minutes": 32.83136009445099
+    },
+    {
+      "fold": 5,
+      "test_bearings": [
+        "Bearing1_5"
+      ],
+      "samples": 52,
+      "failure_precision": 1.0,
+      "failure_recall": 0.2692307692307692,
+      "within_horizon_rul_mae_minutes": 55.60631410256413
+    },
+    {
+      "fold": 6,
+      "test_bearings": [
+        "Bearing2_1"
+      ],
+      "samples": 491,
+      "failure_precision": 1.0,
+      "failure_recall": 0.2809917355371901,
+      "within_horizon_rul_mae_minutes": 22.708584809130265
+    },
+    {
+      "fold": 7,
+      "test_bearings": [
+        "Bearing2_2"
+      ],
+      "samples": 161,
+      "failure_precision": 1.0,
+      "failure_recall": 0.6776859504132231,
+      "within_horizon_rul_mae_minutes": 29.125697363242825
+    },
+    {
+      "fold": 8,
+      "test_bearings": [
+        "Bearing2_3"
+      ],
+      "samples": 533,
+      "failure_precision": 0.3002481389578164,
+      "failure_recall": 1.0,
+      "within_horizon_rul_mae_minutes": 45.53103148366785
+    },
+    {
+      "fold": 9,
+      "test_bearings": [
+        "Bearing2_4"
+      ],
+      "samples": 42,
+      "failure_precision": 1.0,
+      "failure_recall": 0.14285714285714285,
+      "within_horizon_rul_mae_minutes": 63.605335600907026
+    },
+    {
+      "fold": 10,
+      "test_bearings": [
+        "Bearing2_5"
+      ],
+      "samples": 339,
+      "failure_precision": 0.6722222222222223,
+      "failure_recall": 1.0,
+      "within_horizon_rul_mae_minutes": 43.4769590712318
+    },
+    {
+      "fold": 11,
+      "test_bearings": [
+        "Bearing3_1"
+      ],
+      "samples": 2538,
+      "failure_precision": 0.8561151079136691,
+      "failure_recall": 0.9834710743801653,
+      "within_horizon_rul_mae_minutes": 16.83153876426603
+    },
+    {
+      "fold": 12,
+      "test_bearings": [
+        "Bearing3_2"
+      ],
+      "samples": 2496,
+      "failure_precision": 0.9642857142857143,
+      "failure_recall": 0.2231404958677686,
+      "within_horizon_rul_mae_minutes": 32.06915033451398
+    },
+    {
+      "fold": 13,
+      "test_bearings": [
+        "Bearing3_3"
+      ],
+      "samples": 371,
+      "failure_precision": 1.0,
+      "failure_recall": 0.21487603305785125,
+      "within_horizon_rul_mae_minutes": 26.553551357733166
+    },
+    {
+      "fold": 14,
+      "test_bearings": [
+        "Bearing3_4"
+      ],
+      "samples": 1515,
+      "failure_precision": 1.0,
+      "failure_recall": 0.7603305785123967,
+      "within_horizon_rul_mae_minutes": 27.312787091696187
+    },
+    {
+      "fold": 15,
+      "test_bearings": [
+        "Bearing3_5"
+      ],
+      "samples": 114,
+      "failure_precision": 1.0,
+      "failure_recall": 0.8157894736842105,
+      "within_horizon_rul_mae_minutes": 17.778253550543024
+    }
+  ],
+  "per_bearing": [
+    {
+      "bearing_id": "Bearing1_1",
+      "samples": 123,
+      "failure_precision": 1.0,
+      "failure_recall": 0.5041322314049587,
+      "within_horizon_rul_mae_minutes": 25.646940574576938
+    },
+    {
+      "bearing_id": "Bearing1_2",
+      "samples": 161,
+      "failure_precision": 0.7610062893081762,
+      "failure_recall": 1.0,
+      "within_horizon_rul_mae_minutes": 30.63901298701298
+    },
+    {
+      "bearing_id": "Bearing1_3",
+      "samples": 158,
+      "failure_precision": 1.0,
+      "failure_recall": 0.7933884297520661,
+      "within_horizon_rul_mae_minutes": 27.71172884691067
+    },
+    {
+      "bearing_id": "Bearing1_4",
+      "samples": 122,
+      "failure_precision": 1.0,
+      "failure_recall": 0.3305785123966942,
+      "within_horizon_rul_mae_minutes": 32.83136009445099
+    },
+    {
+      "bearing_id": "Bearing1_5",
+      "samples": 52,
+      "failure_precision": 1.0,
+      "failure_recall": 0.2692307692307692,
+      "within_horizon_rul_mae_minutes": 55.60631410256413
+    },
+    {
+      "bearing_id": "Bearing2_1",
+      "samples": 491,
+      "failure_precision": 1.0,
+      "failure_recall": 0.2809917355371901,
+      "within_horizon_rul_mae_minutes": 22.708584809130265
+    },
+    {
+      "bearing_id": "Bearing2_2",
+      "samples": 161,
+      "failure_precision": 1.0,
+      "failure_recall": 0.6776859504132231,
+      "within_horizon_rul_mae_minutes": 29.125697363242825
+    },
+    {
+      "bearing_id": "Bearing2_3",
+      "samples": 533,
+      "failure_precision": 0.3002481389578164,
+      "failure_recall": 1.0,
+      "within_horizon_rul_mae_minutes": 45.53103148366785
+    },
+    {
+      "bearing_id": "Bearing2_4",
+      "samples": 42,
+      "failure_precision": 1.0,
+      "failure_recall": 0.14285714285714285,
+      "within_horizon_rul_mae_minutes": 63.605335600907026
+    },
+    {
+      "bearing_id": "Bearing2_5",
+      "samples": 339,
+      "failure_precision": 0.6722222222222223,
+      "failure_recall": 1.0,
+      "within_horizon_rul_mae_minutes": 43.4769590712318
+    },
+    {
+      "bearing_id": "Bearing3_1",
+      "samples": 2538,
+      "failure_precision": 0.8561151079136691,
+      "failure_recall": 0.9834710743801653,
+      "within_horizon_rul_mae_minutes": 16.83153876426603
+    },
+    {
+      "bearing_id": "Bearing3_2",
+      "samples": 2496,
+      "failure_precision": 0.9642857142857143,
+      "failure_recall": 0.2231404958677686,
+      "within_horizon_rul_mae_minutes": 32.06915033451398
+    },
+    {
+      "bearing_id": "Bearing3_3",
+      "samples": 371,
+      "failure_precision": 1.0,
+      "failure_recall": 0.21487603305785125,
+      "within_horizon_rul_mae_minutes": 26.553551357733166
+    },
+    {
+      "bearing_id": "Bearing3_4",
+      "samples": 1515,
+      "failure_precision": 1.0,
+      "failure_recall": 0.7603305785123967,
+      "within_horizon_rul_mae_minutes": 27.312787091696187
+    },
+    {
+      "bearing_id": "Bearing3_5",
+      "samples": 114,
+      "failure_precision": 1.0,
+      "failure_recall": 0.8157894736842105,
+      "within_horizon_rul_mae_minutes": 17.778253550543024
+    }
+  ],
+  "artifact": "C:\\Users\\aryan\\MaintainIQ\\models\\xjtu_rul_model.joblib",
+  "created_at": "2026-08-05T00:31:07.330668+00:00",
+  "limitations": [
+    "outside the prognostic horizon the model returns a lower bound, not an invented exact RUL",
+    "accelerated laboratory bearing failures are not the same distribution as field machines",
+    "the interval is an empirical cross-validation error bound, not a safety guarantee",
+    "deployment requires target-machine healthy-baseline and run-to-failure/failure-history validation"
+  ]
+}

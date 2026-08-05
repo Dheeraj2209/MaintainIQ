@@ -15,6 +15,7 @@ Desktop.ini
 node_modules/
 __pycache__/
 *.py[cod]
+.pytest_cache/
 .venv/
 venv/
 
@@ -39,3 +40,8 @@ frontend/dist/
 .env.local
 frontend/.env
 frontend/.env.local
+
+# Local research scratch files and superseded XJTU model backups.
+/tmp/
+/models/xjtu_rul_model_v1.joblib
+/models/xjtu_rul_evaluation_v1.json

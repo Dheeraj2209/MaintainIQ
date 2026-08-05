@@ -7,7 +7,7 @@ would duplicate that logic without adding safety for a demo dashboard.
 """
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 Role = Literal["admin", "supervisor", "operator"]
 
@@ -145,3 +145,30 @@ class SimulateFaultResponse(BaseModel):
     probable_cause: Optional[str] = None
     alert: Optional[Alert] = None
     emails_sent: int
+
+
+class RULPredictionRequest(BaseModel):
+    machine_id: str = Field(min_length=1, max_length=128)
+    horizontal: list[float] = Field(min_length=32)
+    vertical: list[float] = Field(min_length=32)
+    sample_rate_hz: float = Field(default=25_600.0, gt=0)
+    speed_rpm: float = Field(gt=0)
+    load_kn: float = Field(ge=0)
+
+
+class RULPredictionResponse(BaseModel):
+    machine_id: str
+    predicted_rul_minutes: float
+    predicted_rul_hours: float
+    rul_estimate_kind: str
+    prognostic_horizon_minutes: float
+    failure_within_horizon_probability: float
+    raw_failure_within_horizon_probability: float
+    warning_persistence_snapshots: int
+    prediction_interval_90_minutes: list[Optional[float]]
+    health_state: str
+    model_version: str
+    history_snapshots: int
+    out_of_distribution: bool
+    outside_training_features: list[str]
+    warnings: list[str]
