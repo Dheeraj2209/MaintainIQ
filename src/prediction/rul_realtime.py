@@ -32,6 +32,7 @@ class RealTimeRULPredictor:
                 f"RUL model not found at {artifact_path}; run "
                 "python -m src.training.xjtu_rul first"
             )
+        self.artifact_path = Path(artifact_path)
         artifact = joblib.load(artifact_path)
         required = {
             "regressor",
