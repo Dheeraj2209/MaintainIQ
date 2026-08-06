@@ -11,6 +11,7 @@ import { MachinesPage } from './pages/MachinesPage'
 import { MachineDetailPage } from './pages/MachineDetailPage'
 import { AlertsPage } from './pages/AlertsPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
+import { ModelPage } from './pages/ModelPage'
 import { MaintenancePage } from './pages/MaintenancePage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="machines/:id" element={<MachineDetailPage />} />
                 <Route path="alerts" element={<AlertsPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="model" element={<ModelPage />} />
                 <Route path="maintenance" element={<MaintenancePage />} />
 
                 <Route element={<RequireRole allow={['admin', 'supervisor']} />}>
