@@ -7,7 +7,11 @@ import type {
   MachineDetail,
   MachineSummary,
   MaintenanceRecord,
+  ModelHealth,
+  ModelTelemetry,
   NotificationOut,
+  ReplayStatus,
+  Report,
   TrendPoint,
   UserOut,
 } from '../api/types'
@@ -178,4 +182,57 @@ export const maintenanceHistoryPage2: MaintenanceRecord[] = [
 export const machineDetailWithFullHistory: MachineDetail = {
   ...machineDetail,
   maintenance_history: maintenanceHistoryPage1,
+}
+
+export const modelHealth: ModelHealth = {
+  status: 'healthy',
+  model_version: 'xjtu_rul_v1',
+  last_inference_at: '2003-10-22T13:00:00+00:00',
+  seconds_since_last_inference: 12.5,
+  active: true,
+}
+
+export const modelTelemetry: ModelTelemetry = {
+  window_minutes: 60,
+  inference_count: 128,
+  error_rate: 0.0,
+  latency_p50_ms: 8.4,
+  latency_p95_ms: 21.7,
+  ood_rate: 0.05,
+  warming_up_rate: 0.1,
+}
+
+export const replayStatus: ReplayStatus = {
+  m1: { cycle: 3, running: true, last_ts: '2003-10-22T13:00:00+00:00', replayed: 1500, error: null },
+  m2: { cycle: null, running: false, last_ts: null, replayed: 0, error: null },
+}
+
+export const reports: Report[] = [
+  {
+    id: 2,
+    report_type: 'fleet_summary',
+    scope: 'fleet',
+    format: 'json',
+    period_start: null,
+    period_end: null,
+    generated_at: '2026-08-06T10:00:00+00:00',
+    generated_by: 1,
+    summary: { machine_count: 2 },
+  },
+  {
+    id: 1,
+    report_type: 'machine_prognostic',
+    scope: 'm1',
+    format: 'markdown',
+    period_start: null,
+    period_end: null,
+    generated_at: '2026-08-06T09:00:00+00:00',
+    generated_by: 1,
+    summary: { report_type: 'machine_prognostic' },
+  },
+]
+
+export const reportDetail: Report = {
+  ...reports[1],
+  content: '# Machine Prognostic Report\n\nPredicted RUL: 42 minutes',
 }

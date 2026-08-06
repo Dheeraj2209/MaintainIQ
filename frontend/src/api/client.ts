@@ -8,7 +8,15 @@ import type {
   MachineSummary,
   MaintenanceCreate,
   MaintenanceRecord,
+  ModelHealth,
+  ModelTelemetry,
   NotificationOut,
+  Report,
+  ReportCreateRequest,
+  ReplayStartRequest,
+  ReplayStartResponse,
+  ReplayStatus,
+  ReplayStopResponse,
   SimulateFaultRequest,
   SimulateFaultResponse,
   TrendPoint,
@@ -28,16 +36,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    // Session is an httpOnly cookie (src/auth/security.py) — 'same-origin' is
-    // fetch's default, but spelled out here since the whole app's auth model
-    // depends on it: both dev (Vite proxy) and prod (FastAPI serves the SPA)
-    // keep API calls same-origin from the browser's point of view.
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  })
+// Shared response handling: fire the app-wide logout event on 401 and turn any
+// non-2xx into an ApiError carrying the backend `detail`. Used by both the JSON
+// `request` helper and the raw `downloadReport` fetch below.
+async function throwIfError(res: Response): Promise<void> {
   if (res.status === 401) {
     window.dispatchEvent(new Event('miq:unauthorized'))
   }
@@ -51,6 +53,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(res.status, detail)
   }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    // Session is an httpOnly cookie (src/auth/security.py) — 'same-origin' is
+    // fetch's default, but spelled out here since the whole app's auth model
+    // depends on it: both dev (Vite proxy) and prod (FastAPI serves the SPA)
+    // keep API calls same-origin from the browser's point of view.
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  })
+  await throwIfError(res)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
@@ -98,4 +113,38 @@ export const api = {
     request<SimulateFaultResponse>(`/demo/reset-machine/${encodeURIComponent(machineId)}`, {
       method: 'POST',
     }),
+
+  getModelHealth: () => request<ModelHealth>('/model/health'),
+  getModelTelemetry: (windowMinutes?: number) =>
+    request<ModelTelemetry>(`/model/telemetry${windowMinutes != null ? `?window_minutes=${windowMinutes}` : ''}`),
+
+  startReplay: (payload: ReplayStartRequest) =>
+    request<ReplayStartResponse>('/ingestion/replay/start', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  stopReplay: (machineId: string) =>
+    request<ReplayStopResponse>('/ingestion/replay/stop', {
+      method: 'POST',
+      body: JSON.stringify({ machine_id: machineId }),
+    }),
+  getReplayStatus: () => request<ReplayStatus>('/ingestion/replay/status'),
+
+  createReport: (payload: ReportCreateRequest) =>
+    request<Report>('/reports', { method: 'POST', body: JSON.stringify(payload) }),
+  listReports: (scope?: string) =>
+    request<Report[]>(`/reports${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`),
+  getReport: (id: number) => request<Report>(`/reports/${id}`),
+  // Raw download: the endpoint returns the file body (not JSON) with a
+  // Content-Disposition filename. Returns the parsed filename + text content so
+  // the caller can build a Blob and trigger a browser download.
+  downloadReport: async (id: number): Promise<{ filename: string; content: string }> => {
+    const res = await fetch(`${BASE}/reports/${id}/download`, { credentials: 'same-origin' })
+    await throwIfError(res)
+    const disposition = res.headers.get('Content-Disposition') ?? ''
+    const match = /filename="?([^"]+)"?/.exec(disposition)
+    const filename = match ? match[1] : `report-${id}`
+    const content = await res.text()
+    return { filename, content }
+  },
 }

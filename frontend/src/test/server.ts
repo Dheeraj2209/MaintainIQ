@@ -5,8 +5,13 @@ import {
   kpiSummary,
   machineDetail,
   machineSummaries,
+  modelHealth,
+  modelTelemetry,
   notifications,
   openAlerts,
+  replayStatus,
+  reportDetail,
+  reports,
   trendPoints,
   users,
 } from './fixtures'
@@ -70,6 +75,45 @@ export const handlers = [
       emails_sent: 0,
     })
   }),
+
+  http.get('/api/model/health', () => HttpResponse.json(modelHealth)),
+  http.get('/api/model/telemetry', () => HttpResponse.json(modelTelemetry)),
+
+  http.get('/api/ingestion/replay/status', () => HttpResponse.json(replayStatus)),
+  http.post('/api/ingestion/replay/start', async ({ request }) => {
+    const body = (await request.json()) as { machine_id: string; speed_multiplier?: number }
+    return HttpResponse.json({
+      machine_id: body.machine_id,
+      status: 'started',
+      speed_multiplier: body.speed_multiplier ?? 1.0,
+    })
+  }),
+  http.post('/api/ingestion/replay/stop', async ({ request }) => {
+    const body = (await request.json()) as { machine_id: string }
+    return HttpResponse.json({ machine_id: body.machine_id, status: 'stopped' })
+  }),
+
+  http.get('/api/reports', () => HttpResponse.json(reports)),
+  http.post('/api/reports', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({
+      id: 3,
+      generated_at: '2026-08-06T11:00:00+00:00',
+      generated_by: 1,
+      content: '# Report',
+      summary: {},
+      ...body,
+    })
+  }),
+  http.get('/api/reports/:id', () => HttpResponse.json(reportDetail)),
+  http.get('/api/reports/:id/download', () =>
+    new HttpResponse('# Machine Prognostic Report', {
+      headers: {
+        'Content-Type': 'text/markdown',
+        'Content-Disposition': 'attachment; filename="report-1.md"',
+      },
+    }),
+  ),
 ]
 
 export const server = setupServer(...handlers)

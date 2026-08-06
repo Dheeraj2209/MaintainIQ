@@ -161,3 +161,76 @@ export interface LiveEvent {
   alert: Alert
   at: string
 }
+
+// ---- Model observability (src/api/routes/model.py) ----
+export interface ModelHealth {
+  status: 'healthy' | 'stale'
+  model_version: string | null
+  last_inference_at: string | null
+  seconds_since_last_inference: number | null
+  active: boolean
+}
+
+export interface ModelTelemetry {
+  window_minutes: number
+  inference_count: number
+  error_rate: number
+  latency_p50_ms: number | null
+  latency_p95_ms: number | null
+  ood_rate: number
+  warming_up_rate: number
+}
+
+// ---- Ingestion replay control (src/api/routes/ingestion.py) ----
+export interface ReplayMachineStatus {
+  cycle: number | null
+  running: boolean
+  last_ts: string | null
+  replayed: number
+  error: string | null
+}
+
+export type ReplayStatus = Record<string, ReplayMachineStatus>
+
+export interface ReplayStartRequest {
+  machine_id: string
+  speed_multiplier?: number
+}
+
+export interface ReplayStartResponse {
+  machine_id: string
+  status: string
+  speed_multiplier: number
+}
+
+export interface ReplayStopResponse {
+  machine_id: string
+  status: string
+}
+
+// ---- Reports (src/api/routes/reports.py) ----
+export type ReportType = 'machine_prognostic' | 'model_performance' | 'fleet_summary'
+export type ReportFormat = 'markdown' | 'json'
+
+export interface ReportCreateRequest {
+  report_type: ReportType
+  scope: string
+  format?: ReportFormat
+  period_start?: string | null
+  period_end?: string | null
+}
+
+// list responses omit `content` (see src/reports/service.py:list_reports);
+// create/get responses include it.
+export interface Report {
+  id: number
+  report_type: ReportType
+  scope: string
+  format: ReportFormat
+  period_start: string | null
+  period_end: string | null
+  generated_at: string
+  generated_by: number | null
+  summary: Record<string, unknown> | null
+  content?: string
+}
