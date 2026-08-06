@@ -13,6 +13,7 @@ import { AlertsPage } from './pages/AlertsPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { ModelPage } from './pages/ModelPage'
 import { IngestionPage } from './pages/IngestionPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { MaintenancePage } from './pages/MaintenancePage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
@@ -35,6 +36,7 @@ export default function App() {
                 <Route path="alerts" element={<AlertsPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="model" element={<ModelPage />} />
+                <Route path="reports" element={<ReportsPage />} />
                 <Route path="maintenance" element={<MaintenancePage />} />
 
                 <Route element={<RequireRole allow={['admin', 'supervisor']} />}>
