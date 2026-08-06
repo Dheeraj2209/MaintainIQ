@@ -174,3 +174,12 @@ class RULPredictionResponse(BaseModel):
     out_of_distribution: bool
     outside_training_features: list[str]
     warnings: list[str]
+
+
+class ReplayStartRequest(BaseModel):
+    machine_id: str = Field(min_length=1, max_length=128)
+    speed_multiplier: float = Field(default=1.0, gt=0)
+
+
+class ReplayStopRequest(BaseModel):
+    machine_id: str = Field(min_length=1, max_length=128)
