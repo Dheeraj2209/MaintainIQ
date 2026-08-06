@@ -241,7 +241,7 @@ def insert_machines(conn: sqlite3.Connection, machines: list) -> None:
                 "operating_condition": m.get("operating_condition"),
                 "speed_rpm": m.get("speed_rpm"),
                 "load_kn": m.get("load_kn"),
-                "dataset": m.get("dataset", "xjtu_sy"),
+                "dataset": m.get("dataset") or "xjtu_sy",
                 "is_documented_failure": int(m.get("is_documented_failure", 0)),
             }
             for m in machines
