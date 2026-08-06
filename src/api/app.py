@@ -23,6 +23,7 @@ from src.api.routes import (
     kpis,
     machines,
     maintenance,
+    model,
     notifications,
     predictions,
     users,
@@ -44,7 +45,7 @@ app.include_router(users.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(demo.router, prefix="/api")
-for module in (machines, alerts, maintenance, kpis, predictions, ingestion):
+for module in (machines, alerts, maintenance, kpis, predictions, ingestion, model):
     app.include_router(module.router, prefix="/api", dependencies=[Depends(get_current_user)])
 
 
