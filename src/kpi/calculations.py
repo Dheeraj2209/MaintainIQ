@@ -236,8 +236,9 @@ def prediction_kpis() -> dict:
         "evaluated_at": report.get("exported_at"),
         "root_cause_accuracy": {
             "status": _NOT_APPLICABLE,
-            "reason": "no labeled root-cause ground truth in the IMS dataset "
-                      "(bearing-wear failures are documented but other causes are not)",
+            "reason": "no labeled root-cause ground truth in the XJTU-SY dataset "
+                      "(run-to-failure bearing wear is documented, but specific "
+                      "root causes are not labeled)",
         },
     }
 

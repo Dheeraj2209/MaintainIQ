@@ -53,6 +53,10 @@ def test_prediction_kpis_shape():
     assert pred["status"] == "available"
     assert "accuracy" in pred
     assert pred["root_cause_accuracy"]["status"] == "not_applicable"
+    reason = pred["root_cause_accuracy"]["reason"]
+    # Platform runs on XJTU-SY now; the stale "IMS dataset" copy must be gone.
+    assert "XJTU-SY" in reason
+    assert "IMS" not in reason
 
 
 def test_operational_kpis_detect_documented_failure(conn):

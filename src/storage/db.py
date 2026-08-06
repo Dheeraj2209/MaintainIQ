@@ -1,24 +1,22 @@
-"""SQLite schema and access for the M3 storage layer.
+"""SQLite schema and access for the storage layer.
 
 Design note (documented limitation, per this project's "flag limitations"
-convention): the plan calls for separate "raw readings" and "feature
-windows" tables, but the IMS ingestion path
-(src/ingestion/ims_bearing.py + src/preprocessing/cleaning.py) only ever
-produces pre-windowed feature rows — there is no raw waveform available to
-store separately. The `readings` table below therefore represents both at
-once (one row per machine per timestamp, holding its extracted features).
-A future M6 raw-telemetry source that windows on the fly would be the first
-real user of a genuinely separate raw-readings table.
+convention): the original plan called for separate "raw readings" and
+"feature windows" tables, but the XJTU-SY ingestion/backfill path produces
+pre-windowed feature rows — there is no raw waveform retained alongside them.
+The `readings` table below therefore represents both at once (one row per
+machine per cycle, holding its extracted features). A future M6 raw-telemetry
+source that windows on the fly would be the first real user of a genuinely
+separate raw-readings table.
 
-Feature columns vary across machines (IMS Test 1 has a second vibration
-channel that Tests 2/3 lack — see stage_classifiers.py's feature_columns
-docstring), so the full feature set per row is stored as a JSON blob
-(`features_json`) rather than as many sparse/nullable columns. The handful
-of columns every downstream module actually filters or sorts on
-(vibration_h_rms, vibration_h_kurtosis, vibration_v_rms, vibration_v_kurtosis,
-cross_axis_rms_ratio, cross_axis_correlation, ...) are promoted to real
-columns for queryability; the full feature vector still lives in
-`features_json`.
+Each XJTU-SY bearing is instrumented on two axes (horizontal + vertical), so
+the columns every downstream module filters or sorts on (vibration_h_rms,
+vibration_h_kurtosis, vibration_v_rms, vibration_v_kurtosis,
+cross_axis_rms_ratio, cross_axis_correlation) are promoted to real columns for
+queryability; the full per-window feature vector still lives in the
+`features_json` blob so new features need no schema change.
+
+See docs/DATA_MODEL.md for the full table-by-table reference.
 """
 import os
 import sqlite3
