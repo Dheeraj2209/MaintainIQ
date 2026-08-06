@@ -14,41 +14,32 @@ import pandas as pd
 
 BEARING_WEAR = "bearing_wear"
 IMBALANCE = "imbalance"
-MECHANICAL_LOOSENESS = "mechanical_looseness"
-OVERHEATING = "overheating"
 SENSOR_DATA_QUALITY = "sensor_or_data_quality_issue"
 UNKNOWN = "unknown"
 
-# Thresholds are heuristic, not learned — see module docstring.
+# Threshold is heuristic, not learned — see module docstring.
 HIGH_KURTOSIS = 5.0
-HIGH_HIGH_BAND_ENERGY_RATIO = 0.3
-HIGH_TEMP_C = 65.0
 
 
 def classify_probable_cause(row: pd.Series) -> str:
     """Return a single probable root cause label for one machine-timestamp record.
 
-    Only called for records already flagged degrading/faulty/critical by
-    src/prediction/rule_based.py or the ML path — a healthy reading has no
-    root cause to report.
+    Only called for records already flagged degrading/faulty/critical — a healthy
+    reading has no root cause to report. Uses the canonical XJTU-SY vibration
+    channels (horizontal RMS + kurtosis); the IMS-era thermal and high-band-energy
+    heuristics are gone with the schema. Root cause is refined alongside RUL in a
+    later phase.
     """
     kurtosis = row.get("vibration_h_kurtosis")
-    high_band_ratio = row.get("vibration_h_high_band_energy_ratio")
-    temperature_c = row.get("temperature_c")
+    rms = row.get("vibration_h_rms")
 
-    if pd.isna(kurtosis) or pd.isna(high_band_ratio):
+    if kurtosis is None or pd.isna(kurtosis):
         return SENSOR_DATA_QUALITY
 
-    if kurtosis >= HIGH_KURTOSIS and high_band_ratio >= HIGH_HIGH_BAND_ENERGY_RATIO:
+    if kurtosis >= HIGH_KURTOSIS:
         return BEARING_WEAR
 
-    if temperature_c is not None and not pd.isna(temperature_c) and temperature_c >= HIGH_TEMP_C:
-        return OVERHEATING
-
-    if high_band_ratio >= HIGH_HIGH_BAND_ENERGY_RATIO:
-        return MECHANICAL_LOOSENESS
-
-    if kurtosis < HIGH_KURTOSIS and row.get("vibration_h_rms", 0) > 0:
+    if rms is not None and not pd.isna(rms) and rms > 0:
         return IMBALANCE
 
     return UNKNOWN

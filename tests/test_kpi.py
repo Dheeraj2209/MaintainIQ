@@ -25,11 +25,10 @@ def test_healthy_machine_low_risk(conn):
     assert m2["open_alert_count"] == 0
 
 
-def test_vibration_and_temperature_severity_from_latest_reading(conn):
+def test_vibration_severity_from_latest_reading(conn):
     m1 = kpi.machine_health_kpis(conn, "m1")[0]
-    # latest m1 reading: kurt 6.0 (>=5) and band 0.5 (>=0.3) -> high; temp 70 -> high
+    # latest m1 reading: kurt 6.0 (>=5) and features_json band 0.5 (>=0.3) -> high
     assert m1["vibration_severity"] == "high"
-    assert m1["temperature_severity"] == "high"
 
 
 def test_maintenance_kpis_avg_resolution_hours(conn):

@@ -11,7 +11,7 @@ import pytest
 
 from src.auth.security import hash_password
 from src.auth.seed import DEMO_USERS
-from src.storage.db import SCHEMA
+from src.storage.db import init_schema
 
 
 def _iso(y, mo, d, h=0, mi=0, s=0):
@@ -26,31 +26,41 @@ _DEMO_USER_ROWS = [(email, name, hash_password(pw), role) for email, name, pw, r
 
 
 def _populate(conn: sqlite3.Connection) -> None:
-    conn.executescript(SCHEMA)
+    init_schema(conn)
 
     conn.executemany(
-        "INSERT INTO machines (machine_id, source_test, bearing, is_documented_failure) VALUES (?,?,?,?)",
+        """INSERT INTO machines
+           (machine_id, bearing_id, operating_condition, speed_rpm, load_kn, dataset,
+            is_documented_failure)
+           VALUES (?,?,?,?,?,?,?)""",
         [
-            ("m1", "test1", "B1", 1),  # documented failure, ends critical
-            ("m2", "test1", "B2", 0),  # stays healthy
+            ("m1", "Bearing1_1", 1, 2100.0, 12.0, "xjtu_sy", 1),  # documented failure, ends critical
+            ("m2", "Bearing1_2", 1, 2100.0, 12.0, "xjtu_sy", 0),  # stays healthy
         ],
     )
 
-    # readings: two per machine, latest last. m1 latest is high-vibration/high-temp.
+    # readings: two per machine, latest last. m1's latest is high-vibration; the
+    # high-band-energy ratio lives in features_json (canonical schema drops it as
+    # a promoted column) so _vibration_severity can still read it.
     readings = [
-        # machine, ts, sensor, rms, kurt, band, temp, synth, rul
-        ("m1", _iso(2003, 10, 22, 12, 0), "s1", 0.1, 3.0, 0.1, 40.0, 0, 100.0),
-        ("m1", _iso(2003, 10, 22, 13, 0), "s1", 0.9, 6.0, 0.5, 70.0, 0, 1.0),
-        ("m2", _iso(2003, 10, 22, 12, 0), "s2", 0.1, 2.5, 0.05, 35.0, 0, 200.0),
-        ("m2", _iso(2003, 10, 22, 13, 0), "s2", 0.12, 2.6, 0.06, 36.0, 0, 199.0),
+        # machine, ts, cycle, elapsed, rms, kurt, v_rms, v_kurt, cross_ratio, cross_corr, rul_min, band
+        ("m1", _iso(2003, 10, 22, 12, 0), 0, 0.0, 0.1, 3.0, 0.1, 3.0, 0.9, 0.4, 100.0, 0.1),
+        ("m1", _iso(2003, 10, 22, 13, 0), 1, 60.0, 0.9, 6.0, 0.8, 5.5, 1.1, 0.8, 1.0, 0.5),
+        ("m2", _iso(2003, 10, 22, 12, 0), 0, 0.0, 0.1, 2.5, 0.1, 2.4, 0.95, 0.1, 200.0, 0.05),
+        ("m2", _iso(2003, 10, 22, 13, 0), 1, 60.0, 0.12, 2.6, 0.11, 2.5, 0.96, 0.12, 199.0, 0.06),
     ]
     conn.executemany(
         """INSERT INTO readings
-           (machine_id, timestamp, sensor_id, vibration_h_rms, vibration_h_kurtosis,
-            vibration_h_high_band_energy_ratio, temperature_c, temperature_is_synthetic,
-            rul_hours, features_json)
-           VALUES (?,?,?,?,?,?,?,?,?, '{}')""",
-        readings,
+           (machine_id, timestamp, cycle, elapsed_minutes, speed_rpm, load_kn,
+            sample_rate_hz, vibration_h_rms, vibration_h_kurtosis, vibration_v_rms,
+            vibration_v_kurtosis, cross_axis_rms_ratio, cross_axis_correlation,
+            rul_minutes, features_json, dataset)
+           VALUES (?,?,?,?, 2100.0, 12.0, 25600.0, ?,?,?,?,?,?,?,
+                   json_object('vibration_h_high_band_energy_ratio', ?), 'xjtu_sy')""",
+        [
+            (m, ts, cyc, elapsed, rms, kurt, v_rms, v_kurt, cr_ratio, cr_corr, rul, band)
+            for (m, ts, cyc, elapsed, rms, kurt, v_rms, v_kurt, cr_ratio, cr_corr, rul, band) in readings
+        ],
     )
 
     # predictions: m1 degrading then critical (2 abnormal), m2 healthy twice.

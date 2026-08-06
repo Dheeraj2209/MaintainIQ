@@ -12,8 +12,11 @@ router = APIRouter(prefix="/machines", tags=["machines"])
 _TREND_COLUMNS = {
     "vibration_h_rms": "vibration_h_rms",
     "vibration_h_kurtosis": "vibration_h_kurtosis",
-    "vibration_h_high_band_energy_ratio": "vibration_h_high_band_energy_ratio",
-    "temperature_c": "temperature_c",
+    "vibration_v_rms": "vibration_v_rms",
+    "vibration_v_kurtosis": "vibration_v_kurtosis",
+    "cross_axis_rms_ratio": "cross_axis_rms_ratio",
+    "cross_axis_correlation": "cross_axis_correlation",
+    "rul_minutes": "rul_minutes",
 }
 
 

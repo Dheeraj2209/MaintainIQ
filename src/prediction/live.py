@@ -31,20 +31,17 @@ SEVERITY_MULTIPLIERS = {
     "critical": 9.0,
 }
 
-# Temperature has a nonzero ambient baseline (~30-40C), so it scales
-# additively (extra degrees) rather than multiplicatively like vibration.
-TEMP_DELTA_C = {
-    "healthy": 0.0,
-    "degrading": 10.0,
-    "faulty": 25.0,
-    "critical": 40.0,
-}
-
+# Used only when a machine's latest reading is missing a value (defensive).
 _FALLBACK = {
     "vibration_h_rms": 0.1,
     "vibration_h_kurtosis": 2.5,
-    "vibration_h_high_band_energy_ratio": 0.05,
-    "temperature_c": 35.0,
+    "vibration_v_rms": 0.1,
+    "vibration_v_kurtosis": 2.5,
+    "cross_axis_rms_ratio": 1.0,
+    "cross_axis_correlation": 0.0,
+    "speed_rpm": 2100.0,
+    "load_kn": 12.0,
+    "sample_rate_hz": 25_600.0,
 }
 
 
@@ -54,14 +51,19 @@ class UnknownMachineError(ValueError):
 
 def _latest_reading(conn, machine_id: str) -> dict:
     row = conn.execute(
-        """SELECT sensor_id, vibration_h_rms, vibration_h_kurtosis,
-                  vibration_h_high_band_energy_ratio, temperature_c, rul_hours
+        """SELECT cycle, elapsed_minutes, speed_rpm, load_kn, sample_rate_hz,
+                  vibration_h_rms, vibration_h_kurtosis, vibration_v_rms,
+                  vibration_v_kurtosis, cross_axis_rms_ratio, cross_axis_correlation
            FROM readings WHERE machine_id = ? ORDER BY timestamp DESC LIMIT 1""",
         (machine_id,),
     ).fetchone()
     if row is None:
         raise UnknownMachineError(f"no baseline reading for machine: {machine_id}")
     return dict(row)
+
+
+def _scaled(baseline: dict, key: str, multiplier: float) -> float:
+    return round((baseline.get(key) or _FALLBACK[key]) * multiplier, 4)
 
 
 def evaluate_new_reading(conn, machine_id: str, target_state: str) -> dict:
@@ -71,21 +73,26 @@ def evaluate_new_reading(conn, machine_id: str, target_state: str) -> dict:
     probable_cause, created_at)."""
     baseline = _latest_reading(conn, machine_id)
     multiplier = SEVERITY_MULTIPLIERS[target_state]
-    temp_delta = TEMP_DELTA_C[target_state]
     timestamp = datetime.now(timezone.utc).isoformat()
 
     synthetic = {
         "machine_id": machine_id,
         "timestamp": timestamp,
-        "sensor_id": baseline["sensor_id"],
-        "vibration_h_rms": round((baseline["vibration_h_rms"] or _FALLBACK["vibration_h_rms"]) * multiplier, 4),
-        "vibration_h_kurtosis": round((baseline["vibration_h_kurtosis"] or _FALLBACK["vibration_h_kurtosis"]) * multiplier, 4),
-        "vibration_h_high_band_energy_ratio": round(
-            (baseline["vibration_h_high_band_energy_ratio"] or _FALLBACK["vibration_h_high_band_energy_ratio"]) * multiplier, 4
-        ),
-        "temperature_c": round((baseline["temperature_c"] or _FALLBACK["temperature_c"]) + temp_delta, 2),
-        "temperature_is_synthetic": 1,
-        "rul_hours": baseline["rul_hours"],
+        # Monotonic cycle from the latest reading keeps UNIQUE(machine_id, cycle).
+        "cycle": int(baseline.get("cycle") or 0) + 1,
+        "elapsed_minutes": float(baseline.get("elapsed_minutes") or 0.0) + 1.0,
+        "speed_rpm": baseline.get("speed_rpm") or _FALLBACK["speed_rpm"],
+        "load_kn": baseline.get("load_kn") if baseline.get("load_kn") is not None else _FALLBACK["load_kn"],
+        "sample_rate_hz": baseline.get("sample_rate_hz") or _FALLBACK["sample_rate_hz"],
+        "vibration_h_rms": _scaled(baseline, "vibration_h_rms", multiplier),
+        "vibration_h_kurtosis": _scaled(baseline, "vibration_h_kurtosis", multiplier),
+        "vibration_v_rms": _scaled(baseline, "vibration_v_rms", multiplier),
+        "vibration_v_kurtosis": _scaled(baseline, "vibration_v_kurtosis", multiplier),
+        "cross_axis_rms_ratio": baseline.get("cross_axis_rms_ratio") or _FALLBACK["cross_axis_rms_ratio"],
+        "cross_axis_correlation": baseline.get("cross_axis_correlation") if baseline.get("cross_axis_correlation") is not None else _FALLBACK["cross_axis_correlation"],
+        "rul_minutes": None,  # live rows carry predicted RUL in predictions, never a label
+        "features_json": "{}",
+        "dataset": "xjtu_sy",
     }
 
     reading_id = insert_single_reading(conn, synthetic)

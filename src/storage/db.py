@@ -18,54 +18,117 @@ of columns every downstream module actually filters or sorts on
 (vibration_h_rms, vibration_h_kurtosis, temperature_c, ...) are promoted to
 real columns for queryability.
 """
-import json
 import os
 import sqlite3
 from pathlib import Path
-
-import pandas as pd
 
 # Overridable via MAINTAINIQ_DB_PATH (e.g. to point at a mounted volume in
 # Docker) since the file lives outside the repo tree in that case.
 DEFAULT_DB_PATH = Path(os.environ.get("MAINTAINIQ_DB_PATH", str(Path(__file__).resolve().parents[2] / "maintainiq.db")))
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS schema_version (
+    version     INTEGER NOT NULL,
+    applied_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS machines (
-    machine_id TEXT PRIMARY KEY,
-    source_test TEXT,
-    bearing TEXT,
-    is_documented_failure INTEGER
+    machine_id            TEXT PRIMARY KEY,
+    bearing_id            TEXT,
+    operating_condition   INTEGER,
+    speed_rpm             REAL,
+    load_kn               REAL,
+    dataset               TEXT NOT NULL DEFAULT 'xjtu_sy',
+    is_documented_failure INTEGER NOT NULL DEFAULT 0,
+    created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS readings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    machine_id TEXT NOT NULL REFERENCES machines(machine_id),
-    timestamp TEXT NOT NULL,
-    sensor_id TEXT,
-    vibration_h_rms REAL,
-    vibration_h_kurtosis REAL,
-    vibration_h_high_band_energy_ratio REAL,
-    temperature_c REAL,
-    temperature_is_synthetic INTEGER,
-    rul_hours REAL,
-    features_json TEXT,
-    UNIQUE(machine_id, timestamp)
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    machine_id             TEXT NOT NULL REFERENCES machines(machine_id),
+    timestamp              TEXT NOT NULL,
+    cycle                  INTEGER NOT NULL,
+    elapsed_minutes        REAL NOT NULL,
+    speed_rpm              REAL NOT NULL,
+    load_kn                REAL NOT NULL,
+    sample_rate_hz         REAL NOT NULL,
+    vibration_h_rms        REAL NOT NULL,
+    vibration_h_kurtosis   REAL NOT NULL,
+    vibration_v_rms        REAL NOT NULL,
+    vibration_v_kurtosis   REAL NOT NULL,
+    cross_axis_rms_ratio   REAL NOT NULL,
+    cross_axis_correlation REAL NOT NULL,
+    rul_minutes            REAL,
+    features_json          TEXT NOT NULL,
+    dataset                TEXT NOT NULL DEFAULT 'xjtu_sy',
+    UNIQUE(machine_id, cycle)
 );
 CREATE INDEX IF NOT EXISTS idx_readings_machine_ts ON readings(machine_id, timestamp);
 
 CREATE TABLE IF NOT EXISTS predictions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    reading_id INTEGER NOT NULL REFERENCES readings(id),
-    machine_id TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    health_state TEXT NOT NULL,
-    confidence REAL,
-    source TEXT NOT NULL,
-    model_name TEXT,
-    probable_cause TEXT,
-    created_at TEXT NOT NULL
+    id                                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    machine_id                         TEXT NOT NULL REFERENCES machines(machine_id),
+    reading_id                         INTEGER REFERENCES readings(id),
+    timestamp                          TEXT NOT NULL,
+    health_state                       TEXT NOT NULL,
+    confidence                         REAL,
+    source                             TEXT NOT NULL DEFAULT 'xjtu_rul',
+    model_name                         TEXT,
+    probable_cause                     TEXT,
+    created_at                         TEXT NOT NULL DEFAULT (datetime('now')),
+    predicted_rul_minutes              REAL,
+    rul_estimate_kind                  TEXT,
+    failure_within_horizon_probability REAL,
+    prognostic_horizon_minutes         REAL,
+    prediction_interval_low            REAL,
+    prediction_interval_high           REAL,
+    model_version                      TEXT,
+    out_of_distribution                INTEGER NOT NULL DEFAULT 0,
+    history_snapshots                  INTEGER,
+    warnings_json                      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_predictions_machine_ts ON predictions(machine_id, timestamp);
+
+CREATE TABLE IF NOT EXISTS model_inference_log (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    machine_id             TEXT NOT NULL,
+    timestamp              TEXT NOT NULL,
+    model_version          TEXT NOT NULL,
+    latency_ms             REAL NOT NULL,
+    failure_probability    REAL,
+    predicted_rul_minutes  REAL,
+    out_of_distribution    INTEGER NOT NULL DEFAULT 0,
+    warming_up             INTEGER NOT NULL DEFAULT 0,
+    warnings_count         INTEGER NOT NULL DEFAULT 0,
+    status                 TEXT NOT NULL DEFAULT 'ok',
+    error_message          TEXT,
+    created_at             TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_inference_model_ts ON model_inference_log(model_version, timestamp);
+CREATE INDEX IF NOT EXISTS idx_inference_machine_ts ON model_inference_log(machine_id, timestamp);
+
+CREATE TABLE IF NOT EXISTS model_registry (
+    model_version  TEXT PRIMARY KEY,
+    artifact_path  TEXT NOT NULL,
+    algorithm      TEXT,
+    trained_at     TEXT,
+    metrics_json   TEXT,
+    deployed_at    TEXT,
+    is_active      INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_type   TEXT NOT NULL,
+    scope         TEXT,
+    format        TEXT NOT NULL,
+    period_start  TEXT,
+    period_end    TEXT,
+    generated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    generated_by  INTEGER,
+    content       TEXT NOT NULL,
+    summary_json  TEXT
+);
 
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,7 +147,6 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_machine_status ON alerts(machine_id, status);
 
--- Schema only for now: M5 populates this via a dashboard form/API.
 CREATE TABLE IF NOT EXISTS maintenance_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     machine_id TEXT NOT NULL REFERENCES machines(machine_id),
@@ -96,10 +158,6 @@ CREATE TABLE IF NOT EXISTS maintenance_records (
     type TEXT CHECK(type IN ('preventive','corrective'))
 );
 
--- Auth + RBAC. Only 3 roles are supported (see src/auth/ — derived from
--- SRS 2.3's Maintenance Operator / Supervisor user classes plus an admin
--- role for user management); enforced with a CHECK rather than a separate
--- roles table since the set is fixed and small.
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT NOT NULL UNIQUE,
@@ -110,9 +168,6 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TEXT NOT NULL
 );
 
--- One row per email actually sent (not per alert), so this table doubles as
--- both the Mailpit-backing audit log and the /notifications page's data
--- source without a join fan-out.
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     alert_id INTEGER REFERENCES alerts(id),
@@ -124,8 +179,6 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TEXT NOT NULL
 );
 """
-
-_FEATURE_PREFIX = ("vibration_h_", "vibration_v_")
 
 
 def get_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
@@ -139,81 +192,76 @@ def get_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript(SCHEMA)
-    for column in ("acknowledged_at TEXT", "acknowledged_by INTEGER"):
-        try:
-            conn.execute(f"ALTER TABLE alerts ADD COLUMN {column}")
-        except sqlite3.OperationalError:
-            pass  # column already exists (fresh DB created via SCHEMA above)
-    for column in (
-        "alert_id INTEGER REFERENCES alerts(id)",
-        "type TEXT CHECK(type IN ('preventive','corrective'))",
-    ):
-        try:
-            conn.execute(f"ALTER TABLE maintenance_records ADD COLUMN {column}")
-        except sqlite3.OperationalError:
-            pass  # column already exists (fresh DB created via SCHEMA above)
-    conn.commit()
+    # Delegates to the versioned migration runner (design §4.8). Import locally
+    # to avoid a circular import: migrations.py imports SCHEMA from this module.
+    from src.storage.migrations import run_migrations
+
+    run_migrations(conn)
 
 
-def insert_machines(conn: sqlite3.Connection, long_df: pd.DataFrame) -> None:
-    machines = long_df[["machine_id", "source_test", "bearing", "is_documented_failure"]].drop_duplicates("machine_id")
+_READING_COLUMNS = (
+    "machine_id", "timestamp", "cycle", "elapsed_minutes", "speed_rpm", "load_kn",
+    "sample_rate_hz", "vibration_h_rms", "vibration_h_kurtosis", "vibration_v_rms",
+    "vibration_v_kurtosis", "cross_axis_rms_ratio", "cross_axis_correlation",
+    "rul_minutes", "features_json", "dataset",
+)
+
+_READING_INSERT_SQL = (
+    f"INTO readings ({', '.join(_READING_COLUMNS)}) "
+    f"VALUES ({', '.join(':' + c for c in _READING_COLUMNS)})"
+)
+
+
+def _normalize_reading(reading: dict) -> dict:
+    """Fill a canonical reading dict: default dataset, and features_json='{}'
+    when absent (the live/demo path stores no full feature vector)."""
+    row = {c: reading.get(c) for c in _READING_COLUMNS}
+    row["dataset"] = reading.get("dataset", "xjtu_sy")
+    if row["features_json"] is None:
+        row["features_json"] = "{}"
+    return row
+
+
+def insert_machines(conn: sqlite3.Connection, machines: list) -> None:
+    """machines: list of dicts. Required key: machine_id. Optional: bearing_id,
+    operating_condition, speed_rpm, load_kn, dataset (default 'xjtu_sy'),
+    is_documented_failure (default 0)."""
     conn.executemany(
-        "INSERT OR IGNORE INTO machines (machine_id, source_test, bearing, is_documented_failure) VALUES (?, ?, ?, ?)",
+        """INSERT OR IGNORE INTO machines
+           (machine_id, bearing_id, operating_condition, speed_rpm, load_kn,
+            dataset, is_documented_failure)
+           VALUES (:machine_id, :bearing_id, :operating_condition, :speed_rpm,
+                   :load_kn, :dataset, :is_documented_failure)""",
         [
-            (r.machine_id, r.source_test, r.bearing, int(r.is_documented_failure))
-            for r in machines.itertuples()
+            {
+                "machine_id": m["machine_id"],
+                "bearing_id": m.get("bearing_id"),
+                "operating_condition": m.get("operating_condition"),
+                "speed_rpm": m.get("speed_rpm"),
+                "load_kn": m.get("load_kn"),
+                "dataset": m.get("dataset", "xjtu_sy"),
+                "is_documented_failure": int(m.get("is_documented_failure", 0)),
+            }
+            for m in machines
         ],
     )
     conn.commit()
 
 
-def insert_readings(conn: sqlite3.Connection, long_df: pd.DataFrame) -> None:
-    feature_cols = [c for c in long_df.columns if c.startswith(_FEATURE_PREFIX)]
-    rows = []
-    for r in long_df.itertuples():
-        row_dict = r._asdict()
-        features = {c: float(row_dict[c]) for c in feature_cols if pd.notna(row_dict.get(c))}
-        rows.append((
-            r.machine_id,
-            r.timestamp.isoformat(),
-            r.sensor_id,
-            float(r.vibration_h_rms) if pd.notna(r.vibration_h_rms) else None,
-            float(r.vibration_h_kurtosis) if pd.notna(r.vibration_h_kurtosis) else None,
-            float(r.vibration_h_high_band_energy_ratio) if pd.notna(r.vibration_h_high_band_energy_ratio) else None,
-            float(r.temperature_c) if pd.notna(r.temperature_c) else None,
-            int(bool(r.temperature_is_synthetic)),
-            float(r.rul_hours) if pd.notna(r.rul_hours) else None,
-            json.dumps(features),
-        ))
-
+def insert_readings(conn: sqlite3.Connection, readings: list) -> None:
+    """readings: list of canonical reading dicts (see _READING_COLUMNS).
+    Idempotent on (machine_id, cycle)."""
     conn.executemany(
-        """INSERT OR IGNORE INTO readings
-           (machine_id, timestamp, sensor_id, vibration_h_rms, vibration_h_kurtosis,
-            vibration_h_high_band_energy_ratio, temperature_c, temperature_is_synthetic,
-            rul_hours, features_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        rows,
+        "INSERT OR IGNORE " + _READING_INSERT_SQL,
+        [_normalize_reading(r) for r in readings],
     )
     conn.commit()
 
 
 def insert_single_reading(conn: sqlite3.Connection, reading: dict) -> int:
-    """Single-row counterpart to insert_readings, for the live/demo path
-    (src/prediction/live.py) where there is one new reading, not a batch
-    dataframe. `reading` keys: machine_id, timestamp (ISO string), sensor_id,
-    vibration_h_rms, vibration_h_kurtosis, vibration_h_high_band_energy_ratio,
-    temperature_c, temperature_is_synthetic, rul_hours. Returns the new row's id."""
-    cur = conn.execute(
-        """INSERT INTO readings
-           (machine_id, timestamp, sensor_id, vibration_h_rms, vibration_h_kurtosis,
-            vibration_h_high_band_energy_ratio, temperature_c, temperature_is_synthetic,
-            rul_hours, features_json)
-           VALUES (:machine_id, :timestamp, :sensor_id, :vibration_h_rms, :vibration_h_kurtosis,
-                   :vibration_h_high_band_energy_ratio, :temperature_c, :temperature_is_synthetic,
-                   :rul_hours, '{}')""",
-        reading,
-    )
+    """Single-row counterpart to insert_readings for the live/demo path
+    (src/prediction/live.py). Returns the new row's id."""
+    cur = conn.execute("INSERT " + _READING_INSERT_SQL, _normalize_reading(reading))
     conn.commit()
     return cur.lastrowid
 

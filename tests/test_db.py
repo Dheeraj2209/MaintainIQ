@@ -82,9 +82,7 @@ def test_maintenance_records_type_check_constraint():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_schema(conn)
-    conn.execute(
-        "INSERT INTO machines (machine_id, source_test, bearing, is_documented_failure) VALUES ('m1', 't', 'b', 0)"
-    )
+    conn.execute("INSERT INTO machines (machine_id) VALUES ('m1')")
     conn.commit()
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(
@@ -128,9 +126,7 @@ def test_maintenance_records_type_check_constraint_via_alter_upgrade_path():
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(maintenance_records)")}
     assert "type" in cols
 
-    conn.execute(
-        "INSERT INTO machines (machine_id, source_test, bearing, is_documented_failure) VALUES ('m1', 't', 'b', 0)"
-    )
+    conn.execute("INSERT INTO machines (machine_id) VALUES ('m1')")
     conn.commit()
 
     for valid_type in ("preventive", "corrective"):

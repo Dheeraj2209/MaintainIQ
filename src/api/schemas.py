@@ -20,7 +20,6 @@ class MachineSummary(BaseModel):
     probable_cause: Optional[str] = None
     last_reading_at: Optional[str] = None
     vibration_severity: str
-    temperature_severity: str
     risk_score: float
     abnormal_event_count: int
     open_alert_count: int

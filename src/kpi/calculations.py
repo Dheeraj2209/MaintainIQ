@@ -30,7 +30,6 @@ _RISK_BY_STATE = {"healthy": 0.0, "degrading": 40.0, "faulty": 70.0, "critical":
 # what "high" means.
 _HIGH_KURTOSIS = 5.0
 _HIGH_BAND_RATIO = 0.3
-_HIGH_TEMP_C = 65.0
 
 _NOT_APPLICABLE = "not_applicable"
 
@@ -55,8 +54,7 @@ def _latest_prediction(conn, machine_id: str):
 
 def _latest_reading(conn, machine_id: str):
     cur = conn.execute(
-        """SELECT vibration_h_rms, vibration_h_kurtosis,
-                  vibration_h_high_band_energy_ratio, temperature_c, timestamp
+        """SELECT vibration_h_rms, vibration_h_kurtosis, features_json, timestamp
            FROM readings
            WHERE machine_id = ?
            ORDER BY timestamp DESC
@@ -68,29 +66,23 @@ def _latest_reading(conn, machine_id: str):
 
 
 def _vibration_severity(reading) -> str:
-    """Coarse severity of the latest vibration reading: low/medium/high."""
+    """Coarse severity of the latest vibration reading: low/medium/high.
+    Kurtosis is a promoted column; the high-band-energy ratio is read from the
+    JSON feature vector (it is no longer a promoted column in the canonical
+    schema)."""
     if not reading:
         return "unknown"
     kurt = reading.get("vibration_h_kurtosis")
-    band = reading.get("vibration_h_high_band_energy_ratio")
+    try:
+        features = json.loads(reading.get("features_json") or "{}")
+    except (TypeError, ValueError):
+        features = {}
+    band = features.get("vibration_h_high_band_energy_ratio")
     if kurt is None or band is None:
         return "unknown"
     if kurt >= _HIGH_KURTOSIS and band >= _HIGH_BAND_RATIO:
         return "high"
     if kurt >= _HIGH_KURTOSIS or band >= _HIGH_BAND_RATIO:
-        return "medium"
-    return "low"
-
-
-def _temperature_severity(reading) -> str:
-    if not reading:
-        return "unknown"
-    temp = reading.get("temperature_c")
-    if temp is None:
-        return "unknown"
-    if temp >= _HIGH_TEMP_C:
-        return "high"
-    if temp >= _HIGH_TEMP_C - 15:
         return "medium"
     return "low"
 
@@ -131,7 +123,6 @@ def _machine_health(conn, machine_id: str) -> dict:
         "probable_cause": latest_pred.get("probable_cause") if latest_pred else None,
         "last_reading_at": latest_reading.get("timestamp") if latest_reading else None,
         "vibration_severity": _vibration_severity(latest_reading),
-        "temperature_severity": _temperature_severity(latest_reading),
         "risk_score": round(risk, 1),
         "abnormal_event_count": _abnormal_event_count(conn, machine_id),
         "open_alert_count": open_alerts,
