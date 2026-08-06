@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS model_registry (
 CREATE TABLE IF NOT EXISTS reports (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     report_type   TEXT NOT NULL,
-    scope         TEXT,
+    scope         TEXT NOT NULL,
     format        TEXT NOT NULL,
     period_start  TEXT,
     period_end    TEXT,
