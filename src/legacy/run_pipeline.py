@@ -17,16 +17,16 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from src.alerts.generation import generate_alerts  # noqa: E402
-from src.features.temperature import synthesize_temperature  # noqa: E402
-from src.ingestion.ims_bearing import load_all_tests  # noqa: E402
-from src.prediction import ml_model, router  # noqa: E402
-from src.prediction.rule_based import add_health_score_and_stage  # noqa: E402
+from src.legacy.temperature import synthesize_temperature  # noqa: E402
+from src.legacy.ims_bearing import load_all_tests  # noqa: E402
+from src.legacy import ml_model, router  # noqa: E402
+from src.legacy.rule_based import add_health_score_and_stage  # noqa: E402
 from src.root_cause.rule_based import add_probable_cause  # noqa: E402
 from src.storage import db  # noqa: E402
-from src.training.anomaly_detector import train_anomaly_detector  # noqa: E402
-from src.training.export import export_winner  # noqa: E402
-from src.training.rul_regressor import add_rul, train_leave_one_trajectory_out  # noqa: E402
-from src.training.stage_classifiers import feature_columns, run_benchmark, select_winner, time_based_split  # noqa: E402
+from src.legacy.anomaly_detector import train_anomaly_detector  # noqa: E402
+from src.legacy.export import export_winner  # noqa: E402
+from src.legacy.rul_regressor import add_rul, train_leave_one_trajectory_out  # noqa: E402
+from src.legacy.stage_classifiers import feature_columns, run_benchmark, select_winner, time_based_split  # noqa: E402
 
 
 def add_synthetic_temperature(long_df):
