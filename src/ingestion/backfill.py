@@ -27,6 +27,10 @@ BACKFILL_EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
 
 # Columns in a build_feature_table record that are identity/label, not features.
 # Everything else is an extract_snapshot_features key and belongs in features_json.
+# COUPLING: _feature_dict assumes every column NOT listed here is a numeric
+# feature (it float()s them). If a future dataset adds a non-numeric label
+# column to build_feature_table, add it here in the same change, or float()
+# will raise at ingest and the label will leak into features_json.
 _NON_FEATURE_COLUMNS = frozenset({
     "bearing_id", "condition", "cycle", "elapsed_minutes", "rul_minutes",
     "speed_rpm", "load_kn", "source_file",
