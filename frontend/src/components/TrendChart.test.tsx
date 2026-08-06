@@ -10,7 +10,7 @@ describe('TrendChart', () => {
   })
 
   it('renders a labeled chart region when data is present', () => {
-    render(<TrendChart metric="temperature_c" points={trendPoints} />)
-    expect(screen.getByRole('img', { name: /temperature_c/ })).toBeInTheDocument()
+    render(<TrendChart metric="rul_minutes" points={trendPoints} />)
+    expect(screen.getByRole('img', { name: /rul_minutes/ })).toBeInTheDocument()
   })
 })

@@ -13,10 +13,12 @@ export interface MachineSummary {
   probable_cause: string | null
   last_reading_at: string | null
   vibration_severity: Severity
-  temperature_severity: Severity
   risk_score: number
   abnormal_event_count: number
   open_alert_count: number
+  predicted_rul_minutes: number | null
+  rul_estimate_kind: string | null
+  out_of_distribution: boolean | null
 }
 
 export interface TrendPoint {

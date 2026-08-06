@@ -21,10 +21,12 @@ export const machineSummaries: MachineSummary[] = [
     probable_cause: 'bearing_wear',
     last_reading_at: '2003-10-22T13:00:00+00:00',
     vibration_severity: 'high',
-    temperature_severity: 'high',
     risk_score: 100,
     abnormal_event_count: 2,
     open_alert_count: 1,
+    predicted_rul_minutes: 42.5,
+    rul_estimate_kind: 'point_estimate',
+    out_of_distribution: false,
   },
   {
     machine_id: 'm2',
@@ -34,10 +36,12 @@ export const machineSummaries: MachineSummary[] = [
     probable_cause: null,
     last_reading_at: '2003-10-22T13:00:00+00:00',
     vibration_severity: 'low',
-    temperature_severity: 'low',
     risk_score: 0,
     abnormal_event_count: 0,
     open_alert_count: 0,
+    predicted_rul_minutes: 1200.0,
+    rul_estimate_kind: 'point_estimate',
+    out_of_distribution: false,
   },
 ]
 

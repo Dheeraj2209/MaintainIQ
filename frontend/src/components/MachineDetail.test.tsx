@@ -42,12 +42,19 @@ describe('MachineDetail', () => {
     render(harness())
 
     const select = await screen.findByLabelText(/metric/i)
-    await userEvent.selectOptions(select, 'temperature_c')
+    await userEvent.selectOptions(select, 'vibration_h_kurtosis')
 
     await waitFor(() =>
-      expect(spy).toHaveBeenCalledWith('m1', 'temperature_c', expect.anything()),
+      expect(spy).toHaveBeenCalledWith('m1', 'vibration_h_kurtosis', expect.anything()),
     )
     spy.mockRestore()
+  })
+
+  it('surfaces the predicted RUL health fact', async () => {
+    render(harness())
+
+    expect(await screen.findByText(/predicted rul \(min\)/i, { selector: 'dt' })).toBeInTheDocument()
+    expect(screen.getByText('42.5')).toBeInTheDocument()
   })
 
   it('logs maintenance and raises a success toast', async () => {

@@ -18,7 +18,7 @@ const METRICS = [
   { value: 'vibration_h_rms', label: 'Vibration RMS' },
   { value: 'vibration_h_kurtosis', label: 'Kurtosis' },
   { value: 'vibration_h_high_band_energy_ratio', label: 'Band energy ratio' },
-  { value: 'temperature_c', label: 'Temperature (°C)' },
+  { value: 'rul_minutes', label: 'Predicted RUL (min)' },
 ]
 
 const HISTORY_PAGE_SIZE = 10
@@ -114,7 +114,16 @@ export function MachineDetail({ machineId }: Props) {
         <Fact label="Risk score" value={String(health.risk_score)} mono />
         <Fact label="Confidence" value={health.confidence != null ? `${Math.round(health.confidence * 100)}%` : '—'} mono />
         <Fact label="Vibration" value={health.vibration_severity} />
-        <Fact label="Temperature" value={health.temperature_severity} />
+        <Fact
+          label="Predicted RUL (min)"
+          value={health.predicted_rul_minutes != null ? health.predicted_rul_minutes.toFixed(1) : '—'}
+          mono
+        />
+        <Fact label="RUL estimate" value={health.rul_estimate_kind ?? '—'} />
+        <Fact
+          label="Out of distribution"
+          value={health.out_of_distribution == null ? '—' : health.out_of_distribution ? 'Yes' : 'No'}
+        />
         <Fact label="Last reading" value={health.last_reading_at ?? '—'} mono />
       </dl>
 

@@ -24,8 +24,8 @@ describe('api client', () => {
         return HttpResponse.json([])
       }),
     )
-    await api.getTrends('m1', 'temperature_c', 100)
-    expect(capturedUrl).toContain('metric=temperature_c')
+    await api.getTrends('m1', 'rul_minutes', 100)
+    expect(capturedUrl).toContain('metric=rul_minutes')
     expect(capturedUrl).toContain('limit=100')
   })
 
