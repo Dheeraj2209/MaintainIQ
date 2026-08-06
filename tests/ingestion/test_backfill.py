@@ -276,11 +276,13 @@ def backfilled_client(tmp_path):
             c.close()
 
     app.dependency_overrides[get_db] = _override
-    with TestClient(app) as test_client:
-        resp = test_client.post("/api/auth/login", json={"email": email, "password": password})
-        assert resp.status_code == 200, resp.text
-        yield test_client
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as test_client:
+            resp = test_client.post("/api/auth/login", json={"email": email, "password": password})
+            assert resp.status_code == 200, resp.text
+            yield test_client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 def test_trends_endpoint_returns_points_for_backfilled_machine(backfilled_client):
