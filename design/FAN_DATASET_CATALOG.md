@@ -12,17 +12,19 @@ From `src/storage/db.py`, `src/features/vibration.py`, `src/features/temperature
 | Field | Type | Source | Notes |
 |---|---|---|---|
 | `vibration_h_rms`, `_kurtosis`, `_high_band_energy_ratio` | REAL | accelerometer, horizontal axis | computed by `src/features/vibration.py` over a signal window |
-| `temperature_c` | REAL | — | **currently synthetic**, derived from vibration RMS (`temperature.py`); no real thermal sensor is modeled yet |
+| `temperature_c` | — | — | **removed** from the canonical XJTU-SY schema; the synthetic thermal feature survives only in `src/legacy/temperature.py` |
 | `rul_hours` | REAL | label | remaining-useful-life target |
 | `features_json` | TEXT (sparse) | accelerometer | fuller feature set incl. vertical axis: mean/std/rms/peak/peak-to-peak/kurtosis/skewness/crest factor/shape factor/dominant freq/spectral centroid/spectral energy/low-mid-high band energy ratio, per axis (h/v) |
 
 Ingestion paths: batch CSV loader shaped for the NASA IMS bearing format
-(`src/ingestion/ims_bearing.py`) or single-row insert used by the demo fault
-simulator (`src/prediction/live.py`). **There is no acoustic, current, RPM, or
-pressure field anywhere in the schema today** — only vibration (2-axis) +
-synthetic temperature. The SRS (`SRS_Document.md` L436-445) documents a wider
-intended input contract (accel axis, temperature, timestamp, machine/sensor ID,
-sampling rate, optional load/speed) that the code hasn't caught up to yet.
+(`src/ingestion/ims_bearing.py`, now archived under `src/legacy/`) or
+single-row insert used by the demo fault simulator (`src/prediction/live.py`).
+The canonical schema now carries shaft **speed (`speed_rpm`)** and **load
+(`load_kn`)** on `machines` and `readings`, plus 2-axis vibration; there is
+still **no acoustic, current, or pressure field** — the SRS (`SRS_Document.md`
+L436-445) documents a wider intended input contract (accel axis, temperature,
+timestamp, machine/sensor ID, sampling rate, optional load/speed) that the
+code hasn't fully caught up to yet.
 
 This means: datasets that are pure raw-accelerometer time series slot in with
 the least new code (reuse `features/vibration.py`); anything acoustic, current,
@@ -38,15 +40,15 @@ before it can reach the model.
 | 3 | [MIMII Dataset](https://zenodo.org/records/3384388) ([paper](https://arxiv.org/abs/1909.09347)) | valves/pumps/**fans**/slide rails, real factory fans, 7 units/type | TAMAGO-03 8-ch circular mic array, 68mm diameter, 50cm from machine | 16 kHz/16-bit, 10s clips, 26k+ normal segments + anomalies mixed at +6/0/-6dB SNR | normal / anomalous per machine, per SNR | CC BY-SA 4.0 (Hitachi) | Real fans, but **acoustic only** — no vibration channel. Useful for a future "listen to the fan" feature, not the current pipeline. DCASE 2020+ Task 2 reuses this dataset as the standard ASD benchmark. |
 | 4 | [IoT-Integrated Predictive Maintenance Dataset](https://www.kaggle.com/datasets/ziya07/iot-integrated-predictive-maintenance-dataset) | synthetic, generic production-line machines | simulated vibration + acoustic + temperature + current, plus decomposed IMF1-3 features | synthetic timestamps | fault class label per row | Kaggle (login), synthetic — not real hardware specs | Not a real fan or real sensor, but its **column shape (timestamp, machine_id, vibration, acoustic, temperature, current)** is the closest tabular match to the SRS's full intended input contract — good for schema/API smoke-testing before real multi-sensor hardware exists |
 | 5 | [AI4I 2020 Predictive Maintenance](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) | synthetic milling machine (not a fan) | air/process temperature, rotational speed, torque, tool wear (no vibration) | synthetic | binary + 5-class failure mode | CC BY 4.0 | Not fan-relevant sensor-wise; only useful as a generic "does our classifier pipeline work on tabular PdM data" sanity check |
-| — | NASA IMS Bearing (already integrated, `src/ingestion/ims_bearing.py`) | bearing test rig | accelerometers | — | run-to-failure | public (NASA PCoE) | Already in the codebase; bearing-only, not a fan, but it's the reason the current schema is vibration-shaped the way it is |
+| — | NASA IMS Bearing (`src/ingestion/ims_bearing.py`, now archived under `src/legacy/`) | bearing test rig | accelerometers | — | run-to-failure | public (NASA PCoE) | Previously integrated; bearing-only, not a fan, but it's the reason the current schema is vibration-shaped the way it is |
 
 ## 3. Sensor catalog — what to actually buy/wire for a real fan deployment
 
 | Signal | Physical sensor examples | Typical spec range (from datasets above) | Maps to MaintainIQ field | Supported today? |
 |---|---|---|---|---|
 | Vibration (accel.) | MEMS: ADXL335/1002; industrial: IMI 601A01, 603C01, [Wilcoxon 786A](https://wilcoxon.com/wp-content/uploads/2022/11/786A_spec_98692E.2.pdf) | 1 kHz–50 kHz sampling, ±50–80g range, triaxial preferred (axial/radial/tangential) | `vibration_h_rms/_kurtosis/_high_band_energy_ratio`, `features_json` (h/v axes) | Yes — this is the app's core signal |
-| Temperature | thermocouple, RTD, or digital (DS18B20), IR spot sensor | contact or non-contact, °C | `temperature_c` | Schema exists but **field is synthetic-only today** — first real sensor to wire up |
-| RPM / speed | optical or magnetic tachometer | pulse-per-rev | none yet | **Gap** — needed to normalize vibration frequency features by shaft order; MAFAULDA shows why (fault signatures shift with RPM) |
+| Temperature | thermocouple, RTD, or digital (DS18B20), IR spot sensor | contact or non-contact, °C | `temperature_c` | **Removed from the canonical schema** — the synthetic field survives only in `src/legacy/temperature.py`; a real sensor would need the field reintroduced |
+| RPM / speed | optical or magnetic tachometer | pulse-per-rev | `speed_rpm` | **Present as dataset-provided metadata** (nominal shaft speed per operating condition), not yet a live tachometer feed; MAFAULDA shows why per-reading RPM matters (fault signatures shift with RPM) |
 | Acoustic | measurement mic (Shure SM81) or MEMS mic array (TAMAGO-03) | 16–48 kHz | none yet | **Gap** — would need a new feature-extraction module (spectrogram/MFCC) and `features_json` key |
 | Current | CT clamp / Hall-effect current sensor | per-phase, synced to vibration | none yet | **Gap** — motor current signature analysis is a well-established fault channel (see the induction-motor dataset below) but nothing in the schema supports it |
 
@@ -54,7 +56,7 @@ Reference for current+vibration+voltage synchronized capture done right: [Compre
 
 ## 4. Recommended test plan
 
-1. **Start with FAN-COIL-I** — it's a real fan, raw accelerometer waveform, and requires zero schema changes: window the 32 kHz signal and run it through the existing `features/vibration.py` extraction, then through `prediction/ml_model.py`. This validates the pipeline end-to-end on genuine fan data.
+1. **Start with FAN-COIL-I** — it's a real fan, raw accelerometer waveform, and requires zero schema changes: window the 32 kHz signal and run it through the existing `features/vibration.py` extraction, then through `prediction/ml_model.py` (now archived under `src/legacy/`). This validates the pipeline end-to-end on genuine fan data.
 2. **Cross-check feature correctness with MAFAULDA** — since FAN-COIL-I has no discrete fault labels, use MAFAULDA's labeled imbalance/misalignment/bearing-fault classes (same accelerometer-feature shape) to confirm the extracted features actually separate fault classes before trusting them on unlabeled fan data.
 3. **Treat MIMII/acoustic as a roadmap item, not a near-term test** — it validates a real "fan" only acoustically; wiring it in means adding a new ingestion path and feature module, not just loading new CSVs.
 4. **Use the synthetic IoT-Integrated dataset only for API/schema smoke-testing** (e.g., does an endpoint accept `{vibration, acoustic, temperature, current}` payloads) — not for model accuracy claims, since it's fully synthetic.
@@ -62,6 +64,6 @@ Reference for current+vibration+voltage synchronized capture done right: [Compre
 
 ## 5. Open gaps flagged for later
 
-- `temperature_c` is synthetic everywhere in the app — no dataset above needs it, but a real fan pilot will need a real sensor before the field means anything.
-- No RPM/tachometer field in the schema despite every labeled fault dataset (MAFAULDA, induction-motor paper) treating shaft speed as a required normalization input.
+- `temperature_c` has been removed from the canonical schema (it survives only in `src/legacy/temperature.py`) — no dataset above needs it, but a real fan pilot will need a real sensor and a reintroduced field before temperature means anything again.
+- `speed_rpm` exists as dataset-provided metadata (nominal condition speed), but there is still no live tachometer ingestion path despite every labeled fault dataset (MAFAULDA, induction-motor paper) treating per-reading shaft speed as a required normalization input.
 - No acoustic or current fields — both are established fault channels but are net-new engineering work (ingestion + feature extraction + schema), not just "load a new dataset."

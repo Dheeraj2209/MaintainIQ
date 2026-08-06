@@ -1,6 +1,6 @@
 # Smart Predictive Maintenance Decision-Support System
 
-A predictive maintenance decision-support system using vibration and temperature data, with multi-machine monitoring, rule-based and ML-driven fault prediction, root cause identification, and maintenance history tracking.
+A predictive maintenance decision-support system built on the XJTU-SY run-to-failure bearing dataset, providing multi-machine vibration monitoring, remaining-useful-life (RUL) prediction, model observability, automated reports, and maintenance history tracking.
 
 ## Where to start
 
@@ -9,6 +9,7 @@ A predictive maintenance decision-support system using vibration and temperature
 - [`design/SRS_Document.md`](design/SRS_Document.md) — full requirements specification.
 - [`design/`](design/) — all other design documents, presentations, and architecture diagrams.
 - [`research/XJTU_SY_MODEL_CARD.md`](research/XJTU_SY_MODEL_CARD.md) — RUL dataset choice, training, validation, and real-time limitations.
+- [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the living data-model, ingestion, storage, telemetry, and report-catalog reference.
 
 ## Repository layout
 
@@ -74,7 +75,7 @@ seed step against a production database.
 ### Running it with Docker
 
 Prerequisite: generate `maintainiq.db` once on the host (step 2 above needs
-the raw IMS dataset, which isn't bundled into the image), and seed the demo
+the raw XJTU-SY dataset, which isn't bundled into the image), and seed the demo
 login accounts into that same file before copying it in.
 
 ```bash
@@ -128,6 +129,10 @@ notify → broadcast pipeline a future live telemetry feed would use.
      recipient, and **Analytics** (`/analytics`) reflects the machine's new
      risk ranking.
 
+Once the backend is running, admins/supervisors can start streaming replay
+from the Ingestion page (or `POST /api/ingestion/replay/start`) to drive the
+dashboard from stored XJTU-SY cycles in near-real-time.
+
 ### Tests
 
 ```bash
@@ -137,9 +142,10 @@ cd frontend && npm run test   # frontend, Vitest
 
 ## Train the real run-to-failure RUL model
 
-The older IMS stage classifier remains for the original dashboard demo. For
-an actual remaining-useful-life experiment, use the XJTU-SY pipeline. Download
-and extract the official dataset, then run:
+The XJTU-SY RUL pipeline is the platform's model. (The earlier IMS stage
+classifier is retained only under `src/legacy/`, import-guarded, and is not
+part of the running system.) Download and extract the official dataset, then
+run:
 
 ```bash
 python -m src.training.xjtu_rul --data-dir /path/to/XJTU-SY_Bearing_Datasets --rebuild-features
