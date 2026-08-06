@@ -183,3 +183,11 @@ class ReplayStartRequest(BaseModel):
 
 class ReplayStopRequest(BaseModel):
     machine_id: str = Field(min_length=1, max_length=128)
+
+
+class ReportCreateRequest(BaseModel):
+    report_type: Literal["machine_prognostic", "model_performance", "fleet_summary"]
+    scope: str
+    format: Literal["markdown", "json"] = "json"
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
