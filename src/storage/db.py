@@ -15,8 +15,10 @@ channel that Tests 2/3 lack — see stage_classifiers.py's feature_columns
 docstring), so the full feature set per row is stored as a JSON blob
 (`features_json`) rather than as many sparse/nullable columns. The handful
 of columns every downstream module actually filters or sorts on
-(vibration_h_rms, vibration_h_kurtosis, temperature_c, ...) are promoted to
-real columns for queryability.
+(vibration_h_rms, vibration_h_kurtosis, vibration_v_rms, vibration_v_kurtosis,
+cross_axis_rms_ratio, cross_axis_correlation, ...) are promoted to real
+columns for queryability; the full feature vector still lives in
+`features_json`.
 """
 import os
 import sqlite3
@@ -216,7 +218,7 @@ def _normalize_reading(reading: dict) -> dict:
     """Fill a canonical reading dict: default dataset, and features_json='{}'
     when absent (the live/demo path stores no full feature vector)."""
     row = {c: reading.get(c) for c in _READING_COLUMNS}
-    row["dataset"] = reading.get("dataset", "xjtu_sy")
+    row["dataset"] = reading.get("dataset") or "xjtu_sy"
     if row["features_json"] is None:
         row["features_json"] = "{}"
     return row
