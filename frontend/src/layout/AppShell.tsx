@@ -1,4 +1,4 @@
-import { Activity, Bell, Gauge, LayoutGrid, LogOut, PlayCircle, Radar, ShieldAlert, Users, Wrench } from 'lucide-react'
+import { Activity, Bell, Gauge, LayoutGrid, LogOut, PlayCircle, Radar, ShieldAlert, Users, Waves, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
@@ -22,6 +22,7 @@ const NAV: NavItem[] = [
   { to: '/model', label: 'Model', icon: Activity },
   { to: '/maintenance', label: 'Maintenance', icon: Wrench },
   { to: '/notifications', label: 'Notifications', icon: Bell, roles: ['admin', 'supervisor'] },
+  { to: '/ingestion', label: 'Ingestion', icon: Waves, roles: ['admin', 'supervisor'] },
   { to: '/admin/users', label: 'Users', icon: Users, roles: ['admin'] },
   { to: '/demo', label: 'Demo control', icon: PlayCircle, roles: ['admin'] },
 ]

@@ -12,6 +12,7 @@ import { MachineDetailPage } from './pages/MachineDetailPage'
 import { AlertsPage } from './pages/AlertsPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { ModelPage } from './pages/ModelPage'
+import { IngestionPage } from './pages/IngestionPage'
 import { MaintenancePage } from './pages/MaintenancePage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
@@ -38,6 +39,7 @@ export default function App() {
 
                 <Route element={<RequireRole allow={['admin', 'supervisor']} />}>
                   <Route path="notifications" element={<NotificationsPage />} />
+                  <Route path="ingestion" element={<IngestionPage />} />
                 </Route>
 
                 <Route element={<RequireRole allow={['admin']} />}>
