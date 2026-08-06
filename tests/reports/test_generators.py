@@ -195,6 +195,32 @@ def test_fleet_summary_latest_prediction_per_machine(rconn):
     assert s["top_at_risk"][0]["predicted_rul_minutes"] == 25.0
 
 
+# ---- build_summary dispatch ----
+
+def test_build_summary_dispatches_machine_prognostic(rconn):
+    _machine(rconn, "m1")
+    _prediction(rconn, timestamp="2030-01-01T00:00:00+00:00", health_state="critical", rul=30.0)
+    s = generators.build_summary(rconn, report_type="machine_prognostic", scope="m1")
+    assert s["report_type"] == "machine_prognostic"
+    assert s == generators.machine_prognostic(rconn, scope="m1")
+
+
+def test_build_summary_dispatches_model_performance(rconn):
+    s = generators.build_summary(rconn, report_type="model_performance", scope="fleet")
+    assert s["report_type"] == "model_performance"
+
+
+def test_build_summary_dispatches_fleet_summary(rconn):
+    _machine(rconn, "m1")
+    s = generators.build_summary(rconn, report_type="fleet_summary", scope="fleet")
+    assert s["report_type"] == "fleet_summary"
+
+
+def test_build_summary_rejects_unknown_type(rconn):
+    with pytest.raises(ValueError):
+        generators.build_summary(rconn, report_type="bogus", scope="fleet")
+
+
 # ---- renderers ----
 
 def test_render_json_roundtrips(rconn):
