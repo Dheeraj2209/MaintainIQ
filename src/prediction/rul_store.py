@@ -135,3 +135,32 @@ def register_active_model(conn, *, model_version: str, artifact_path: str,
         (model_version,),
     )
     conn.commit()
+
+
+def rehydrate(predictor, conn, machine_id: str) -> int:
+    """Replay stored readings for machine_id back through the predictor so a
+    cold instance rebuilds the same in-memory state a warm one would have.
+
+    Uses the already-extracted feature vector in readings.features_json (never
+    recomputes a feature). Readings without a stored feature vector (live/demo
+    rows with features_json '{}') are skipped. Returns the number replayed.
+    """
+    cur = conn.execute(
+        """SELECT speed_rpm, load_kn, sample_rate_hz, features_json
+           FROM readings WHERE machine_id = ? ORDER BY cycle ASC""",
+        (machine_id,),
+    )
+    replayed = 0
+    for row in cur.fetchall():
+        base = json.loads(row["features_json"] or "{}")
+        if not base:
+            continue
+        predictor._predict_from_base(
+            machine_id,
+            base,
+            sample_rate_hz=row["sample_rate_hz"],
+            speed_rpm=row["speed_rpm"],
+            load_kn=row["load_kn"],
+        )
+        replayed += 1
+    return replayed

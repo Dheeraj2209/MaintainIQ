@@ -108,7 +108,19 @@ class RealTimeRULPredictor:
         if speed_rpm <= 0 or load_kn < 0:
             raise ValueError("speed_rpm must be positive and load_kn must be non-negative")
         base = extract_snapshot_features(horizontal, vertical, sample_rate_hz)
+        return self._predict_from_base(
+            machine_id, base, sample_rate_hz=sample_rate_hz, speed_rpm=speed_rpm, load_kn=load_kn
+        )
 
+    def _predict_from_base(
+        self,
+        machine_id: str,
+        base: dict,
+        *,
+        sample_rate_hz: float,
+        speed_rpm: float,
+        load_kn: float,
+    ) -> dict:
         with self._locks[machine_id]:
             history = self._history[machine_id]
             cycle = self._cycles[machine_id]
