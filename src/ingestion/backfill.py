@@ -11,10 +11,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
 
-from src.ingestion.xjtu_sy import SAMPLE_RATE_HZ
+from src.ingestion.xjtu_sy import SAMPLE_RATE_HZ, build_feature_table
 from src.storage.db import insert_machines, insert_readings
 
 # XJTU snapshots are one-per-minute but carry no wall clock. We anchor every
@@ -109,3 +110,9 @@ def backfill_from_table(conn, feature_df: pd.DataFrame, *, dataset: str = "xjtu_
     skipped = len(reading_rows) - readings_written
 
     return BackfillResult(machines_written, readings_written, skipped)
+
+
+def backfill_dataset(conn, dataset_dir: Path, *, dataset: str = "xjtu_sy") -> BackfillResult:
+    """Build the feature table from a raw dataset directory, then backfill it."""
+    table = build_feature_table(Path(dataset_dir))
+    return backfill_from_table(conn, table, dataset=dataset)
