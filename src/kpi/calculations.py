@@ -41,7 +41,9 @@ def _all_machine_ids(conn) -> list:
 
 def _latest_prediction(conn, machine_id: str):
     cur = conn.execute(
-        """SELECT health_state, confidence, source, model_name, probable_cause, timestamp
+        """SELECT health_state, confidence, source, model_name, probable_cause, timestamp,
+                  predicted_rul_minutes, rul_estimate_kind,
+                  failure_within_horizon_probability, out_of_distribution
            FROM predictions
            WHERE machine_id = ?
            ORDER BY timestamp DESC
@@ -126,6 +128,9 @@ def _machine_health(conn, machine_id: str) -> dict:
         "risk_score": round(risk, 1),
         "abnormal_event_count": _abnormal_event_count(conn, machine_id),
         "open_alert_count": open_alerts,
+        "predicted_rul_minutes": latest_pred.get("predicted_rul_minutes") if latest_pred else None,
+        "rul_estimate_kind": latest_pred.get("rul_estimate_kind") if latest_pred else None,
+        "out_of_distribution": bool(latest_pred["out_of_distribution"]) if latest_pred and latest_pred.get("out_of_distribution") is not None else None,
     }
 
 

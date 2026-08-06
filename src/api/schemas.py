@@ -23,6 +23,9 @@ class MachineSummary(BaseModel):
     risk_score: float
     abnormal_event_count: int
     open_alert_count: int
+    predicted_rul_minutes: Optional[float] = None
+    rul_estimate_kind: Optional[str] = None
+    out_of_distribution: Optional[bool] = None
 
 
 class TrendPoint(BaseModel):
