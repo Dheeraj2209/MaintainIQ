@@ -134,3 +134,24 @@ def test_start_rejects_nonpositive_speed(db_path):
     svc = _service(db_path, _FakePredictor())
     with pytest.raises(ValueError):
         svc.start("m1", speed_multiplier=0)
+
+
+def test_worker_error_is_captured_in_status(db_path):
+    class _BoomPredictor:
+        def _predict_from_base(self, *args, **kwargs):
+            raise RuntimeError("model exploded")
+
+    svc = ReplayService(
+        predictor_provider=lambda: _BoomPredictor(),
+        connection_factory=lambda: _row_conn(db_path),
+        base_interval_seconds=0.001,
+    )
+    svc.start("m1")
+    deadline = time.time() + 5.0
+    while svc.status()["m1"]["running"] and time.time() < deadline:
+        time.sleep(0.02)
+    svc.stop_all()
+    st = svc.status()["m1"]
+    assert st["running"] is False
+    assert st["replayed"] == 0
+    assert st["error"] is not None and "model exploded" in st["error"]

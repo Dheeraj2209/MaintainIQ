@@ -60,7 +60,7 @@ class ReplayService:
             conn.close()
 
     def _fresh_state(self) -> dict:
-        return {"cycle": None, "running": False, "last_ts": None, "replayed": 0}
+        return {"cycle": None, "running": False, "last_ts": None, "replayed": 0, "error": None}
 
     def replay_once(self, machine_id: str) -> bool:
         """Process the next queued snapshot through the predict+persist path.
@@ -139,6 +139,10 @@ class ReplayService:
                     break
                 if stop_event.wait(interval):
                     break
+        except Exception as exc:  # worker-thread failure must be observable, not silent
+            with self._lock:
+                if machine_id in self._state:
+                    self._state[machine_id]["error"] = repr(exc)
         finally:
             with self._lock:
                 if machine_id in self._state:

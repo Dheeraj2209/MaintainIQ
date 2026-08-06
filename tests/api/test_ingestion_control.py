@@ -130,3 +130,11 @@ def test_replay_produces_predictions_and_status_advances(auth_client, replay_svc
         conn.close()
     assert len(rows) == 2
     assert all(r["source"] == "xjtu_rul" and r["reading_id"] is not None for r in rows)
+
+
+def test_admin_can_start_and_stop(auth_client, replay_svc):
+    client = auth_client("admin")
+    resp = client.post("/api/ingestion/replay/start", json={"machine_id": "m1"})
+    assert resp.status_code == 200, resp.text
+    resp = client.post("/api/ingestion/replay/stop", json={"machine_id": "m1"})
+    assert resp.status_code == 200
