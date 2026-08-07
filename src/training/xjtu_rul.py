@@ -370,6 +370,41 @@ def train_and_export(
     return report
 
 
+def register_trained_model(conn, artifact_path: Path, report: dict) -> str:
+    """Record a freshly trained artifact as the single active model.
+
+    Reads the version stamped into the artifact by train_and_export and writes
+    a model_registry row (deactivating any previous active model). This is what
+    makes the /model observability page and the model_performance report able to
+    resolve "the deployed model" — the realtime predictor loads the joblib
+    directly, but nothing else knows a model exists until it is registered.
+    Returns the registered model_version.
+    """
+    # Local import keeps the training module importable without pulling in the
+    # prediction stack (and avoids any import cycle) unless registration is
+    # actually requested.
+    from src.prediction.rul_store import register_active_model
+
+    artifact = joblib.load(artifact_path)
+    model_version = artifact["model_version"]
+
+    resolved = Path(artifact_path).resolve()
+    try:
+        artifact_rel = str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        # Artifact outside the repo (e.g. a test tmp dir): store the path as-is.
+        artifact_rel = str(resolved)
+
+    register_active_model(
+        conn,
+        model_version=model_version,
+        artifact_path=artifact_rel,
+        algorithm=type(artifact["regressor"]).__name__,
+        metrics_json=json.dumps(report, sort_keys=True),
+    )
+    return model_version
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train the XJTU-SY bearing RUL model")
     parser.add_argument("--data-dir", type=Path, help="extracted raw XJTU-SY directory")
@@ -377,6 +412,8 @@ def main() -> None:
     parser.add_argument("--rebuild-features", action="store_true")
     parser.add_argument("--artifact", type=Path, default=DEFAULT_ARTIFACT)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
+    parser.add_argument("--no-register", action="store_true",
+                        help="train and export only; do not record the model in model_registry")
     args = parser.parse_args()
 
     if args.rebuild_features or not args.features_csv.exists():
@@ -387,6 +424,17 @@ def main() -> None:
         table = pd.read_csv(args.features_csv)
     report = train_and_export(table, args.artifact, args.report)
     print(json.dumps(report, indent=2))
+
+    if not args.no_register:
+        from src.storage.db import get_connection, init_schema
+
+        conn = get_connection()
+        try:
+            init_schema(conn)
+            version = register_trained_model(conn, args.artifact, report)
+        finally:
+            conn.close()
+        print(f"registered active model {version}")
 
 
 if __name__ == "__main__":

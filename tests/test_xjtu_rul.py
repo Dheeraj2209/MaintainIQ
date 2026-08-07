@@ -1,11 +1,17 @@
+import sqlite3
+
+import joblib
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import ExtraTreesRegressor
 
 from src.ingestion.xjtu_sy import build_feature_table, extract_snapshot_features, read_snapshot
+from src.storage.db import init_schema
 from src.training.xjtu_rul import (
     ROLLING_SOURCE_COLUMNS,
     add_past_context,
     feature_columns,
+    register_trained_model,
     train_and_export,
 )
 
@@ -13,6 +19,49 @@ from src.training.xjtu_rul import (
 def _signal(scale=1.0, points=128):
     t = np.arange(points) / 25600.0
     return scale * np.sin(2 * np.pi * 1000 * t)
+
+
+def test_register_trained_model_activates_artifact(tmp_path):
+    """After training, the artifact is recorded as the single active model so
+    the /model observability page and model_performance report resolve it."""
+    artifact_path = tmp_path / "m.joblib"
+    joblib.dump(
+        {"model_version": "xjtu-rul-TESTVER", "regressor": ExtraTreesRegressor()},
+        artifact_path,
+    )
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_schema(conn)
+
+    version = register_trained_model(conn, artifact_path, {"mae_minutes": 1.0})
+
+    assert version == "xjtu-rul-TESTVER"
+    row = conn.execute(
+        "SELECT model_version, algorithm, is_active, metrics_json "
+        "FROM model_registry WHERE is_active = 1"
+    ).fetchone()
+    assert row["model_version"] == "xjtu-rul-TESTVER"
+    assert row["algorithm"] == "ExtraTreesRegressor"
+    assert row["is_active"] == 1
+    assert "mae_minutes" in row["metrics_json"]
+
+
+def test_register_trained_model_deactivates_previous(tmp_path):
+    """Registering a second model leaves exactly one active row."""
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_schema(conn)
+
+    for version in ("xjtu-rul-OLD", "xjtu-rul-NEW"):
+        path = tmp_path / f"{version}.joblib"
+        joblib.dump({"model_version": version, "regressor": ExtraTreesRegressor()}, path)
+        register_trained_model(conn, path, {})
+
+    active = conn.execute(
+        "SELECT model_version FROM model_registry WHERE is_active = 1"
+    ).fetchall()
+    assert [r["model_version"] for r in active] == ["xjtu-rul-NEW"]
 
 
 def test_snapshot_features_are_finite_and_dual_axis():

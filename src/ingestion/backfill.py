@@ -16,7 +16,13 @@ from pathlib import Path
 import pandas as pd
 
 from src.ingestion.xjtu_sy import SAMPLE_RATE_HZ, build_feature_table
-from src.storage.db import insert_machines, insert_readings
+from src.storage.db import get_connection, init_schema, insert_machines, insert_readings
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+# Shared with src/training/xjtu_rul.py: training writes this cache and backfill
+# reuses it, so `train` then `backfill` never rebuilds features from the raw
+# dataset twice.
+DEFAULT_FEATURES_CSV = REPO_ROOT / "outputs" / "xjtu_features.csv"
 
 # XJTU snapshots are one-per-minute but carry no wall clock. We anchor every
 # bearing's cycle 0 at this fixed UTC epoch and add elapsed_minutes, so the
@@ -120,3 +126,56 @@ def backfill_dataset(conn, dataset_dir: Path, *, dataset: str = "xjtu_sy") -> Ba
     """Build the feature table from a raw dataset directory, then backfill it."""
     table = build_feature_table(Path(dataset_dir))
     return backfill_from_table(conn, table, dataset=dataset)
+
+
+def main(argv=None) -> BackfillResult:
+    """CLI: load XJTU-SY machines + readings into the canonical SQLite DB.
+
+    Feature-table sourcing mirrors src/training/xjtu_rul.py: reuse the cached
+    CSV when present, otherwise build it from --data-dir (and cache it). This
+    is the one-time DB-population step the app needs before it can serve a
+    fleet.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Backfill XJTU-SY machines + readings into the SQLite DB",
+    )
+    parser.add_argument(
+        "--data-dir", type=Path,
+        help="extracted raw XJTU-SY dataset directory (folders Bearing1_1 ... Bearing3_5)",
+    )
+    parser.add_argument(
+        "--features-csv", type=Path, default=DEFAULT_FEATURES_CSV,
+        help="feature-table cache; reused if present unless --rebuild-features is set",
+    )
+    parser.add_argument("--rebuild-features", action="store_true",
+                        help="rebuild the feature cache from --data-dir even if it exists")
+    parser.add_argument("--dataset", default="xjtu_sy",
+                        help="dataset tag stored on each machine/reading row")
+    args = parser.parse_args(argv)
+
+    if args.rebuild_features or not args.features_csv.exists():
+        if args.data_dir is None:
+            parser.error("--data-dir is required when the feature CSV does not exist")
+        table = build_feature_table(args.data_dir, args.features_csv)
+    else:
+        table = pd.read_csv(args.features_csv)
+
+    conn = get_connection()
+    try:
+        init_schema(conn)
+        result = backfill_from_table(conn, table, dataset=args.dataset)
+    finally:
+        conn.close()
+
+    print(
+        f"backfilled {result.machines_written} machines, "
+        f"{result.readings_written} readings "
+        f"({result.skipped} already present)"
+    )
+    return result
+
+
+if __name__ == "__main__":
+    main()

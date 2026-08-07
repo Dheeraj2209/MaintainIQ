@@ -239,6 +239,44 @@ def test_backfill_dataset_end_to_end_populates_zero_null_readings(tmp_path):
             assert row[col] is not None, f"{col} was NULL"
 
 
+def test_cli_backfills_from_cached_feature_csv(tmp_path, monkeypatch):
+    """`python -m src.ingestion.backfill --features-csv <cache>` loads the DB
+    from an already-built feature table, no raw dataset needed."""
+    from src.storage.db import get_connection
+
+    csv = tmp_path / "features.csv"
+    _table([
+        _row("Bearing1_1", 0), _row("Bearing1_1", 1),
+        _row("Bearing1_2", 0),
+    ]).to_csv(csv, index=False)
+
+    db_file = tmp_path / "cli.db"
+    monkeypatch.setattr(backfill_module, "get_connection", lambda: get_connection(db_file))
+
+    result = backfill_module.main(["--features-csv", str(csv)])
+
+    assert result.machines_written == 2
+    assert result.readings_written == 3
+    verify = get_connection(db_file)
+    try:
+        assert verify.execute("SELECT COUNT(*) FROM machines").fetchone()[0] == 2
+        assert verify.execute("SELECT COUNT(*) FROM readings").fetchone()[0] == 3
+    finally:
+        verify.close()
+
+
+def test_cli_requires_data_dir_when_feature_csv_missing(tmp_path, monkeypatch):
+    """With no cache and no --data-dir, the CLI errors instead of writing an
+    empty DB."""
+    from src.storage.db import get_connection
+
+    db_file = tmp_path / "cli.db"
+    monkeypatch.setattr(backfill_module, "get_connection", lambda: get_connection(db_file))
+
+    with pytest.raises(SystemExit):
+        backfill_module.main(["--features-csv", str(tmp_path / "does-not-exist.csv")])
+
+
 @pytest.fixture
 def backfilled_client(tmp_path):
     """TestClient (admin) whose DB is a fresh schema + one backfilled bearing."""
