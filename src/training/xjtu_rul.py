@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -390,16 +391,26 @@ def register_trained_model(conn, artifact_path: Path, report: dict) -> str:
 
     resolved = Path(artifact_path).resolve()
     try:
-        artifact_rel = str(resolved.relative_to(REPO_ROOT))
+        # model_registry.artifact_path must be repo-root-relative with forward
+        # slashes (matches src/api/routes/predictions.py:_relative_artifact_path
+        # so both registration paths agree on the same model_version's row).
+        artifact_rel = os.path.relpath(resolved, REPO_ROOT).replace(os.sep, "/")
     except ValueError:
-        # Artifact outside the repo (e.g. a test tmp dir): store the path as-is.
-        artifact_rel = str(resolved)
+        # Artifact on a different drive than the repo (e.g. a test tmp dir on
+        # another mount): store the absolute path with forward slashes.
+        artifact_rel = resolved.as_posix()
+
+    # The trained regressor is a Pipeline; the informative algorithm name is its
+    # final estimator, not "Pipeline". Fall back to the object itself for a bare
+    # estimator.
+    regressor = artifact["regressor"]
+    estimator = regressor.steps[-1][1] if hasattr(regressor, "steps") else regressor
 
     register_active_model(
         conn,
         model_version=model_version,
         artifact_path=artifact_rel,
-        algorithm=type(artifact["regressor"]).__name__,
+        algorithm=type(estimator).__name__,
         metrics_json=json.dumps(report, sort_keys=True),
     )
     return model_version

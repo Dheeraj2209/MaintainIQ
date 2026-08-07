@@ -3,14 +3,15 @@ import sqlite3
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import ExtraTreesRegressor
 
 from src.ingestion.xjtu_sy import build_feature_table, extract_snapshot_features, read_snapshot
 from src.storage.db import init_schema
+from src.training import xjtu_rul as xjtu_rul_module
 from src.training.xjtu_rul import (
     ROLLING_SOURCE_COLUMNS,
     add_past_context,
     feature_columns,
+    make_regressor,
     register_trained_model,
     train_and_export,
 )
@@ -23,10 +24,13 @@ def _signal(scale=1.0, points=128):
 
 def test_register_trained_model_activates_artifact(tmp_path):
     """After training, the artifact is recorded as the single active model so
-    the /model observability page and model_performance report resolve it."""
+    the /model observability page and model_performance report resolve it. The
+    stored algorithm is the Pipeline's final estimator, not "Pipeline"."""
     artifact_path = tmp_path / "m.joblib"
+    # A real train_and_export artifact stores a Pipeline (make_regressor), so the
+    # test dumps the same shape to exercise the estimator-unwrap in registration.
     joblib.dump(
-        {"model_version": "xjtu-rul-TESTVER", "regressor": ExtraTreesRegressor()},
+        {"model_version": "xjtu-rul-TESTVER", "regressor": make_regressor()},
         artifact_path,
     )
 
@@ -47,6 +51,26 @@ def test_register_trained_model_activates_artifact(tmp_path):
     assert "mae_minutes" in row["metrics_json"]
 
 
+def test_register_trained_model_stores_repo_relative_forward_slash_path(tmp_path, monkeypatch):
+    """artifact_path is stored repo-root-relative with forward slashes so it
+    matches the API registration path and stays portable across OSes."""
+    monkeypatch.setattr(xjtu_rul_module, "REPO_ROOT", tmp_path)
+    artifact_path = tmp_path / "models" / "xjtu_rul_model.joblib"
+    artifact_path.parent.mkdir(parents=True)
+    joblib.dump({"model_version": "xjtu-rul-PATHVER", "regressor": make_regressor()}, artifact_path)
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_schema(conn)
+
+    register_trained_model(conn, artifact_path, {})
+
+    stored = conn.execute(
+        "SELECT artifact_path FROM model_registry WHERE model_version = 'xjtu-rul-PATHVER'"
+    ).fetchone()["artifact_path"]
+    assert stored == "models/xjtu_rul_model.joblib"
+
+
 def test_register_trained_model_deactivates_previous(tmp_path):
     """Registering a second model leaves exactly one active row."""
     conn = sqlite3.connect(":memory:")
@@ -55,7 +79,7 @@ def test_register_trained_model_deactivates_previous(tmp_path):
 
     for version in ("xjtu-rul-OLD", "xjtu-rul-NEW"):
         path = tmp_path / f"{version}.joblib"
-        joblib.dump({"model_version": version, "regressor": ExtraTreesRegressor()}, path)
+        joblib.dump({"model_version": version, "regressor": make_regressor()}, path)
         register_trained_model(conn, path, {})
 
     active = conn.execute(
