@@ -49,3 +49,12 @@ frontend/.env.local
 
 # Local credentials scratch file — demo/dev logins, never committed.
 /credentials.txt
+
+# Raw XJTU-SY dataset downloads, reference PDFs, and bearing photos (multi-GB,
+# not source — re-download per docs/DATA_MODEL.md if needed).
+/local_data/
+
+# Serena MCP tool project config and Claude Code hook session logs — local
+# tooling state, not source.
+/.serena/
+/logs/
