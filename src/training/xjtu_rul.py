@@ -297,7 +297,10 @@ def train_and_export(
     report = {
         "dataset": "XJTU-SY",
         "approach": "two-stage prognostics: classify failure within horizon, then regress RUL",
-        "validation": "leave-one-bearing-out; each of 15 test folds is one completely unseen bearing",
+        "validation": (
+            f"leave-one-bearing-out; each of {int(unique_groups)} test folds "
+            "is one completely unseen bearing"
+        ),
         "bearing_count": int(unique_groups),
         "sample_count": int(len(table)),
         "classifier_feature_count": len(classifier_features),
