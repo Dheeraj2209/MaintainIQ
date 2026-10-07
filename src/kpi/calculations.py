@@ -14,11 +14,13 @@ KPI response contract stays stable once M6 (live telemetry) lands. See
 design/DESIGN_BASELINE.md for the full decision table.
 """
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.maintenance.records import days_since_last_maintenance, last_maintenance_at
 from src.observability.telemetry import _percentile
+from src.prediction import health_epoch
 from src.storage.db import table_exists
 from src.telemetry import device_health
 
@@ -47,7 +49,8 @@ def _latest_prediction(conn, machine_id: str):
     cur = conn.execute(
         """SELECT health_state, confidence, source, model_name, probable_cause, timestamp,
                   predicted_rul_minutes, rul_estimate_kind,
-                  failure_within_horizon_probability, out_of_distribution
+                  failure_within_horizon_probability, out_of_distribution,
+                  instant_health_state, health_episode, warnings_json
            FROM predictions
            WHERE machine_id = ?
            ORDER BY timestamp DESC
@@ -102,17 +105,43 @@ def _open_alert_count(conn, machine_id: str) -> int:
 
 
 def _abnormal_event_count(conn, machine_id: str) -> int:
+    # Counted on the instant state: a held (ratcheted) row repeats an earlier
+    # abnormal reading, it is not a new event (review R2-7). Pre-ratchet rows
+    # have no instant state and count on their own state.
     cur = conn.execute(
-        "SELECT COUNT(*) AS n FROM predictions WHERE machine_id = ? AND health_state != 'healthy'",
+        """SELECT COUNT(*) AS n FROM predictions
+           WHERE machine_id = ? AND COALESCE(instant_health_state, health_state) != 'healthy'""",
         (machine_id,),
     )
     return cur.fetchone()["n"]
 
 
+_COMMISSIONING = re.compile(r"^commissioning: (\d+)/(\d+) ")
+
+
+def _commissioning(latest_pred) -> dict | None:
+    """{"seen", "of"} from the latest prediction's commissioning warning
+    (rul_realtime, plan D3), or None."""
+    try:
+        warnings = json.loads(latest_pred.get("warnings_json") or "[]")
+    except (TypeError, ValueError):
+        return None
+    for warning in warnings if isinstance(warnings, list) else []:
+        match = _COMMISSIONING.match(str(warning))
+        if match:
+            return {"seen": int(match.group(1)), "of": int(match.group(2))}
+    return None
+
+
 def _machine_health(conn, machine_id: str) -> dict:
     latest_pred = _latest_prediction(conn, machine_id)
     latest_reading = _latest_reading(conn, machine_id)
-    health_state = latest_pred["health_state"] if latest_pred else "unknown"
+    # The latest prediction can predate a reset or re-arm (plan D6): the
+    # current state is then the DB held level, flagged reset_pending_reading.
+    effective = health_epoch.effective_state(conn, machine_id, latest_pred)
+    pending = effective["reset_pending_reading"]
+    health_state = effective["health_state"] or "unknown"
+    instant = None if pending or not latest_pred else latest_pred.get("instant_health_state")
 
     # Combined risk: driven by the current health state, nudged up when an
     # alert is still open for the machine (unresolved issue = higher risk).
@@ -135,6 +164,10 @@ def _machine_health(conn, machine_id: str) -> dict:
         "predicted_rul_minutes": latest_pred.get("predicted_rul_minutes") if latest_pred else None,
         "rul_estimate_kind": latest_pred.get("rul_estimate_kind") if latest_pred else None,
         "out_of_distribution": bool(latest_pred["out_of_distribution"]) if latest_pred and latest_pred.get("out_of_distribution") is not None else None,
+        "instant_health_state": instant,
+        "health_state_held": instant is not None and instant != health_state,
+        "commissioning": None if pending or not latest_pred else _commissioning(latest_pred),
+        "reset_pending_reading": pending,
     }
 
 

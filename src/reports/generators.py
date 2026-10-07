@@ -14,6 +14,7 @@ import json
 from datetime import datetime, timedelta
 
 from src.observability.telemetry import _percentile
+from src.prediction import health_epoch
 
 REPORT_TYPES = ("machine_prognostic", "model_performance", "fleet_summary")
 FORMATS = ("markdown", "json")
@@ -42,6 +43,16 @@ def _add_minutes(iso_ts: str, minutes: float) -> str:
     return (datetime.fromisoformat(iso_ts) + timedelta(minutes=minutes)).isoformat()
 
 
+def _current_state(conn, machine_id: str, latest: dict, period_end) -> dict:
+    """The latest prediction's state, or, for an open-ended report, the
+    machine's effective state (plan D6): after a reset or re-arm with no new
+    reading, the DB held level. A bounded report describes the past, so it
+    keeps the row's own state."""
+    if period_end is not None:
+        return {"health_state": latest["health_state"], "reset_pending_reading": False}
+    return health_epoch.effective_state(conn, machine_id, latest)
+
+
 def machine_prognostic(conn, *, scope, period_start=None, period_end=None) -> dict:
     where, params = _period_clause("timestamp", period_start, period_end)
     params["machine_id"] = scope
@@ -50,7 +61,7 @@ def machine_prognostic(conn, *, scope, period_start=None, period_end=None) -> di
         f"""SELECT timestamp, health_state, predicted_rul_minutes, rul_estimate_kind,
                    prediction_interval_low, prediction_interval_high,
                    failure_within_horizon_probability, out_of_distribution,
-                   probable_cause, model_version, confidence
+                   probable_cause, model_version, confidence, health_episode
             FROM predictions
             WHERE machine_id = :machine_id{where}
             ORDER BY id DESC LIMIT 1""",
@@ -82,9 +93,11 @@ def machine_prognostic(conn, *, scope, period_start=None, period_end=None) -> di
     current = None
     recommended = {"within_minutes": None, "by_timestamp": None}
     if latest is not None:
+        state = _current_state(conn, scope, dict(latest), period_end)
         current = {
             "timestamp": latest["timestamp"],
-            "health_state": latest["health_state"],
+            "health_state": state["health_state"],
+            "reset_pending_reading": state["reset_pending_reading"],
             "predicted_rul_minutes": latest["predicted_rul_minutes"],
             "rul_estimate_kind": latest["rul_estimate_kind"],
             "prediction_interval_low": latest["prediction_interval_low"],
@@ -212,7 +225,7 @@ def fleet_summary(conn, *, scope="fleet", period_start=None, period_end=None) ->
     machine_count = conn.execute("SELECT COUNT(*) AS n FROM machines").fetchone()["n"]
 
     latest_rows = conn.execute(
-        f"""SELECT p.machine_id, p.health_state, p.predicted_rul_minutes
+        f"""SELECT p.machine_id, p.health_state, p.predicted_rul_minutes, p.health_episode
             FROM predictions p
             JOIN (SELECT machine_id, MAX(id) AS max_id FROM predictions
                   WHERE 1 = 1{pred_where} GROUP BY machine_id) l
@@ -224,12 +237,12 @@ def fleet_summary(conn, *, scope="fleet", period_start=None, period_end=None) ->
     health_distribution: dict = {}
     at_risk = []
     for r in latest_rows:
-        state = r["health_state"]
+        state = _current_state(conn, r["machine_id"], dict(r), period_end)["health_state"]
         health_distribution[state] = health_distribution.get(state, 0) + 1
         at_risk.append({
             "machine_id": r["machine_id"],
             "predicted_rul_minutes": r["predicted_rul_minutes"],
-            "health_state": r["health_state"],
+            "health_state": state,
         })
 
     # Lowest predicted RUL = most at risk; machines with no RUL sort last.
