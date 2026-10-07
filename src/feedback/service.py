@@ -25,6 +25,8 @@ healthy, in the same transaction, keeping the epoch and baseline. The next
 abnormal reading then opens and pages one new alert. Other outcomes keep the
 held level and the suppression until a repair resets it. An open alert never
 re-arms: that would show the machine healthy while its alert is still open.
+Nor does any alert while another real alert is open, or any but the episode's
+newest real alert: a stale edit to an older alert keeps the newer hold.
 
 `actor` is the get_current_user dict (id, role, name).
 
