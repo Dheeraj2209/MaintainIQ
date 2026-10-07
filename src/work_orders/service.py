@@ -160,6 +160,10 @@ def get_work_order(conn, wo_id: int, *, with_events: bool = False) -> dict:
             ).fetchone()
             alert = live.api_alert(row) if row is not None else None
         order["alert"] = alert
+        # What completing it as corrective work would do with reset_health
+        # omitted (plan D2, before the date guard), so the drawer's checkbox
+        # starts from the server's decision rather than a client guess.
+        order["resets_health_by_default"] = _resets_by_default(conn, order, "corrective")
     return order
 
 

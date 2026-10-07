@@ -249,6 +249,26 @@ describe('WorkOrderDrawer', () => {
       expect(bodies[0]).toMatchObject({ maintenance_type: 'preventive', reset_health: true })
     })
 
+    it("follows the server's default: unchecked for an open alert of an older health episode", async () => {
+      // The client cannot see episodes; the server says this order would not
+      // reset (its alert predates a later reset), so the box starts unchecked.
+      const bodies = captureCompletes()
+      server.use(
+        onGetOrder(() =>
+          HttpResponse.json({ ...structuredClone(workOrderDetail), resets_health_by_default: false }),
+        ),
+      )
+      render(harness())
+      const drawer = await openDrawer()
+      await userEvent.click(within(drawer).getByRole('button', { name: /^complete$/i }))
+
+      expect(within(drawer).getByRole('checkbox', { name: /restart health tracking/i })).not.toBeChecked()
+      await userEvent.click(within(drawer).getByRole('button', { name: /confirm completion/i }))
+
+      await waitFor(() => expect(bodies).toHaveLength(1))
+      expect(bodies[0]).toMatchObject({ maintenance_type: 'corrective', reset_health: false })
+    })
+
     it('is unchecked for a free-standing order and sends an explicit false', async () => {
       const bodies = captureCompletes()
       serveOrder({ ...workOrders[2], alert_id: null })

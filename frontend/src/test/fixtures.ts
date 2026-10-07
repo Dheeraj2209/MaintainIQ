@@ -89,6 +89,19 @@ export const commissioningMachine: MachineSummary = {
   health_warnings: ['commissioning: 7/20 snapshots; learning the baseline, instant state faulty is not held'],
 }
 
+// Reset (a repair or a manual reset) with no reading since: the held level is
+// healthy, but the baseline has not been relearned yet.
+export const resetPendingMachine: MachineSummary = {
+  ...machineSummaries[0],
+  health_state: 'healthy',
+  instant_health_state: null,
+  health_state_held: false,
+  held_since: null,
+  commissioning: null,
+  reset_pending_reading: true,
+  health_warnings: [],
+}
+
 export const kpiSummary: KpiSummary = {
   machine_count: 2,
   health_state_counts: { critical: 1, healthy: 1 },
@@ -647,12 +660,18 @@ export const workOrderDetail: WorkOrderDetail = {
     },
   ],
   alert: openAlerts[0],
+  resets_health_by_default: true,
 }
 
 // A detail for any list entry, for tests that need a specific status or
 // assignee in the drawer (the default handler always serves #3's trail).
 export function workOrderDetailFor(order: WorkOrder): WorkOrderDetail {
-  return { ...structuredClone(workOrderDetail), ...structuredClone(order), alert: null }
+  return {
+    ...structuredClone(workOrderDetail),
+    ...structuredClone(order),
+    alert: null,
+    resets_health_by_default: false,
+  }
 }
 
 export const assignees: Assignee[] = [

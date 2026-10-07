@@ -347,3 +347,21 @@ def test_complete_route_passes_reset_health(auth_client, conn):
     assert resp.status_code == 200, resp.text
     assert _epoch(conn) == (0, 0)
     assert _alert(conn, alert["id"])["status"] == "open"
+
+
+def test_work_order_detail_exposes_the_server_reset_default(auth_client, conn):
+    # The drawer pre-checks "restart health tracking" from the server's own
+    # D2 decision, which the client cannot compute (it needs the episode).
+    alert = _open_alert(conn, at=_wall(60))
+    sup = auth_client("supervisor")
+    wo = sup.post(f"/api/alerts/{alert['id']}/work-order",
+                  json={"assigned_to": SUP["id"]}).json()
+    assert sup.get(f"/api/work-orders/{wo['id']}").json()["resets_health_by_default"] is True
+
+    # A later reset puts the order's alert in an older episode.
+    health_epoch.reset_machine_health(conn, "m2", reason="test")
+    conn.commit()
+    assert sup.get(f"/api/work-orders/{wo['id']}").json()["resets_health_by_default"] is False
+
+    free = sup.post("/api/work-orders", json={"machine_id": "m2", "title": "t"}).json()
+    assert sup.get(f"/api/work-orders/{free['id']}").json()["resets_health_by_default"] is False

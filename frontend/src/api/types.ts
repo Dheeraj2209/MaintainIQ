@@ -711,6 +711,9 @@ export interface WorkOrderEvent {
 export interface WorkOrderDetail extends WorkOrder {
   events: WorkOrderEvent[]
   alert: Alert | null
+  // Whether completing it as corrective work resets the machine's health by
+  // default (plan D2: its alert is a real alert of the current episode).
+  resets_health_by_default: boolean
 }
 
 export interface WorkOrderCreate {

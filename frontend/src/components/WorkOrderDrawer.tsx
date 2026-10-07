@@ -144,17 +144,12 @@ export function WorkOrderDrawer({ workOrderId, onClose, onChanged }: Props) {
     }
   }
 
-  // Mirrors the server's default (plan D2): corrective work on the machine's
-  // current alert (open, or closed by a person) restarts health tracking. The
-  // drawer always sends the choice explicitly, so the box is what happens.
+  // The server's own default (plan D2): corrective work on a real alert of
+  // the machine's current health episode restarts health tracking. Only the
+  // server knows the episode, so the detail carries its decision. The drawer
+  // always sends the choice explicitly, so the box is what happens.
   function defaultResetHealth(type: 'corrective' | 'preventive'): boolean {
-    const alert = detail?.alert
-    return (
-      type === 'corrective' &&
-      alert != null &&
-      alert.source !== 'demo' &&
-      (alert.status === 'open' || alert.closed_by != null)
-    )
+    return type === 'corrective' && detail?.resets_health_by_default === true
   }
 
   function changeMaintenanceType(type: 'corrective' | 'preventive') {

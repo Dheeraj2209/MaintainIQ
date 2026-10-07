@@ -505,6 +505,9 @@ class WorkOrderEvent(BaseModel):
 class WorkOrderDetail(WorkOrder):
     events: list[WorkOrderEvent]  # oldest first
     alert: Optional[Alert] = None  # the linked alert, if any
+    # Whether completing it as corrective work resets the machine's health by
+    # default (plan D2; the date guard still applies at completion).
+    resets_health_by_default: bool = False
 
 
 class WorkOrderCreate(BaseModel):
