@@ -50,6 +50,15 @@ table (one row per browser push endpoint) plus notifications.channel
 ('email' | 'push', DEFAULT 'email' so every existing row reads as an email).
 Additive and the same mixed shape as migration 3.
 
+Migration 8 adds the health-state ratchet
+(docs/superpowers/plans/2026-10-07-ratchet-maintenance-reset.md): the
+machine_health_state table (epoch, episode, held max_state per machine),
+nullable predictions.health_epoch / health_episode / instant_health_state and
+alerts.health_episode stamps (pre-ratchet rows stay NULL),
+maintenance_records.resets_health (DEFAULT 0), the per-epoch predictions
+index, and a deploy seed that holds the level of a pre-deploy open or
+human-closed real alert. Additive and the same mixed shape as migration 3.
+
 Migrations still do not run at app start. Instead ensure_current_schema
 upgrades a versioned (>= 1) but stale file the first time a request
 (src/api/deps.get_db) or the paging job opens it, so new code never reads the
@@ -60,6 +69,7 @@ backfill decision.
 import logging
 import sqlite3
 import threading
+from datetime import datetime, timezone
 
 from src.storage.db import (
     DEVICE_HEALTH_SCHEMA,
@@ -206,6 +216,128 @@ def _migration_007_push(conn: sqlite3.Connection) -> None:
         pass  # fresh DB: SCHEMA already has the column
 
 
+# The held (ratcheted) health level per machine
+# (docs/superpowers/plans/2026-10-07-ratchet-maintenance-reset.md). epoch is the
+# baseline life (bumped by a repair reset), episode the alert episode (bumped
+# by every reset and false-alarm re-arm), max_state the held level of the
+# current episode, and model_version the artifact that derived it (NULL for a
+# migration seed). A machine with no row reads as (0, 0, 'healthy').
+_HEALTH_STATE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS machine_health_state (
+    machine_id         TEXT PRIMARY KEY REFERENCES machines(machine_id),
+    epoch              INTEGER NOT NULL DEFAULT 0,
+    episode            INTEGER NOT NULL DEFAULT 0,
+    max_state          TEXT NOT NULL DEFAULT 'healthy'
+                       CHECK(max_state IN ('healthy','degrading','faulty','critical')),
+    model_version      TEXT,
+    epoch_started_at   TEXT,
+    episode_started_at TEXT,
+    reset_reason       TEXT,
+    updated_at         TEXT NOT NULL
+);
+"""
+
+# Literals mirror src/prediction/rul_store.PREDICTION_SOURCE and
+# src/alerts/live.DEMO_SOURCE; migrations do not import app modules. Only real
+# model alerts seed: demo and other detectors' alerts never do.
+_SEED_SOURCE = "xjtu_rul"
+_STATE_RANK_SQL = (
+    "CASE health_state WHEN 'critical' THEN 3 WHEN 'faulty' THEN 2 "
+    "WHEN 'degrading' THEN 1 ELSE 0 END"
+)
+_NO_SEED_OUTCOMES = ("false_alarm",)
+_NO_SEED_CAUSES = ("sensor_or_data_quality_issue",)
+
+
+def _seed_alert(conn: sqlite3.Connection, machine_id: str, has_feedback: bool):
+    """The one pre-deploy alert, as (id, health_state, opened_at, ...), whose
+    level the machine should hold (plan D14), or None: its worst open real alert; otherwise its newest resolved
+    real alert, if that was closed by a person after the machine's last
+    maintenance and was not judged a false alarm or a data-quality issue."""
+    open_alert = conn.execute(
+        f"SELECT id, health_state, opened_at FROM alerts "
+        f"WHERE machine_id = ? AND source = ? AND status = 'open' "
+        f"ORDER BY {_STATE_RANK_SQL} DESC, id DESC LIMIT 1",
+        (machine_id, _SEED_SOURCE),
+    ).fetchone()
+    if open_alert is not None:
+        return open_alert
+    newest = conn.execute(
+        "SELECT id, health_state, opened_at, resolved_at, closed_by FROM alerts "
+        "WHERE machine_id = ? AND source = ? AND status = 'resolved' "
+        "ORDER BY resolved_at DESC, id DESC LIMIT 1",
+        (machine_id, _SEED_SOURCE),
+    ).fetchone()
+    if newest is None or newest[4] is None:
+        return None
+    last_maintenance = conn.execute(
+        "SELECT MAX(performed_at) AS t FROM maintenance_records WHERE machine_id = ?",
+        (machine_id,),
+    ).fetchone()[0]
+    if last_maintenance is not None and not (newest[3] or "") > last_maintenance:
+        return None
+    if has_feedback:
+        feedback = conn.execute(
+            "SELECT outcome, actual_cause FROM alert_feedback WHERE alert_id = ?",
+            (newest[0],),
+        ).fetchone()
+        if feedback is not None and (
+            feedback[0] in _NO_SEED_OUTCOMES or feedback[1] in _NO_SEED_CAUSES
+        ):
+            return None
+    return newest
+
+
+def _migration_008_health_epoch(conn: sqlite3.Connection) -> None:
+    # Additive: the machine_health_state table, nullable epoch/episode stamps
+    # on predictions and alerts (legacy rows stay NULL, "pre-ratchet"),
+    # maintenance_records.resets_health, and the per-epoch predictions index.
+    # executescript() COMMITs first; the guarded ALTERs, the CREATE INDEX IF
+    # NOT EXISTS and the INSERT OR IGNORE seed are idempotent, so a crash
+    # before the version stamp re-runs cleanly (same shape as migration 3).
+    # The index comes after the ALTERs: SCHEMA's predictions lacks the column.
+    from src.storage.db import table_exists
+
+    conn.executescript(_HEALTH_STATE_SCHEMA)
+    for table, column in (
+        ("predictions", "health_epoch INTEGER"),
+        ("predictions", "health_episode INTEGER"),
+        ("predictions", "instant_health_state TEXT"),
+        ("alerts", "health_episode INTEGER"),
+        ("maintenance_records", "resets_health INTEGER NOT NULL DEFAULT 0"),
+    ):
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
+        except sqlite3.OperationalError:
+            pass  # re-run: the column is already there
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_predictions_machine_epoch "
+        "ON predictions(machine_id, health_epoch, id)"
+    )
+    # Deploy seed (plan D14): hold the level of a pre-deploy open or
+    # human-closed real alert, so the first cold reading neither resolves the
+    # open one nor re-pages the closed one. Seeded machines start at
+    # (epoch 0, episode 0); the seed alert joins episode 0.
+    has_feedback = table_exists(conn, "alert_feedback")
+    now = datetime.now(timezone.utc).isoformat()
+    machines = [row[0] for row in conn.execute(
+        "SELECT DISTINCT machine_id FROM alerts WHERE source = ? ORDER BY machine_id",
+        (_SEED_SOURCE,),
+    )]
+    for machine_id in machines:
+        seed = _seed_alert(conn, machine_id, has_feedback)
+        if seed is None:
+            continue
+        inserted = conn.execute(
+            "INSERT OR IGNORE INTO machine_health_state (machine_id, epoch, episode, max_state, "
+            "model_version, epoch_started_at, episode_started_at, reset_reason, updated_at) "
+            "VALUES (?, 0, 0, ?, NULL, NULL, ?, 'migration_008_seed', ?)",
+            (machine_id, seed[1], seed[2], now),
+        ).rowcount
+        if inserted:
+            conn.execute("UPDATE alerts SET health_episode = 0 WHERE id = ?", (seed[0],))
+
+
 # Ordered list of (target_version, up_callable). Append new migrations here.
 MIGRATIONS = [
     (1, _migration_001_canonical_baseline),
@@ -215,6 +347,7 @@ MIGRATIONS = [
     (5, _migration_005_feedback),
     (6, _migration_006_alert_explanations),
     (7, _migration_007_push),
+    (8, _migration_008_health_epoch),
 ]
 
 
