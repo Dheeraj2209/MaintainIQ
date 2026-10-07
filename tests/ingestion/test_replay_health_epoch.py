@@ -259,3 +259,61 @@ def test_reset_machine_health_without_the_table_is_a_noop(conn):
     conn.execute("DROP TABLE machine_health_state")
     conn.commit()
     assert health_epoch.reset_machine_health(conn, "m1", reason="replay_restart") == (None, [])
+
+
+def test_racing_starts_reset_once_and_the_run_survives(db_path, monkeypatch):
+    # A enters its reset, B arrives while A is still resetting. B must not
+    # bump the epoch again (that would stop A's run on its first tick).
+    entered, release = threading.Event(), threading.Event()
+    real = health_epoch.reset_machine_health
+    calls = []
+
+    def first_blocks(conn, machine_id, **kw):
+        calls.append(machine_id)
+        if len(calls) == 1:
+            entered.set()
+            release.wait(5.0)
+        return real(conn, machine_id, **kw)
+
+    monkeypatch.setattr(health_epoch, "reset_machine_health", first_blocks)
+    _, on_prediction = _fan_out_recorder()
+    svc = _service(db_path, _FakePredictor(), base_interval_seconds=10.0,
+                   on_prediction=on_prediction)
+    a = threading.Thread(target=svc.start, args=("m1",))
+    a.start()
+    try:
+        assert entered.wait(5.0)
+        b = threading.Thread(target=svc.start, args=("m1",))
+        b.start()
+        time.sleep(0.2)
+        release.set()
+        a.join(5.0)
+        b.join(5.0)
+        _wait(lambda: svc.status()["m1"]["replayed"] >= 1)
+        assert _epoch(db_path).epoch == 1
+        assert svc.status()["m1"].get("stopped_reason") is None
+    finally:
+        release.set()
+        svc.stop_all()
+
+
+def test_a_reset_after_the_epoch_check_still_stops_the_replay(db_path, monkeypatch):
+    # The reset commits after replay_once's start but before the synced
+    # prediction: the old trajectory row must not join the new epoch (D9).
+    svc = _started(db_path)
+    real = health_epoch.predict_synced
+
+    def reset_first(predictor, conn, machine_id, call):
+        conn2 = _row_conn(db_path)
+        health_epoch.reset_machine_health(conn2, machine_id, reason="work_order")
+        conn2.close()
+        return real(predictor, conn, machine_id, call)
+
+    monkeypatch.setattr(health_epoch, "predict_synced", reset_first)
+    try:
+        assert svc.replay_once("m1") is False
+        assert svc.status()["m1"]["stopped_reason"] == "health_reset"
+        assert _count(db_path, "SELECT COUNT(*) FROM predictions "
+                               "WHERE machine_id='m1' AND source='xjtu_rul'") == 1
+    finally:
+        svc.stop_all()

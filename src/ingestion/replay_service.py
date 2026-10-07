@@ -76,6 +76,10 @@ class LiveMachineError(ValueError):
     """Raised by start() for a machine currently fed by live MQTT telemetry."""
 
 
+class _EpochReset(Exception):
+    """The machine's DB health epoch is no longer the one the run began."""
+
+
 def _parse_iso(value):
     if not value:
         return None
@@ -116,6 +120,11 @@ class ReplayService:
         # finds another epoch stops: someone else reset the machine.
         self._start_epoch: dict[str, int | None] = {}
         self._lock = threading.RLock()
+        # Serialises start() per machine from the running check through the
+        # reset and the spawn, so a racing start cannot bump the epoch after
+        # the winner recorded it. Separate from self._lock, which a reset
+        # must never hold (status() and other machines go on).
+        self._start_locks: dict[str, threading.Lock] = {}
 
     def _load_worklist(self, machine_id: str) -> list[dict]:
         conn = self._connection_factory()
@@ -155,31 +164,36 @@ class ReplayService:
         base = json.loads(row["features_json"] or "{}")
         predictor = self._predictor_provider()
         conn = self._connection_factory()
-        try:
+        def predict():
+            # Checked inside the synced section, after the predictor adopted
+            # the DB epoch: reset by someone else mid-run (e.g. a completed
+            # work order), feeding the rest of a failing trajectory into the
+            # fresh baseline would be wrong, so the run ends (D9). A reset
+            # after this check bumps the episode, so the conditional persist
+            # refuses the result. A re-arm moves only the episode and does
+            # not stop the run.
             if start_epoch is not None:
                 health = health_epoch.current(conn, machine_id)
                 if health is not None and health.epoch != start_epoch:
-                    # Reset by someone else mid-run (e.g. a completed work
-                    # order): feeding the rest of a failing trajectory into
-                    # the fresh baseline would be wrong, so the run ends (D9).
-                    # A re-arm moves only the episode and does not stop it.
-                    logger.info("Stopping the replay of %s: its health epoch was reset", machine_id)
-                    with self._lock:
-                        self._state[machine_id]["stopped_reason"] = "health_reset"
-                    return False
+                    raise _EpochReset(machine_id)
+            return predictor._predict_from_base(
+                machine_id, base,
+                sample_rate_hz=row["sample_rate_hz"],
+                speed_rpm=row["speed_rpm"],
+                load_kn=row["load_kn"],
+            )
+
+        try:
             start = time.perf_counter()
             try:
                 # Synced to the machine's DB health epoch first, atomically
                 # with the prediction (plan D4).
-                result = health_epoch.predict_synced(
-                    predictor, conn, machine_id,
-                    lambda: predictor._predict_from_base(
-                        machine_id, base,
-                        sample_rate_hz=row["sample_rate_hz"],
-                        speed_rpm=row["speed_rpm"],
-                        load_kn=row["load_kn"],
-                    ),
-                )
+                result = health_epoch.predict_synced(predictor, conn, machine_id, predict)
+            except _EpochReset:
+                logger.info("Stopping the replay of %s: its health epoch was reset", machine_id)
+                with self._lock:
+                    self._state[machine_id]["stopped_reason"] = "health_reset"
+                return False
             except StaleEpoch:
                 logger.info("Skipping replayed snapshot of %s: its health state was reset "
                             "during the prediction", machine_id)
@@ -222,10 +236,17 @@ class ReplayService:
 
         The live guard, worklist load and DB reset run outside self._lock, so
         a reset waiting on live._TRANSITION_LOCK or SQLite never stalls
-        status() or another machine's replay. Two racing starts may both
-        bump the epoch, which is harmless; only one thread is spawned."""
+        status() or another machine's replay. Racing starts of one machine
+        are serialised by a per-machine start lock: the loser sees the
+        winner's run and returns without a second reset."""
         if speed_multiplier <= 0:
             raise ValueError("speed_multiplier must be positive")
+        with self._lock:
+            start_lock = self._start_locks.setdefault(machine_id, threading.Lock())
+        with start_lock:
+            self._start_locked(machine_id, speed_multiplier)
+
+    def _start_locked(self, machine_id: str, speed_multiplier: float) -> None:
         if self._is_running(machine_id):
             return  # already running; idempotent
         last_live = self._last_live_reading(machine_id)
@@ -240,8 +261,6 @@ class ReplayService:
             raise ValueError(f"no replayable readings for machine {machine_id}")
         new_epoch = self._reset_health(machine_id)
         with self._lock:
-            if self._is_running(machine_id):
-                return  # a racing start won; its run continues
             self._start_epoch[machine_id] = new_epoch
             self._worklists[machine_id] = worklist
             self._cursors[machine_id] = 0
