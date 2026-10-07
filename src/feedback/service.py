@@ -200,6 +200,19 @@ def _maybe_rearm_locked(conn, alert: dict, values: dict, now: str) -> None:
     row = health_epoch.current(conn, alert["machine_id"])
     if row is None or row.episode != episode:
         return
+    # Only the episode's newest real alert speaks for the held level, and
+    # never while another real alert is still open: a stale edit to an older
+    # alert must not drop a newer alert's hold.
+    if live._open_alert(conn, alert["machine_id"], demo=False) is not None:
+        return
+    newest = conn.execute(
+        f"""SELECT MAX(id) FROM alerts
+            WHERE machine_id = ? AND health_episode = ?
+              AND COALESCE(source, '') != '{live.DEMO_SOURCE}'""",
+        (alert["machine_id"], episode),
+    ).fetchone()[0]
+    if newest != alert["id"]:
+        return
     health_epoch._rearm_locked(conn, alert["machine_id"], now=now)
 
 

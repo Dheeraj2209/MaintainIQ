@@ -140,3 +140,45 @@ def test_rearm_and_close_are_one_transaction(conn, monkeypatch):
                         (alert["id"],)).fetchone()[0] == 0
     row = _row(conn)
     assert (row.episode, row.max_state) == (0, "critical")
+
+
+def _newer_alert_of_the_episode(conn, older):
+    """Close `older` as confirmed_failure, then let m2 escalate in the same
+    episode so a newer, more severe real alert B opens."""
+    service.close_alert(conn, older["id"], OPERATOR, outcome="confirmed_failure", now=T)
+    _, newer = live.apply_reading(conn, "m2", "critical", None, SRC, T, health_episode=0)
+    assert newer is not None and newer["status"] == "open"
+    return newer
+
+
+def _held_faulty_alert(conn):
+    health_epoch.record_level(conn, "m2", 0, "faulty", "v1")
+    conn.commit()
+    _, alert = live.apply_reading(conn, "m2", "faulty", None, SRC, T, health_episode=0)
+    return alert
+
+
+def test_false_alarm_on_an_older_alert_does_not_rearm_while_a_newer_one_is_open(conn):
+    older = _held_faulty_alert(conn)
+    newer = _newer_alert_of_the_episode(conn, older)
+    health_epoch.record_level(conn, "m2", 0, "critical", "v1")
+    conn.commit()
+
+    service.record_feedback(conn, older["id"], OPERATOR, outcome="false_alarm", now=T)
+
+    row = _row(conn)
+    assert (row.episode, row.max_state) == (0, "critical")
+    assert live.get_alert(conn, newer["id"])["status"] == "open"
+
+
+def test_false_alarm_edit_on_an_older_alert_keeps_a_newer_confirmed_hold(conn):
+    older = _held_faulty_alert(conn)
+    newer = _newer_alert_of_the_episode(conn, older)
+    health_epoch.record_level(conn, "m2", 0, "critical", "v1")
+    conn.commit()
+    service.close_alert(conn, newer["id"], OPERATOR, outcome="confirmed_failure", now=T)
+
+    service.record_feedback(conn, older["id"], OPERATOR, outcome="false_alarm", now=T)
+
+    row = _row(conn)
+    assert (row.episode, row.max_state) == (0, "critical")
