@@ -85,6 +85,9 @@ def handle_prediction(
     machine_id = result["machine_id"]
     health_state = result["health_state"]
     timestamp = timestamp or result.get("timestamp") or _now_iso()
+    # Alert episodes only with the ratchet on (plan D7); off, the alert path
+    # is exactly legacy, which is what makes the kill switch a rollback.
+    health_episode = result.get("health_episode") if result.get("health_ratchet") else None
 
     applied = apply_reading(
         conn,
@@ -96,6 +99,7 @@ def handle_prediction(
         prediction_id=prediction_id,
         reading_id=reading_id,
         model_version=result.get("model_version"),
+        health_episode=health_episode,
     )
     # Minus "input_features": the predictor carries the raw feature vector on
     # its result only so _probable_cause above can read it. It is not in

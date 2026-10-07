@@ -48,7 +48,7 @@ _ALERT_COLUMNS = (
     "id, machine_id, opened_at, resolved_at, severity, health_state, "
     "probable_cause, message, status, source, created_at, "
     "acknowledged_at, acknowledged_by, page_level, last_paged_at, "
-    "prediction_id, reading_id, model_version, closed_by"
+    "prediction_id, reading_id, model_version, closed_by, health_episode"
 )
 
 
@@ -94,7 +94,7 @@ _TRANSITION_LOCK = threading.Lock()
 
 
 def apply_reading(conn, machine_id: str, health_state: str, probable_cause, source: str, timestamp: str,
-                  *, prediction_id=None, reading_id=None, model_version=None):
+                  *, prediction_id=None, reading_id=None, model_version=None, health_episode=None):
     """Apply one new (health_state, probable_cause) reading to machine_id's
     alert state. Returns (event_type, alert_dict) where event_type is
     "alert_created" | "alert_escalated" | "alert_resolved", or None if this
@@ -103,30 +103,51 @@ def apply_reading(conn, machine_id: str, health_state: str, probable_cause, sour
 
     prediction_id / reading_id / model_version are stored on a newly opened
     alert only; callers without a stored prediction (the demo routes) omit
-    them and the columns stay NULL."""
+    them and the columns stay NULL.
+
+    health_episode (plan 2026-10-07-ratchet-maintenance-reset, D7) is given
+    only with the health ratchet on, and only matters for real readings. A
+    reading from an episode the machine has left (a reset or false-alarm
+    re-arm overtook it) is dropped. A new alert stores its episode, and an
+    abnormal reading with no open alert opens nothing when the newest
+    resolved real alert of the same episode was closed by a human at the
+    same or a higher severity. With health_episode None this is the legacy
+    state machine."""
     with _TRANSITION_LOCK:
         return _apply_reading(conn, machine_id, health_state, probable_cause, source, timestamp,
                               prediction_id=prediction_id, reading_id=reading_id,
-                              model_version=model_version)
+                              model_version=model_version, health_episode=health_episode)
 
 
 def _apply_reading(conn, machine_id: str, health_state: str, probable_cause, source: str, timestamp: str,
-                   *, prediction_id=None, reading_id=None, model_version=None):
-    open_alert = _open_alert(conn, machine_id, demo=source == DEMO_SOURCE)
+                   *, prediction_id=None, reading_id=None, model_version=None, health_episode=None):
+    real = source != DEMO_SOURCE
+    if not real:
+        health_episode = None
+    if health_episode is not None:
+        row = conn.execute("SELECT episode FROM machine_health_state WHERE machine_id = ?",
+                           (machine_id,)).fetchone()
+        if health_episode != (row[0] if row is not None else 0):
+            return None
+
+    open_alert = _open_alert(conn, machine_id, demo=not real)
     now = datetime.now(timezone.utc).isoformat()
 
     if health_state in ABNORMAL_STATES:
         severity = SEVERITY_BY_STATE[health_state]
 
         if open_alert is None:
+            if health_episode is not None and _closed_at_or_above(conn, machine_id, health_episode, severity):
+                return None
             message = format_alert_message(machine_id, health_state, probable_cause)
             cur = conn.execute(
                 """INSERT INTO alerts
                    (machine_id, opened_at, resolved_at, severity, health_state, probable_cause,
-                    message, status, source, created_at, prediction_id, reading_id, model_version)
-                   VALUES (?, ?, NULL, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)""",
+                    message, status, source, created_at, prediction_id, reading_id, model_version,
+                    health_episode)
+                   VALUES (?, ?, NULL, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)""",
                 (machine_id, timestamp, severity, health_state, probable_cause, message, source, now,
-                 prediction_id, reading_id, model_version),
+                 prediction_id, reading_id, model_version, health_episode),
             )
             conn.commit()
             return "alert_created", {
@@ -149,6 +170,7 @@ def _apply_reading(conn, machine_id: str, health_state: str, probable_cause, sou
                 "reading_id": reading_id,
                 "model_version": model_version,
                 "closed_by": None,
+                "health_episode": health_episode,
             }
 
         # Escalation keeps the opening prediction links (decision 3).
@@ -175,6 +197,21 @@ def _apply_reading(conn, machine_id: str, health_state: str, probable_cause, sou
         return "alert_resolved", open_alert
 
     return None
+
+
+def _closed_at_or_above(conn, machine_id: str, health_episode: int, severity: str) -> bool:
+    """Whether the newest resolved real alert of this episode was closed by a
+    human at `severity` or above. A system-resolved newest alert (closed_by
+    NULL) does not suppress: nobody decided about it."""
+    last = conn.execute(
+        f"""SELECT severity, closed_by FROM alerts
+            WHERE machine_id = ? AND status = 'resolved' AND health_episode = ?
+              AND COALESCE(source, '') != '{DEMO_SOURCE}'
+            ORDER BY id DESC LIMIT 1""",
+        (machine_id, health_episode),
+    ).fetchone()
+    return (last is not None and last["closed_by"] is not None
+            and SEVERITY_RANK[severity] <= SEVERITY_RANK[last["severity"]])
 
 
 def get_alert(conn, alert_id: int):
@@ -217,7 +254,10 @@ def _resolve_locked(conn, alert_id: int, user_id: int, now: str) -> bool:
     """A human close: resolve alert_id at `now` as user_id if it is still
     open. Returns whether this call resolved it. For callers that already
     hold _TRANSITION_LOCK; does not commit (the _acknowledge_locked contract).
-    A later abnormal reading opens a fresh alert, since nothing is open."""
+    A later abnormal reading opens a fresh alert, since nothing is open;
+    with the ratchet on, a later abnormal reading in the same episode opens a
+    fresh alert only if it is more severe. A repair reset or a false-alarm
+    re-arm starts a new episode."""
     cur = conn.execute(
         """UPDATE alerts SET status = 'resolved', resolved_at = ?, closed_by = ?
            WHERE id = ? AND status = 'open'""",
