@@ -201,8 +201,67 @@ describe('WorkOrderDrawer', () => {
       notes: 'Bearing replaced',
       performed_at: new Date('2026-10-07T10:30').toISOString(),
       maintenance_type: 'preventive',
+      reset_health: false,
     })
     expect(toast.success).toHaveBeenCalled()
+  })
+
+  describe('restarting health tracking on completion', () => {
+    function captureCompletes() {
+      const bodies: Record<string, unknown>[] = []
+      server.use(
+        http.post('/api/work-orders/:id/complete', async ({ request }) => {
+          bodies.push((await request.json()) as Record<string, unknown>)
+          return HttpResponse.json({ ...workOrders[2], status: 'done', maintenance_record_id: 99 })
+        }),
+      )
+      return bodies
+    }
+
+    it("is pre-checked for corrective work on the machine's open alert and sends reset_health true", async () => {
+      const bodies = captureCompletes()
+      render(harness())
+      const drawer = await openDrawer()
+      await userEvent.click(within(drawer).getByRole('button', { name: /^complete$/i }))
+
+      const box = within(drawer).getByRole('checkbox', { name: /restart health tracking/i })
+      expect(box).toBeChecked()
+      expect(within(drawer).getByText(/relearns baseline over the next 20 readings/i)).toBeInTheDocument()
+      await userEvent.click(within(drawer).getByRole('button', { name: /confirm completion/i }))
+
+      await waitFor(() => expect(bodies).toHaveLength(1))
+      expect(bodies[0]).toMatchObject({ maintenance_type: 'corrective', reset_health: true })
+    })
+
+    it('unchecks for preventive work, and the user can tick it again', async () => {
+      const bodies = captureCompletes()
+      render(harness())
+      const drawer = await openDrawer()
+      await userEvent.click(within(drawer).getByRole('button', { name: /^complete$/i }))
+
+      await userEvent.selectOptions(within(drawer).getByLabelText(/^type$/i), 'preventive')
+      const box = within(drawer).getByRole('checkbox', { name: /restart health tracking/i })
+      expect(box).not.toBeChecked()
+      await userEvent.click(box)
+      await userEvent.click(within(drawer).getByRole('button', { name: /confirm completion/i }))
+
+      await waitFor(() => expect(bodies).toHaveLength(1))
+      expect(bodies[0]).toMatchObject({ maintenance_type: 'preventive', reset_health: true })
+    })
+
+    it('is unchecked for a free-standing order and sends an explicit false', async () => {
+      const bodies = captureCompletes()
+      serveOrder({ ...workOrders[2], alert_id: null })
+      render(harness())
+      const drawer = await openDrawer()
+      await userEvent.click(within(drawer).getByRole('button', { name: /^complete$/i }))
+
+      expect(within(drawer).getByRole('checkbox', { name: /restart health tracking/i })).not.toBeChecked()
+      await userEvent.click(within(drawer).getByRole('button', { name: /confirm completion/i }))
+
+      await waitFor(() => expect(bodies).toHaveLength(1))
+      expect(bodies[0]).toMatchObject({ reset_health: false })
+    })
   })
 
   it('cancels with a reason', async () => {

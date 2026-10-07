@@ -19,6 +19,23 @@ export interface MachineSummary {
   predicted_rul_minutes: number | null
   rul_estimate_kind: string | null
   out_of_distribution: boolean | null
+  // Health ratchet (docs/superpowers/plans/2026-10-07-ratchet-maintenance-reset.md,
+  // Task 12). Optional so older fixtures keep type-checking. health_state is
+  // the held (ratcheted) level; instant_health_state the current reading's
+  // own state; commissioning the baseline relearning after a reset.
+  instant_health_state?: string | null
+  health_state_held?: boolean
+  held_since?: string | null
+  commissioning?: Commissioning | null
+  reset_pending_reading?: boolean
+  // The latest prediction's commissioning:/condition_receded:/ood_not_latched: warnings.
+  health_warnings?: string[]
+}
+
+// Baseline relearning after a health reset: `seen` of `of` readings.
+export interface Commissioning {
+  seen: number
+  of: number
 }
 
 export interface TrendPoint {
@@ -197,6 +214,13 @@ export interface ExplanationPrediction {
   out_of_distribution: boolean
   outside_training_features: string[]
   warnings: string[]
+  // Health ratchet (plan Task 12); absent from a predictor without it.
+  instant_health_state?: string | null
+  health_state_held?: boolean | null
+  health_ratchet?: boolean | null
+  commissioning?: Commissioning | null
+  health_epoch?: number | null
+  health_episode?: number | null
 }
 
 export interface RuleCheck {
@@ -369,6 +393,8 @@ export interface MaintenanceRecord {
   created_at: string
   alert_id?: number | null
   type?: 'preventive' | 'corrective' | null
+  // The record restarted the machine's health tracking (a repair).
+  resets_health?: boolean
 }
 
 export interface MaintenanceCreate {
@@ -378,6 +404,8 @@ export interface MaintenanceCreate {
   technician?: string | null
   alert_id?: number | null
   type?: 'preventive' | 'corrective' | null
+  // Restart health tracking. Only true resets; admin/supervisor only.
+  reset_health?: boolean | null
 }
 
 export interface MaintenanceSummary {
@@ -715,6 +743,8 @@ export interface WorkOrderComplete {
   notes?: string | null
   performed_at?: string | null
   maintenance_type?: 'preventive' | 'corrective'
+  // Restart health tracking. The drawer always sends it explicitly.
+  reset_health?: boolean | null
 }
 
 // GET /api/work-orders/assignees (admin/supervisor): active users, no email.

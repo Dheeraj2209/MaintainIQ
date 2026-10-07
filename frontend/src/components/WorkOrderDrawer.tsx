@@ -18,6 +18,7 @@ import { formatRelative } from '../lib/telemetryFormat'
 import { useDialogFocus } from '../lib/useDialogFocus'
 import { useLiveEvents } from '../realtime/LiveEventsProvider'
 import { AlertCloseForm } from './AlertCloseForm'
+import { RestartHealthCheckbox } from './RestartHealthCheckbox'
 import type { AlertCloseResult } from './AlertCloseForm'
 import {
   feedbackOutcomeLabel,
@@ -80,6 +81,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onChanged }: Props) {
   const [notes, setNotes] = useState('')
   const [performedAt, setPerformedAt] = useState('')
   const [maintenanceType, setMaintenanceType] = useState<'corrective' | 'preventive'>('corrective')
+  const [resetHealth, setResetHealth] = useState(false)
   const [reason, setReason] = useState('')
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -142,12 +144,30 @@ export function WorkOrderDrawer({ workOrderId, onClose, onChanged }: Props) {
     }
   }
 
+  // Mirrors the server's default (plan D2): corrective work on the machine's
+  // current alert (open, or closed by a person) restarts health tracking. The
+  // drawer always sends the choice explicitly, so the box is what happens.
+  function defaultResetHealth(type: 'corrective' | 'preventive'): boolean {
+    const alert = detail?.alert
+    return (
+      type === 'corrective' &&
+      alert != null &&
+      alert.source !== 'demo' &&
+      (alert.status === 'open' || alert.closed_by != null)
+    )
+  }
+
+  function changeMaintenanceType(type: 'corrective' | 'preventive') {
+    setMaintenanceType(type)
+    setResetHealth(defaultResetHealth(type))
+  }
+
   function openPending(next: Pending) {
     setPending(next)
     if (next === 'complete') {
       setNotes('')
       setPerformedAt(nowLocalInput())
-      setMaintenanceType('corrective')
+      changeMaintenanceType('corrective')
     } else if (next === 'cancel') {
       setReason('')
     } else if (next === 'edit' && detail) {
@@ -173,6 +193,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onChanged }: Props) {
           ...(notes.trim() ? { notes: notes.trim() } : {}),
           ...(performed ? { performed_at: performed } : {}),
           maintenance_type: maintenanceType,
+          reset_health: resetHealth,
         }),
       `Work order #${workOrderId} completed — maintenance logged`,
       () => {
@@ -434,12 +455,13 @@ export function WorkOrderDrawer({ workOrderId, onClose, onChanged }: Props) {
                       </Label>
                       <Label>
                         Type
-                        <Select value={maintenanceType} onChange={(e) => setMaintenanceType(e.target.value as 'corrective' | 'preventive')}>
-                          <option value="corrective">Corrective</option>
-                          <option value="preventive">Preventive</option>
+                        <Select value={maintenanceType} onChange={(e) => changeMaintenanceType(e.target.value as 'corrective' | 'preventive')}>
+                          <option value="corrective">Corrective (repair)</option>
+                          <option value="preventive">Preventive (routine)</option>
                         </Select>
                       </Label>
                     </div>
+                    <RestartHealthCheckbox checked={resetHealth} onChange={setResetHealth} />
                     <div className="flex gap-2">
                       <Button type="submit" variant="accent" size="sm" disabled={busy}>
                         Confirm completion

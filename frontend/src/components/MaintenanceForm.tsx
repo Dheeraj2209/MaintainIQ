@@ -4,6 +4,7 @@ import type { Alert, MaintenanceCreate } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { Input, Label, Select } from './ui/input'
 import { Button } from './ui/button'
+import { RestartHealthCheckbox } from './RestartHealthCheckbox'
 
 interface Props {
   machineId: string
@@ -21,6 +22,10 @@ export function MaintenanceForm({ machineId, onSubmit, linkedAlert = null }: Pro
   const [technician, setTechnician] = useState('')
   const [type, setType] = useState<MaintenanceType>(linkedAlert ? 'corrective' : 'preventive')
   const [chipDismissed, setChipDismissed] = useState(false)
+  // Restart health tracking (plan D2): an explicit admin/supervisor choice,
+  // never implied by the record's type. Operators reset only by completing a
+  // work order.
+  const [resetHealth, setResetHealth] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [busy, setBusy] = useState(false)
   const technicianTouched = useRef(false)
@@ -29,9 +34,12 @@ export function MaintenanceForm({ machineId, onSubmit, linkedAlert = null }: Pro
     if (!technicianTouched.current && user?.name) setTechnician(user.name)
   }, [user])
 
+  const canReset = user?.role === 'admin' || user?.role === 'supervisor'
+
   useEffect(() => {
     setType(linkedAlert ? 'corrective' : 'preventive')
     setChipDismissed(false)
+    setResetHealth(false)
   }, [linkedAlert])
 
   async function handleSubmit(e: FormEvent) {
@@ -48,10 +56,12 @@ export function MaintenanceForm({ machineId, onSubmit, linkedAlert = null }: Pro
         technician: technician || null,
         alert_id: linkedAlert?.id ?? null,
         type,
+        ...(canReset ? { reset_health: resetHealth } : {}),
       })
       setStatus({ kind: 'ok', message: 'Logged.' })
       setWhen('')
       setDescription('')
+      setResetHealth(false)
     } catch (err) {
       setStatus({ kind: 'err', message: err instanceof Error ? err.message : 'Failed to log maintenance' })
     } finally {
@@ -99,10 +109,11 @@ export function MaintenanceForm({ machineId, onSubmit, linkedAlert = null }: Pro
       <Label>
         Type
         <Select value={type} onChange={(e) => setType(e.target.value as MaintenanceType)}>
-          <option value="preventive">Preventive</option>
-          <option value="corrective">Corrective</option>
+          <option value="preventive">Preventive (routine)</option>
+          <option value="corrective">Corrective (repair)</option>
         </Select>
       </Label>
+      {canReset && <RestartHealthCheckbox checked={resetHealth} onChange={setResetHealth} />}
       <Button type="submit" variant="accent" size="sm" disabled={busy} className="justify-self-start">
         Log maintenance
       </Button>
@@ -112,3 +123,4 @@ export function MaintenanceForm({ machineId, onSubmit, linkedAlert = null }: Pro
     </form>
   )
 }
+

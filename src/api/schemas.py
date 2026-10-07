@@ -12,6 +12,12 @@ from pydantic import BaseModel, Field
 Role = Literal["admin", "supervisor", "operator"]
 
 
+class Commissioning(BaseModel):
+    """Baseline relearning after a health reset: `seen` of `of` readings."""
+    seen: int
+    of: int
+
+
 class MachineSummary(BaseModel):
     machine_id: str
     health_state: str
@@ -26,6 +32,17 @@ class MachineSummary(BaseModel):
     predicted_rul_minutes: Optional[float] = None
     rul_estimate_kind: Optional[str] = None
     out_of_distribution: Optional[bool] = None
+    # Health ratchet (docs/superpowers/plans/2026-10-07-ratchet-maintenance-reset.md,
+    # Task 12): the current reading's own state, whether health_state is a
+    # held (ratcheted) level above it and since when, the commissioning
+    # progress after a reset, and whether a reset has no reading yet.
+    instant_health_state: Optional[str] = None
+    health_state_held: bool = False
+    held_since: Optional[str] = None
+    commissioning: Optional[Commissioning] = None
+    reset_pending_reading: bool = False
+    # The latest prediction's commissioning:/condition_receded:/ood_not_latched: warnings.
+    health_warnings: list[str] = []
 
 
 class TrendPoint(BaseModel):
@@ -579,6 +596,14 @@ class RULPredictionResponse(BaseModel):
     out_of_distribution: bool
     outside_training_features: list[str]
     warnings: list[str]
+    # Health ratchet (plan Task 12). Optional: a predictor without the ratchet
+    # (a test fake) leaves them out.
+    instant_health_state: Optional[str] = None
+    health_state_held: Optional[bool] = None
+    health_ratchet: Optional[bool] = None
+    commissioning: Optional[Commissioning] = None
+    health_epoch: Optional[int] = None
+    health_episode: Optional[int] = None
 
 
 class ReplayStartRequest(BaseModel):

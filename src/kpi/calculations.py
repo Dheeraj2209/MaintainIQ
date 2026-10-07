@@ -133,6 +133,32 @@ def _commissioning(latest_pred) -> dict | None:
     return None
 
 
+_HEALTH_WARNING_PREFIXES = ("commissioning:", "condition_receded:", "ood_not_latched:")
+
+
+def _health_warnings(latest_pred) -> list:
+    """The latest prediction's ratchet warnings (rul_realtime), for the
+    machine views (plan Task 12)."""
+    try:
+        warnings = json.loads(latest_pred.get("warnings_json") or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(warnings, list):
+        return []
+    return [str(w) for w in warnings if str(w).startswith(_HEALTH_WARNING_PREFIXES)]
+
+
+def _held_since(conn, machine_id: str, latest_pred) -> str | None:
+    """When the held level was first reached in the latest prediction's
+    episode: the earliest prediction of that episode at that state."""
+    row = conn.execute(
+        """SELECT MIN(timestamp) AS since FROM predictions
+           WHERE machine_id = ? AND health_episode IS ? AND health_state = ?""",
+        (machine_id, latest_pred.get("health_episode"), latest_pred.get("health_state")),
+    ).fetchone()
+    return row["since"] if row else None
+
+
 def _machine_health(conn, machine_id: str) -> dict:
     latest_pred = _latest_prediction(conn, machine_id)
     latest_reading = _latest_reading(conn, machine_id)
@@ -142,6 +168,7 @@ def _machine_health(conn, machine_id: str) -> dict:
     pending = effective["reset_pending_reading"]
     health_state = effective["health_state"] or "unknown"
     instant = None if pending or not latest_pred else latest_pred.get("instant_health_state")
+    held = instant is not None and instant != health_state
 
     # Combined risk: driven by the current health state, nudged up when an
     # alert is still open for the machine (unresolved issue = higher risk).
@@ -165,9 +192,11 @@ def _machine_health(conn, machine_id: str) -> dict:
         "rul_estimate_kind": latest_pred.get("rul_estimate_kind") if latest_pred else None,
         "out_of_distribution": bool(latest_pred["out_of_distribution"]) if latest_pred and latest_pred.get("out_of_distribution") is not None else None,
         "instant_health_state": instant,
-        "health_state_held": instant is not None and instant != health_state,
+        "health_state_held": held,
+        "held_since": _held_since(conn, machine_id, latest_pred) if held else None,
         "commissioning": None if pending or not latest_pred else _commissioning(latest_pred),
         "reset_pending_reading": pending,
+        "health_warnings": [] if pending or not latest_pred else _health_warnings(latest_pred),
     }
 
 

@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { AuthProvider } from '../../auth/AuthContext'
 import { LiveEventsProvider } from '../../realtime/LiveEventsProvider'
 import { server } from '../../test/server'
-import { machineDetail } from '../../test/fixtures'
+import { commissioningMachine, heldMachine, machineDetail } from '../../test/fixtures'
 import { MobileMachineDetailPage } from './MobileMachineDetailPage'
 import { MobileMachinesPage } from './MobileMachinesPage'
 
@@ -56,6 +56,30 @@ describe('MobileMachineDetailPage', () => {
     expect(await screen.findByText("Unknown machine 'nope'")).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Scan again' }))
     expect(await screen.findByText('scan page')).toBeInTheDocument()
+  })
+})
+
+describe('MobileMachineDetailPage health ratchet', () => {
+  it('shows the held badge and the held state in place of the remaining life', async () => {
+    server.use(http.get('/api/machines/:id', () => HttpResponse.json({ ...structuredClone(machineDetail), health: heldMachine })))
+    render(harness('/m/machines/m1'))
+
+    const health = await screen.findByRole('region', { name: 'Machine health' })
+    expect(within(health).getByText(/held since/i)).toBeInTheDocument()
+    expect(within(health).getByText('Held: Critical (current signal: Healthy)')).toBeInTheDocument()
+    expect(within(health).queryByText('43 min')).not.toBeInTheDocument()
+  })
+
+  it('shows commissioning progress instead of healthy', async () => {
+    server.use(
+      http.get('/api/machines/:id', () => HttpResponse.json({ ...structuredClone(machineDetail), health: commissioningMachine })),
+    )
+    render(harness('/m/machines/m2'))
+
+    const health = await screen.findByRole('region', { name: 'Machine health' })
+    expect(within(health).getByText('Commissioning 7/20')).toBeInTheDocument()
+    expect(within(health).queryByText('Healthy')).not.toBeInTheDocument()
+    expect(within(health).getByText('Signal: Faulty')).toBeInTheDocument()
   })
 })
 

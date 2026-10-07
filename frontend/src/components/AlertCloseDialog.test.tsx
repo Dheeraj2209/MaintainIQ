@@ -218,6 +218,40 @@ describe('AlertCloseDialog', () => {
     expect(bodies[0].work_order_id).toBe(7)
   })
 
+  describe('what closing does to the held health state', () => {
+    it('says the machine stays held after a confirmed failure, linking to work-order creation', async () => {
+      const dialog = await openDialog(openAlert())
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: /confirmed failure/i }))
+      expect(within(dialog).getByText(/the machine stays held at critical until a repair is recorded/i)).toBeInTheDocument()
+      expect(within(dialog).getByRole('link', { name: /create a work order/i })).toHaveAttribute('href', '/machines/m1')
+      expect(within(dialog).queryByText(/health tracking re-armed/i)).not.toBeInTheDocument()
+    })
+
+    it('links the active work order to complete after prevented-by-maintenance', async () => {
+      const dialog = await openDialog(openAlert({ active_work_order_id: 7 }))
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: /prevented by maintenance/i }))
+      expect(within(dialog).getByText(/stays held at critical/i)).toBeInTheDocument()
+      expect(within(dialog).getByRole('link', { name: /complete work order #7/i })).toHaveAttribute('href', '/work-orders/7')
+    })
+
+    it('says health tracking re-arms on a false alarm', async () => {
+      const dialog = await openDialog(openAlert())
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: /false alarm/i }))
+      expect(within(dialog).getByText(/health tracking re-armed/i)).toBeInTheDocument()
+      expect(within(dialog).queryByText(/stays held/i)).not.toBeInTheDocument()
+    })
+
+    it('says nothing about holding when recording on an already-resolved alert', async () => {
+      const dialog = await openDialog(resolvedAlert())
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: /confirmed failure/i }))
+      expect(within(dialog).queryByText(/stays held/i)).not.toBeInTheDocument()
+    })
+  })
+
   it('closes on Escape and returns focus to the opener', async () => {
     renderDialog(openAlert())
     const opener = screen.getByRole('button', { name: /open dialog/i })

@@ -231,3 +231,15 @@ def test_predict_links_the_opened_alert_to_its_prediction(rul_client, db_path, m
     assert prediction["health_state"] == alert["health_state"]
     assert alert["reading_id"] is None
     assert alert["model_version"] == "test-model"
+
+
+def test_predict_response_serializes_the_health_fields(rul_client):
+    # Plan Task 12: the route's response model keeps the ratchet fields the
+    # predictor returns instead of dropping them.
+    body = rul_client.post("/api/predictions/rul", json=_payload()).json()
+    assert body["health_ratchet"] is True
+    assert body["instant_health_state"] in {"healthy", "degrading", "faulty", "critical"}
+    assert isinstance(body["health_state_held"], bool)
+    assert body["commissioning"] == {"seen": 1, "of": 2}
+    assert body["health_epoch"] == 0
+    assert body["health_episode"] == 0

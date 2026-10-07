@@ -3,7 +3,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider } from '../auth/AuthContext'
 import { MaintenanceForm } from './MaintenanceForm'
-import { openAlerts } from '../test/fixtures'
+import { http, HttpResponse } from 'msw'
+import { server } from '../test/server'
+import { openAlerts, operatorUser } from '../test/fixtures'
 
 function harness(props: Parameters<typeof MaintenanceForm>[0]) {
   return (
@@ -31,6 +33,7 @@ describe('MaintenanceForm', () => {
       technician: 'tech1',
       alert_id: null,
       type: 'preventive',
+      reset_health: false,
     })
   })
 
@@ -76,5 +79,36 @@ describe('MaintenanceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: /log maintenance/i }))
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ alert_id: 2, type: 'corrective' }))
+  })
+
+  it('offers an unchecked restart-health checkbox to an admin and sends it when ticked', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    render(harness({ machineId: 'm1', onSubmit, linkedAlert: openAlerts[0] }))
+
+    const box = await screen.findByRole('checkbox', { name: /restart health tracking/i })
+    expect(box).not.toBeChecked()
+    await userEvent.click(box)
+    await userEvent.type(screen.getByLabelText(/when/i), '2026-07-20T10:00')
+    await userEvent.click(screen.getByRole('button', { name: /log maintenance/i }))
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ reset_health: true, type: 'corrective' }))
+  })
+
+  it('hides the restart-health checkbox from an operator and never sends reset_health', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(operatorUser)))
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    render(harness({ machineId: 'm1', onSubmit }))
+
+    expect(await screen.findByDisplayValue(operatorUser.name)).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /restart health tracking/i })).not.toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText(/when/i), '2026-07-20T10:00')
+    await userEvent.click(screen.getByRole('button', { name: /log maintenance/i }))
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('reset_health')
+  })
+
+  it('labels corrective work so it does not imply a health reset', () => {
+    render(harness({ machineId: 'm1', onSubmit: vi.fn() }))
+    expect(screen.getByRole('option', { name: /corrective \(repair\)/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /preventive \(routine\)/i })).toBeInTheDocument()
   })
 })

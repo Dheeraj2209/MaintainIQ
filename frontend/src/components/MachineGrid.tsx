@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
 import type { CSSProperties } from 'react'
 import type { MachineSummary } from '../api/types'
-import { healthClasses, healthLabel, healthTone } from './healthStyles'
+import { HealthStateBadges } from './HealthStateBadges'
+import { healthClasses, healthTone } from './healthStyles'
 
 interface Props {
   machines: MachineSummary[]
@@ -17,7 +18,9 @@ export function MachineGrid({ machines, selectedId, onSelect }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {machines.map((m, i) => {
-        const cls = healthClasses(m.health_state)
+        // Commissioning is neutral, not the forced-healthy green.
+        const tone = m.commissioning ? 'unknown' : m.health_state
+        const cls = healthClasses(tone)
         const selected = m.machine_id === selectedId
         return (
           <motion.button
@@ -31,7 +34,7 @@ export function MachineGrid({ machines, selectedId, onSelect }: Props) {
             whileHover={{ y: -3 }}
             // The proximity light picks up the tile's own health color, so a
             // critical machine catches magenta and a healthy one stays slate.
-            style={{ '--spot-tone': healthTone(m.health_state) } as CSSProperties}
+            style={{ '--spot-tone': healthTone(tone) } as CSSProperties}
             // No `overflow-hidden` — the edge-catch ring sits at `inset: -1px`
             // and clipping would erase it. The corner glow blob that used to
             // need that clipping is gone: it lit the tile at all times, which
@@ -44,8 +47,8 @@ export function MachineGrid({ machines, selectedId, onSelect }: Props) {
               <span className="font-mono font-semibold text-text">{m.machine_id}</span>
               <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${cls.dot} ${cls.glow}`} aria-hidden />
             </div>
-            <span className={`relative mt-2 inline-flex rounded-full px-2.5 py-0.5 text-xs ${cls.badge}`}>
-              {healthLabel(m.health_state)}
+            <span className="relative mt-2 flex">
+              <HealthStateBadges health={m} />
             </span>
             <div className="relative mt-3 flex items-center gap-1.5 font-mono text-xs text-text-muted">
               <span className={cls.text}>Risk {m.risk_score}</span>

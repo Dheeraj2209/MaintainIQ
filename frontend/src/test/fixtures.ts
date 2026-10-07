@@ -67,6 +67,28 @@ export const machineSummaries: MachineSummary[] = [
   },
 ]
 
+// Health ratchet (plan Task 12): a machine held at critical while its
+// current signal has receded, and one relearning its baseline after a reset.
+export const heldMachine: MachineSummary = {
+  ...machineSummaries[0],
+  instant_health_state: 'healthy',
+  health_state_held: true,
+  held_since: '2003-10-22T12:00:00+00:00',
+  commissioning: null,
+  reset_pending_reading: false,
+  health_warnings: ['condition_receded: instant state healthy; holding critical until maintenance resets health tracking'],
+}
+
+export const commissioningMachine: MachineSummary = {
+  ...machineSummaries[1],
+  instant_health_state: 'faulty',
+  health_state_held: true,
+  held_since: null,
+  commissioning: { seen: 7, of: 20 },
+  reset_pending_reading: false,
+  health_warnings: ['commissioning: 7/20 snapshots; learning the baseline, instant state faulty is not held'],
+}
+
 export const kpiSummary: KpiSummary = {
   machine_count: 2,
   health_state_counts: { critical: 1, healthy: 1 },

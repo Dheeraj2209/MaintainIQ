@@ -132,3 +132,48 @@ def test_open_ended_fleet_summary_uses_the_effective_state(hconn):
 
     bounded = generators.fleet_summary(hconn, period_end="2030-12-31T00:00:00+00:00")
     assert bounded["health_distribution"] == {"critical": 1}
+
+
+def test_held_since_is_when_the_held_level_was_first_reached(hconn):
+    _pred(hconn, n=1, state="healthy")
+    _pred(hconn, n=2, state="critical", instant="critical")
+    _pred(hconn, n=3, state="critical", instant="healthy")
+    _level(hconn, "critical")
+
+    health = kpi.machine_health_kpis(hconn, "m1")[0]
+    assert health["health_state_held"] is True
+    assert health["held_since"] == "2030-01-01T00:02:00+00:00"
+
+
+def test_held_since_is_none_when_not_held(hconn):
+    _pred(hconn, n=1, state="critical", instant="critical")
+
+    assert kpi.machine_health_kpis(hconn, "m1")[0]["held_since"] is None
+
+
+def test_health_warnings_keep_only_the_ratchet_warnings(hconn):
+    _pred(hconn, n=1, state="critical", instant="healthy", warnings=[
+        "condition_receded: instant state healthy; holding critical",
+        "ood_not_latched: instant state faulty on out-of-distribution input",
+        "something else entirely",
+    ])
+
+    health = kpi.machine_health_kpis(hconn, "m1")[0]
+    assert health["health_warnings"] == [
+        "condition_receded: instant state healthy; holding critical",
+        "ood_not_latched: instant state faulty on out-of-distribution input",
+    ]
+
+
+def test_machine_summary_serializes_the_health_fields(hconn):
+    from src.api.schemas import MachineSummary
+
+    _pred(hconn, n=1, state="healthy", instant="faulty",
+          warnings=["commissioning: 7/20 snapshots; learning the baseline"])
+    dumped = MachineSummary(**kpi.machine_health_kpis(hconn, "m1")[0]).model_dump()
+    assert dumped["commissioning"] == {"seen": 7, "of": 20}
+    assert dumped["instant_health_state"] == "faulty"
+    assert dumped["health_state_held"] is True
+    assert dumped["reset_pending_reading"] is False
+    assert dumped["held_since"] is not None
+    assert dumped["health_warnings"] == ["commissioning: 7/20 snapshots; learning the baseline"]

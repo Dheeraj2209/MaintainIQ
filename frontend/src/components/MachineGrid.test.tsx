@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MachineGrid } from './MachineGrid'
-import { machineSummaries } from '../test/fixtures'
+import { commissioningMachine, heldMachine, machineSummaries } from '../test/fixtures'
 
 describe('MachineGrid', () => {
   it('renders one card per machine with its state and risk', () => {
@@ -29,5 +29,21 @@ describe('MachineGrid', () => {
   it('shows an empty state when there are no machines', () => {
     render(<MachineGrid machines={[]} selectedId={null} onSelect={() => {}} />)
     expect(screen.getByText(/no machines/i)).toBeInTheDocument()
+  })
+})
+
+describe('MachineGrid health ratchet', () => {
+  it('badges a held machine with when it was held', () => {
+    render(<MachineGrid machines={[heldMachine]} selectedId={null} onSelect={() => {}} />)
+    expect(screen.getByText('Critical')).toBeInTheDocument()
+    expect(screen.getByText(/held since/i)).toBeInTheDocument()
+  })
+
+  it('shows commissioning in a neutral badge instead of healthy, with the current signal', () => {
+    render(<MachineGrid machines={[commissioningMachine]} selectedId={null} onSelect={() => {}} />)
+    expect(screen.getByText('Commissioning 7/20')).toBeInTheDocument()
+    expect(screen.queryByText('Healthy')).not.toBeInTheDocument()
+    expect(screen.getByText('Signal: Faulty')).toBeInTheDocument()
+    expect(screen.queryByText(/held since/i)).not.toBeInTheDocument()
   })
 })

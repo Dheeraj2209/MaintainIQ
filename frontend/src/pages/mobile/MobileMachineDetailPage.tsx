@@ -11,8 +11,8 @@ import { useAuth } from '../../auth/AuthContext'
 import { AlertCloseDialog } from '../../components/AlertCloseDialog'
 import type { AlertCloseResult } from '../../components/AlertCloseForm'
 import { formatRul } from '../../components/dashboard/risk'
-import { healthClasses, healthLabel } from '../../components/healthStyles'
-import { Badge } from '../../components/ui/badge'
+import { HealthStateBadges } from '../../components/HealthStateBadges'
+import { heldText } from '../../lib/healthHold'
 import { formatPercent, formatRelative } from '../../lib/telemetryFormat'
 import { MobileAlertCard } from '../../mobile/MobileAlertCard'
 import { useQuickAlertActions } from '../../mobile/useQuickAlertActions'
@@ -103,10 +103,10 @@ function MachineView({ machineId }: { machineId: string }) {
           <section aria-label="Machine health" className="glass space-y-3 rounded-2xl p-4">
             <div className="flex items-center justify-between gap-2">
               <h1 className="truncate text-xl font-bold text-text">{health.machine_id}</h1>
-              <Badge className={healthClasses(health.health_state).badge}>{healthLabel(health.health_state)}</Badge>
+              <HealthStateBadges health={health} />
             </div>
             <dl className="grid grid-cols-2 gap-3">
-              <Fact label="Remaining life" value={formatRul(health.predicted_rul_minutes)} />
+              <Fact label="Remaining life" value={heldText(health) ?? formatRul(health.predicted_rul_minutes)} />
               <Fact label="Risk" value={String(Math.round(health.risk_score))} />
               <Fact label="Confidence" value={formatPercent(health.confidence, 0)} />
               <Fact label="Last reading" value={formatRelative(health.last_reading_at)} />

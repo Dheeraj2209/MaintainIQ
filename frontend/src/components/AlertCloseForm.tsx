@@ -5,13 +5,14 @@
 // resolved one gets its outcome recorded or edited (PUT /feedback). No outcome
 // is preselected, so nobody records one by just clicking through.
 import { useId, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { FormEvent } from 'react'
 import { api } from '../api/client'
 import type { Alert, AlertFeedback, AlertFeedbackIn, FeedbackCause, FeedbackOutcome } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { isoToLocalInput, localInputToIso, nowLocalInput } from '../lib/datetime'
 import { FEEDBACK_CAUSES, FEEDBACK_MODE_TITLE, FEEDBACK_OUTCOMES, canEditFeedback, feedbackMode } from '../lib/feedback'
-import { causeLabel, feedbackOutcomeLabel, feedbackOutcomeTone } from './healthStyles'
+import { causeLabel, feedbackOutcomeLabel, feedbackOutcomeTone, healthLabel } from './healthStyles'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Input, Label, Select, Textarea } from './ui/input'
@@ -177,6 +178,7 @@ export function AlertCloseForm({ alert, workOrderId, initialNotes = '', onSaved,
           Closing resolves this alert now. If the machine still reads abnormal, the next reading opens a new alert.
         </p>
       )}
+      {mode === 'close' && alert.source !== 'demo' && <HoldNote alert={alert} outcome={outcome} cause={cause} workOrderId={workOrderId} />}
       {alert.active_work_order_id != null && alert.active_work_order_id !== workOrderId && (
         <p className="text-xs text-text-muted">
           Work order #{alert.active_work_order_id} stays open — complete or cancel it separately.
@@ -198,5 +200,45 @@ export function AlertCloseForm({ alert, workOrderId, initialNotes = '', onSaved,
         </Button>
       </div>
     </form>
+  )
+}
+
+// What closing does to the machine's held health state (plan D12, Task 12):
+// a false alarm (or a sensor/data cause) re-arms tracking at once; a real
+// fault keeps the machine held until a repair is recorded, which a work order
+// completion (or a supervisor's maintenance record) does.
+function HoldNote({
+  alert,
+  outcome,
+  cause,
+  workOrderId,
+}: {
+  alert: Alert
+  outcome: FeedbackOutcome | null
+  cause: FeedbackCause | ''
+  workOrderId?: number | null
+}) {
+  if (outcome === 'false_alarm' || cause === 'sensor_or_data_quality_issue') {
+    return (
+      <p role="note" className="text-xs text-healthy">
+        Health tracking re-armed: the machine shows healthy again now, and a fault that comes back alerts once more.
+      </p>
+    )
+  }
+  if (outcome !== 'confirmed_failure' && outcome !== 'maintenance_prevented') return null
+  const openOrder = alert.active_work_order_id != null && alert.active_work_order_id !== workOrderId ? alert.active_work_order_id : null
+  return (
+    <p role="note" className="text-xs text-degrading">
+      The machine stays held at {healthLabel(alert.health_state)} until a repair is recorded.{' '}
+      {openOrder != null ? (
+        <Link to={`/work-orders/${openOrder}`} className="text-accent hover:text-accent-hover">
+          Complete work order #{openOrder}
+        </Link>
+      ) : (
+        <Link to={`/machines/${encodeURIComponent(alert.machine_id)}`} className="text-accent hover:text-accent-hover">
+          Create a work order
+        </Link>
+      )}
+    </p>
   )
 }

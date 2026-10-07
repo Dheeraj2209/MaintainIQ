@@ -7,6 +7,8 @@ import { MachineDetail } from './MachineDetail'
 import { server } from '../test/server'
 import { api } from '../api/client'
 import {
+  commissioningMachine,
+  heldMachine,
   machineDetail,
   machineDetailWithFullHistory,
   maintenanceHistoryPage2,
@@ -316,5 +318,27 @@ describe('MachineDetail', () => {
       await userEvent.click(await screen.findByText('m1 critical'))
       expect(screen.queryByRole('button', { name: /close alert|record outcome/i })).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('MachineDetail health ratchet', () => {
+  it('shows the held badge, replaces the RUL with the held state and lists the model warnings', async () => {
+    server.use(http.get('/api/machines/:id', () => HttpResponse.json({ ...machineDetail, health: heldMachine })))
+    render(harness())
+
+    expect(await screen.findByText(/held since/i)).toBeInTheDocument()
+    const rul = screen.getByText('Predicted RUL (min)', { selector: 'dt' })
+    expect(rul.nextElementSibling).toHaveTextContent('Held: Critical (current signal: Healthy)')
+    expect(screen.getByText(/condition_receded: instant state healthy/)).toBeInTheDocument()
+  })
+
+  it('shows commissioning progress instead of a healthy badge', async () => {
+    server.use(http.get('/api/machines/:id', () => HttpResponse.json({ ...machineDetail, health: commissioningMachine })))
+    render(harness())
+
+    expect(await screen.findByText('Commissioning 7/20')).toBeInTheDocument()
+    expect(screen.getByText('Signal: Faulty')).toBeInTheDocument()
+    expect(screen.queryByText(/held since/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/commissioning: 7\/20 snapshots/)).toBeInTheDocument()
   })
 })

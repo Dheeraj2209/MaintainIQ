@@ -4,7 +4,9 @@ import type { Alert, MachineDetail as Detail, MaintenanceRecord, TelemetryDevice
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { FEEDBACK_MODE_TITLE, canEditFeedback, feedbackMode } from '../lib/feedback'
-import { deviceStateLabel, deviceStateTone, healthClasses, healthLabel } from './healthStyles'
+import { heldText } from '../lib/healthHold'
+import { HealthStateBadges } from './HealthStateBadges'
+import { deviceStateLabel, deviceStateTone, healthClasses } from './healthStyles'
 import { TrendChart } from './TrendChart'
 import { AlertsPanel } from './AlertsPanel'
 import { MaintenanceForm } from './MaintenanceForm'
@@ -119,7 +121,8 @@ export function MachineDetail({ machineId, onCreateWorkOrder, onRecordOutcome, o
   }
 
   const { health, maintenance, alerts } = detail
-  const hc = healthClasses(health.health_state)
+  // Commissioning is neutral, not the forced-healthy green.
+  const hc = healthClasses(health.commissioning ? 'unknown' : health.health_state)
 
   async function handleLog(payload: Parameters<typeof api.logMaintenance>[0]) {
     const result = await api.logMaintenance(payload)
@@ -147,7 +150,7 @@ export function MachineDetail({ machineId, onCreateWorkOrder, onRecordOutcome, o
       <div aria-hidden className={`pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full opacity-20 blur-3xl ${hc.dot}`} />
       <header className="relative flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-mono text-lg font-semibold text-text">{health.machine_id}</h2>
-        <Badge variant={health.health_state}>{healthLabel(health.health_state)}</Badge>
+        <HealthStateBadges health={health} />
       </header>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
@@ -157,8 +160,11 @@ export function MachineDetail({ machineId, onCreateWorkOrder, onRecordOutcome, o
         <Fact label="Vibration" value={health.vibration_severity} />
         <Fact
           label="Predicted RUL (min)"
-          value={health.predicted_rul_minutes != null ? health.predicted_rul_minutes.toFixed(1) : '—'}
-          mono
+          value={
+            heldText(health) ??
+            (health.predicted_rul_minutes != null ? health.predicted_rul_minutes.toFixed(1) : '—')
+          }
+          mono={!heldText(health)}
         />
         <Fact label="RUL estimate" value={health.rul_estimate_kind ?? '—'} />
         <Fact
@@ -168,6 +174,16 @@ export function MachineDetail({ machineId, onCreateWorkOrder, onRecordOutcome, o
         <Fact label="Last reading" value={health.last_reading_at ?? '—'} mono />
         <SensorNodeFact nodes={nodes} />
       </dl>
+
+      {health.health_warnings && health.health_warnings.length > 0 && (
+        <ul aria-label="Model warnings" className="mt-3 space-y-1 text-xs text-text-muted">
+          {health.health_warnings.map((w) => (
+            <li key={w} className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 font-mono">
+              {w}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="mt-4">
         <label className="flex items-center gap-2 text-sm text-text-muted">
@@ -271,7 +287,10 @@ export function MachineDetail({ machineId, onCreateWorkOrder, onRecordOutcome, o
               {history.map((r) => (
                 <tr key={r.id} className="border-t border-white/10">
                   <td className="py-1 pr-3 font-mono">{r.performed_at}</td>
-                  <td className="py-1 pr-3">{r.type ?? '—'}</td>
+                  <td className="py-1 pr-3">
+                    {r.type ?? '—'}
+                    {r.resets_health && <span className="text-text-muted"> · health reset</span>}
+                  </td>
                   <td className="py-1 pr-3">{r.description ?? '—'}</td>
                   <td className="py-1">{r.technician ?? '—'}</td>
                 </tr>
