@@ -20,10 +20,16 @@ live._TRANSITION_LOCK, inside the caller's transaction (the _locked
 functions do not commit). reset_machine_health is the self-contained
 wrapper. The broadcast of the alerts a reset resolved (announce_resolved)
 runs after the commit and outside the lock.
+
+Every predictor call goes through predict_synced, which syncs the in-memory
+predictor to this row and predicts under one per-machine lock (plan D4, D5,
+D10). Lock order: _SYNC_LOCKS[machine] -> live._TRANSITION_LOCK.
 """
 from __future__ import annotations
 
 import logging
+import threading
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -212,3 +218,121 @@ def effective_state(conn, machine_id: str, latest_pred: dict | None) -> dict:
         "reset_pending_reading": pending,
         "health_episode": row.episode,
     }
+
+
+# One lock per machine, held across sync and predict (D4): the only in-memory
+# resets and restores happen inside _prepare_locked, under it.
+_SYNC_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
+
+
+def predict_synced(predictor, conn, machine_id: str, call):
+    """Sync `predictor` to machine_id's DB health row, then run `call()` (the
+    prediction), atomically per machine. A predictor without restore_health
+    (a test fake) is just called. The result can still raise StaleEpoch if
+    an in-memory reset slips in anyway; the caller logs it and skips persist."""
+    if not hasattr(predictor, "restore_health"):
+        return call()
+    with _SYNC_LOCKS[machine_id]:
+        _prepare_locked(predictor, conn, machine_id)
+        return call()
+
+
+def _prepare_locked(predictor, conn, machine_id: str) -> None:
+    """Bring the predictor to the DB epoch, episode and held level.
+
+    - A model change re-derives the held level (D10).
+    - A NULL model_version (a seed) adopts the current model, keeping the level.
+    - Same epoch, other episode (a re-arm): restore the held level only.
+    - Other epoch (a restart or a reset): reset, rehydrate the epoch
+      (bounded, D5) and restore. A failed rehydrate is logged and the epoch
+      starts from empty history, still synced, so it is not retried.
+    """
+    from src.prediction import rul_store
+
+    row = current(conn, machine_id)
+    if row is None:
+        return
+    model = predictor.artifact["model_version"]
+    if row.model_version not in (None, model):
+        _rederive_for_model(predictor, conn, machine_id, row, model)
+        return
+    if row.model_version is None and row != _DEFAULT:
+        _adopt_model(conn, machine_id, row.episode, model)
+    if predictor.epoch_of(machine_id) == row.epoch:
+        if predictor.episode_of(machine_id) != row.episode:
+            predictor.restore_health(machine_id, epoch=row.epoch, episode=row.episode,
+                                     max_state=row.max_state)
+        return
+    predictor._reset_state(machine_id)
+    try:
+        rul_store.rehydrate(predictor, conn, machine_id, epoch=row.epoch)
+    except Exception:
+        logger.exception("rehydrate failed for %s; starting the epoch from empty history", machine_id)
+        predictor._reset_state(machine_id)
+    predictor.restore_health(machine_id, epoch=row.epoch, episode=row.episode,
+                             max_state=row.max_state)
+
+
+def _adopt_model(conn, machine_id: str, episode: int, model: str) -> None:
+    """Stamp a seed row (model_version NULL) with the current model and keep
+    its held level (D10). Conditional on the episode; commits."""
+    with live._TRANSITION_LOCK:
+        try:
+            conn.execute(
+                f"UPDATE {_TABLE} SET model_version = ?, updated_at = ? "
+                f"WHERE machine_id = ? AND episode = ? AND model_version IS NULL",
+                (model, _now(), machine_id, episode),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def _rederive_for_model(predictor, conn, machine_id: str, row: HealthRow, model: str) -> None:
+    """The held level was derived by another model (D10). Replay the whole
+    epoch once, take the level the current model latches over the current
+    episode's rows, floor it at the open real alert's state (a model change
+    never silently resolves an alert), write it with the new model_version
+    (conditional on the episode; commits) and restore the predictor to it."""
+    from src.prediction import rul_store
+
+    levels = []
+
+    def collect(stored, result):
+        if stored["health_episode"] == row.episode and rul_store._latches(result):
+            levels.append(result["instant_health_state"])
+
+    predictor._reset_state(machine_id)
+    try:
+        rul_store.rehydrate(predictor, conn, machine_id, epoch=row.epoch, full=True,
+                            on_result=collect)
+    except Exception:
+        # Cannot re-derive: keep the stored level rather than drop it.
+        logger.exception("re-derive failed for %s; keeping the held level %s",
+                         machine_id, row.max_state)
+        predictor._reset_state(machine_id)
+        levels = [row.max_state]
+    open_states = conn.execute(
+        f"""SELECT health_state FROM alerts WHERE machine_id = ? AND status = 'open'
+              AND COALESCE(source, '') != '{live.DEMO_SOURCE}'""",
+        (machine_id,),
+    ).fetchall()
+    levels += [r[0] for r in open_states if r[0] in HEALTH_RANK]
+    level = max(levels, key=HEALTH_RANK.__getitem__, default="healthy")
+    with live._TRANSITION_LOCK:
+        try:
+            written = conn.execute(
+                f"UPDATE {_TABLE} SET max_state = ?, model_version = ?, updated_at = ? "
+                f"WHERE machine_id = ? AND episode = ?",
+                (level, model, _now(), machine_id, row.episode),
+            ).rowcount
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    if not written:
+        # A reset or re-arm moved the episode meanwhile: sync to the new row.
+        _prepare_locked(predictor, conn, machine_id)
+        return
+    predictor.restore_health(machine_id, epoch=row.epoch, episode=row.episode, max_state=level)

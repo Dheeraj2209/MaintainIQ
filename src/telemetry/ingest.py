@@ -51,7 +51,8 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from src.ingestion.xjtu_sy import extract_snapshot_features  # read-only use (ML boundary)
-from src.prediction import pipeline, rul_store
+from src.prediction import health_epoch, pipeline, rul_store
+from src.prediction.rul_realtime import StaleEpoch
 from src.telemetry import device_health, protocol
 from src.telemetry.device_health import DEFAULT_HEARTBEAT_S, OFFLINE_AFTER_HEARTBEATS  # noqa: F401  re-exported
 from src.telemetry.protocol import DeviceStatus, ProtocolError, Snapshot
@@ -407,10 +408,21 @@ class TelemetryIngestor:
         infer_start = time.perf_counter()
         try:
             predictor = self._predictor_provider()
-            result = predictor.predict(
-                snap.machine_id, snap.horizontal, snap.vertical,
-                snap.sample_rate_hz, snap.speed_rpm, snap.load_kn,
+            # Synced to the machine's DB health epoch first, atomically with
+            # the prediction (plan D4).
+            result = health_epoch.predict_synced(
+                predictor, conn, snap.machine_id,
+                lambda: predictor.predict(
+                    snap.machine_id, snap.horizontal, snap.vertical,
+                    snap.sample_rate_hz, snap.speed_rpm, snap.load_kn,
+                ),
             )
+        except StaleEpoch:
+            # The machine was reset mid-prediction: not a failure. The reading
+            # is stored; the stale result is neither persisted nor fanned out.
+            logger.info("Skipping the prediction for %s: its health state was reset "
+                        "during the prediction", snap.machine_id)
+            result = None
         except Exception as exc:
             # FileNotFoundError (no trained model yet) lands here too. Keep the
             # reading, record the failure in both logs, and move on.
@@ -432,23 +444,10 @@ class TelemetryIngestor:
                                  latency_ms=elapsed_ms())
         infer_ms = (time.perf_counter() - infer_start) * 1000.0
 
-        prediction_id = rul_store.persist_prediction(conn, result, reading_id=reading_id)
-        rul_store.log_inference(
-            conn, machine_id=snap.machine_id, model_version=result["model_version"],
-            latency_ms=infer_ms, result=result,
-        )
-
-        # As in replay: the prediction row is the durable record, alerting and
-        # paging are consequences of it. A fan-out failure is logged, not
-        # allowed to turn an accepted reading into an error.
         event = None
-        try:
-            fanned = self._on_prediction(conn, result, base, sampled_iso,
-                                         prediction_id=prediction_id, reading_id=reading_id)
-            if isinstance(fanned, dict):
-                event = fanned.get("event")
-        except Exception:
-            logger.exception("Alert fan-out failed for %s", snap.machine_id)
+        if result is not None:
+            event = self._persist_and_fan_out(conn, snap, result, base, sampled_iso,
+                                              reading_id=reading_id, infer_ms=infer_ms)
 
         latency = elapsed_ms()
         self._insert_message(conn, status=ACCEPTED, reading_id=reading_id, latency_ms=latency, **common)
@@ -456,6 +455,31 @@ class TelemetryIngestor:
         return IngestOutcome(status=ACCEPTED, kind=kind, device_id=snap.device_id,
                              machine_id=snap.machine_id, reading_id=reading_id, event=event,
                              latency_ms=latency)
+
+    def _persist_and_fan_out(self, conn, snap: Snapshot, result: dict, base: dict, sampled_iso: str,
+                             *, reading_id: int, infer_ms: float):
+        """Store the prediction and fan it out; returns the alert event, if any."""
+        prediction_id = rul_store.persist_prediction(conn, result, reading_id=reading_id)
+        rul_store.log_inference(
+            conn, machine_id=snap.machine_id, model_version=result["model_version"],
+            latency_ms=infer_ms, result=result,
+        )
+        if prediction_id is None:
+            # Overtaken by a reset or re-arm: not stored, so no alerting (D6).
+            logger.info("Skipping fan-out of a stale prediction for %s", snap.machine_id)
+            return None
+
+        # As in replay: the prediction row is the durable record, alerting and
+        # paging are consequences of it. A fan-out failure is logged, not
+        # allowed to turn an accepted reading into an error.
+        try:
+            fanned = self._on_prediction(conn, result, base, sampled_iso,
+                                         prediction_id=prediction_id, reading_id=reading_id)
+            if isinstance(fanned, dict):
+                return fanned.get("event")
+        except Exception:
+            logger.exception("Alert fan-out failed for %s", snap.machine_id)
+        return None
 
     def _is_duplicate(self, conn, snap: Snapshot) -> bool:
         return conn.execute(

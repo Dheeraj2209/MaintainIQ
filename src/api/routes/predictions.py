@@ -9,13 +9,15 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.deps import get_db
 from src.api.schemas import RULPredictionRequest, RULPredictionResponse
-from src.prediction import pipeline, rul_store
-from src.prediction.rul_realtime import RealTimeRULPredictor
+from src.prediction import health_epoch, pipeline, rul_store
+from src.prediction.rul_realtime import RealTimeRULPredictor, StaleEpoch
 from src.training.xjtu_rul import REPO_ROOT
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
+
+_STALE_DETAIL = "machine health was reset during this prediction; retry"
 
 
 @lru_cache(maxsize=1)
@@ -47,14 +49,21 @@ def predict_rul(payload: RULPredictionRequest, db=Depends(get_db), predictor=Dep
     )
     start = time.perf_counter()
     try:
-        result = predictor.predict(
-            machine_id=payload.machine_id,
-            horizontal=np.asarray(payload.horizontal, dtype=np.float64),
-            vertical=np.asarray(payload.vertical, dtype=np.float64),
-            sample_rate_hz=payload.sample_rate_hz,
-            speed_rpm=payload.speed_rpm,
-            load_kn=payload.load_kn,
+        # Synced to the machine's DB health epoch first (a restart, a reset or
+        # a re-arm made elsewhere), atomically with the prediction.
+        result = health_epoch.predict_synced(
+            predictor, db, payload.machine_id,
+            lambda: predictor.predict(
+                machine_id=payload.machine_id,
+                horizontal=np.asarray(payload.horizontal, dtype=np.float64),
+                vertical=np.asarray(payload.vertical, dtype=np.float64),
+                sample_rate_hz=payload.sample_rate_hz,
+                speed_rpm=payload.speed_rpm,
+                load_kn=payload.load_kn,
+            ),
         )
+    except StaleEpoch as exc:
+        raise HTTPException(status_code=409, detail=_STALE_DETAIL) from exc
     except ValueError as exc:
         latency_ms = (time.perf_counter() - start) * 1000.0
         rul_store.log_inference(
@@ -69,6 +78,11 @@ def predict_rul(payload: RULPredictionRequest, db=Depends(get_db), predictor=Dep
         db, machine_id=payload.machine_id, model_version=model_version,
         latency_ms=latency_ms, result=result,
     )
+    if prediction_id is None:
+        # The machine was reset or re-armed while this prediction ran: the
+        # result belongs to an old episode, so it was not stored and must not
+        # open, resolve or page an alert (plan D6).
+        raise HTTPException(status_code=409, detail=_STALE_DETAIL)
     # Same fan-out the replay ingestion path uses: the prediction row is the
     # durable record, but an operator only hears about a failing machine if it
     # also reaches the alert state machine, email paging and the realtime feed.

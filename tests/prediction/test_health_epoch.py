@@ -399,3 +399,253 @@ def test_persist_falls_back_to_legacy_without_the_health_schema(conn):
     row_id = rul_store.persist_prediction(conn, _ratchet_result())
     assert row_id is not None
     assert _pred(conn, row_id)["health_episode"] is None
+
+
+# --- predict_synced: every predictor call syncs to the DB first (Task 6) ----
+
+import json
+
+import joblib
+import numpy as np
+
+from src.alerts import live
+from src.prediction import rul_store
+from src.prediction.rul_realtime import RealTimeRULPredictor
+from src.training.xjtu_rul import ROLLING_SOURCE_COLUMNS
+
+M = "m2"
+RUL = {"healthy": 900.0, "degrading": 500.0, "faulty": 100.0, "critical": 10.0}
+KW = dict(sample_rate_hz=25_600.0, speed_rpm=2100.0, load_kn=12.0)
+
+
+class _AlwaysLate:
+    """Late life on every row; with _ScriptedRul each base picks its state."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def predict_proba(self, X):
+        self.calls += 1
+        return np.tile([0.0, 1.0], (len(X), 1))
+
+
+class _NeverLate:
+    def predict_proba(self, X):
+        return np.tile([1.0, 0.0], (len(X), 1))
+
+
+class _ScriptedRul:
+    def predict(self, X):
+        return X["scripted_rul"].to_numpy(dtype=float)
+
+
+def _artifact(path, **overrides):
+    artifact = {
+        "classifiers": [_AlwaysLate()],
+        "regressor": _ScriptedRul(),
+        "classifier_feature_columns": ["speed_rpm", "h_kurtosis"],
+        "regressor_feature_columns": ["scripted_rul"],
+        "feature_bounds_99pct": {},
+        "conformal_error_90_minutes": 10.0,
+        "model_version": "test-model",
+        "prognostic_horizon_minutes": 1000.0,
+        "failure_probability_threshold": 0.6,
+        "probability_smoothing_window": 1,
+        "warning_persistence_snapshots": 1,
+        "baseline_window": 2,
+        "sample_rate_hz": 25_600.0,
+    }
+    artifact.update(overrides)
+    joblib.dump(artifact, path)
+    return path
+
+
+def _make(tmp_path, name="a", **overrides):
+    return RealTimeRULPredictor(_artifact(tmp_path / f"{name}.joblib", **overrides))
+
+
+def _sbase(state):
+    base = {column: 1.0 for column in ROLLING_SOURCE_COLUMNS}
+    base["scripted_rul"] = RUL[state]
+    return base
+
+
+def _synced(predictor, conn, state, machine_id=M):
+    base = _sbase(state)
+    return health_epoch.predict_synced(
+        predictor, conn, machine_id,
+        lambda: predictor._predict_from_base(machine_id, base, **KW))
+
+
+def _insert_reading(conn, state, machine_id=M) -> int:
+    cur = conn.execute(
+        """INSERT INTO readings (machine_id, timestamp, cycle, elapsed_minutes, speed_rpm,
+               load_kn, sample_rate_hz, features_json, dataset,
+               vibration_h_rms, vibration_h_kurtosis, vibration_v_rms,
+               vibration_v_kurtosis, cross_axis_rms_ratio, cross_axis_correlation)
+           VALUES (?, ?, (SELECT COALESCE(MAX(cycle), -1) + 1 FROM readings WHERE machine_id = ?),
+                   0, 2100.0, 12.0, 25600.0, ?, 'xjtu_sy', 0, 0, 0, 0, 0, 0)""",
+        (machine_id, NOW, machine_id, json.dumps(_sbase(state))),
+    )
+    return cur.lastrowid
+
+
+def _synced_persist(predictor, conn, state, machine_id=M):
+    """One synced prediction, stored the way ingest/replay store it: the
+    reading (features_json) and its prediction row."""
+    result = _synced(predictor, conn, state, machine_id)
+    reading_id = _insert_reading(conn, state, machine_id)
+    conn.commit()
+    return result, rul_store.persist_prediction(conn, result, reading_id=reading_id)
+
+
+def _store_rows(conn, states, *, epoch=0, episode=0, machine_id=M):
+    for state in states:
+        reading_id = _insert_reading(conn, state, machine_id)
+        conn.execute(
+            """INSERT INTO predictions (reading_id, machine_id, timestamp, health_state, source,
+                   health_epoch, health_episode)
+               VALUES (?, ?, ?, ?, 'xjtu_rul', ?, ?)""",
+            (reading_id, machine_id, NOW, state, epoch, episode),
+        )
+    conn.commit()
+
+
+def test_predict_synced_restores_after_a_restart(tmp_path, conn):
+    """F1: a cold predictor rehydrates the epoch and adopts the DB held level."""
+    a = _make(tmp_path)
+    for state in ["healthy", "healthy", "critical", "critical"]:
+        _synced_persist(a, conn, state)
+    assert health_epoch.current(conn, M).max_state == "critical"
+
+    b = _make(tmp_path, "b")
+    result = _synced(b, conn, "healthy")
+    assert result["health_state"] == "critical"
+    assert result["history_snapshots"] == 5
+    assert (result["health_epoch"], result["health_episode"]) == (0, 0)
+
+
+def test_predict_synced_follows_a_reset_made_elsewhere(tmp_path, conn):
+    a = _make(tmp_path)
+    for state in ["healthy", "healthy", "critical"]:
+        _synced_persist(a, conn, state)
+    health_epoch.reset_machine_health(conn, M, reason="test", now=NOW)
+
+    result = _synced(a, conn, "critical")
+    assert result["history_snapshots"] == 1
+    assert result["health_state"] == "healthy"
+    assert result["commissioning"] == {"seen": 1, "of": 2}
+    assert (result["health_epoch"], result["health_episode"]) == (1, 1)
+
+
+def test_predict_synced_follows_a_rearm_made_elsewhere(tmp_path, conn):
+    a = _make(tmp_path)
+    for state in ["healthy", "healthy", "critical"]:
+        _synced_persist(a, conn, state)
+    with live._TRANSITION_LOCK:
+        health_epoch._rearm_locked(conn, M, now=NOW)
+        conn.commit()
+
+    result = _synced(a, conn, "healthy")
+    assert result["history_snapshots"] == 4  # the baseline and history are kept
+    assert result["health_state"] == "healthy"
+    assert result["commissioning"] is None
+    assert (result["health_epoch"], result["health_episode"]) == (0, 1)
+    assert _synced(a, conn, "critical")["health_state"] == "critical"
+
+
+def test_predict_synced_survives_a_rehydrate_failure(tmp_path, conn, monkeypatch):
+    a = _make(tmp_path)
+    for state in ["healthy", "healthy", "critical"]:
+        _synced_persist(a, conn, state)
+    calls = []
+
+    def boom(*args, **kwargs):
+        calls.append(args)
+        raise RuntimeError("corrupt history")
+
+    monkeypatch.setattr(rul_store, "rehydrate", boom)
+    b = _make(tmp_path, "b")
+    result = _synced(b, conn, "healthy")
+    assert result["health_epoch"] == 0
+    assert result["history_snapshots"] == 1
+    assert result["health_state"] == "critical"  # the DB held level is still adopted
+    _synced(b, conn, "healthy")
+    assert len(calls) == 1
+
+
+def test_model_change_rederives_the_held_level(tmp_path, conn):
+    _store_rows(conn, ["critical"] * 6)
+    health_epoch.record_level(conn, M, 0, "critical", "old")
+    conn.commit()
+
+    new = _make(tmp_path, classifiers=[_NeverLate()], model_version="new")
+    result = _synced(new, conn, "healthy")
+    row = health_epoch.current(conn, M)
+    assert (row.max_state, row.model_version) == ("healthy", "new")
+    assert result["health_state"] == "healthy"
+    assert result["history_snapshots"] == 7
+
+
+def test_model_change_keeps_the_level_of_an_open_alert(tmp_path, conn):
+    _store_rows(conn, ["critical"] * 6)
+    health_epoch.record_level(conn, M, 0, "critical", "old")
+    alert_id = _insert_alert(conn, M, state="critical")
+
+    new = _make(tmp_path, classifiers=[_NeverLate()], model_version="new")
+    result = _synced(new, conn, "healthy")
+    row = health_epoch.current(conn, M)
+    assert (row.max_state, row.model_version) == ("critical", "new")
+    assert result["health_state"] == "critical"
+    assert conn.execute("SELECT status FROM alerts WHERE id = ?", (alert_id,)).fetchone()[0] == "open"
+
+
+def test_model_change_rederives_only_the_current_episode(tmp_path, conn):
+    """Rows of an earlier episode (before a re-arm) never set the level."""
+    _store_rows(conn, ["healthy", "healthy", "critical"], episode=0)
+    _store_rows(conn, ["degrading"], episode=1)
+    conn.execute(
+        "INSERT INTO machine_health_state (machine_id, epoch, episode, max_state, model_version, "
+        "updated_at) VALUES (?, 0, 1, 'critical', 'old', ?)", (M, NOW))
+    conn.commit()
+
+    _synced(_make(tmp_path, model_version="new"), conn, "healthy")
+    row = health_epoch.current(conn, M)
+    assert (row.episode, row.max_state, row.model_version) == (1, "degrading", "new")
+
+
+def test_null_model_version_seed_is_kept_and_adopted(tmp_path, conn):
+    conn.execute(
+        "INSERT INTO machine_health_state (machine_id, epoch, episode, max_state, updated_at) "
+        "VALUES (?, 0, 0, 'critical', ?)", (M, NOW))
+    conn.commit()
+
+    result = _synced(_make(tmp_path), conn, "healthy")
+    assert result["health_state"] == "critical"
+    row = health_epoch.current(conn, M)
+    assert (row.max_state, row.model_version) == ("critical", "test-model")
+
+
+def test_predict_synced_without_restore_health_just_calls(conn):
+    class Fake:
+        pass
+
+    assert health_epoch.predict_synced(Fake(), conn, M, lambda: "called") == "called"
+
+
+def test_predict_synced_without_the_table_just_calls(tmp_path, conn):
+    conn.execute("DROP TABLE machine_health_state")
+    conn.commit()
+    assert _synced(_make(tmp_path), conn, "healthy")["health_epoch"] is None
+
+
+def test_predict_synced_rehydrate_is_bounded(tmp_path, conn):
+    """A 3,000-row epoch costs at most baseline_window + max_history
+    classifier calls to rehydrate (D5), plus the one prediction."""
+    _store_rows(conn, ["healthy"] * 3000)
+    classifier = _AlwaysLate()
+    cold = _make(tmp_path, classifiers=[classifier], baseline_window=20)
+    cold.classifiers = [classifier]  # the unpickled copy would not count
+    result = _synced(cold, conn, "healthy")
+    assert result["history_snapshots"] == 3001
+    assert classifier.calls <= 20 + cold.max_history + 1

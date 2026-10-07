@@ -42,7 +42,8 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from src.prediction import pipeline, rul_store
+from src.prediction import health_epoch, pipeline, rul_store
+from src.prediction.rul_realtime import StaleEpoch
 
 logger = logging.getLogger(__name__)
 
@@ -149,32 +150,46 @@ class ReplayService:
 
         base = json.loads(row["features_json"] or "{}")
         predictor = self._predictor_provider()
-        start = time.perf_counter()
-        result = predictor._predict_from_base(
-            machine_id, base,
-            sample_rate_hz=row["sample_rate_hz"],
-            speed_rpm=row["speed_rpm"],
-            load_kn=row["load_kn"],
-        )
-        latency_ms = (time.perf_counter() - start) * 1000.0
-
         conn = self._connection_factory()
         try:
-            prediction_id = rul_store.persist_prediction(conn, result, reading_id=row["id"])
-            rul_store.log_inference(
-                conn, machine_id=machine_id,
-                model_version=result["model_version"],
-                latency_ms=latency_ms, result=result,
-            )
-            # The prediction row above is the durable record; alerting, email
-            # and the realtime feed are consequences of it. A failure in any
-            # of them is logged and dropped rather than allowed to stall the
-            # replay loop or cost us the prediction we just made.
+            start = time.perf_counter()
             try:
-                self._on_prediction(conn, result, base,
-                                    prediction_id=prediction_id, reading_id=row["id"])
-            except Exception:
-                logger.exception("Alert fan-out failed for %s", machine_id)
+                # Synced to the machine's DB health epoch first, atomically
+                # with the prediction (plan D4).
+                result = health_epoch.predict_synced(
+                    predictor, conn, machine_id,
+                    lambda: predictor._predict_from_base(
+                        machine_id, base,
+                        sample_rate_hz=row["sample_rate_hz"],
+                        speed_rpm=row["speed_rpm"],
+                        load_kn=row["load_kn"],
+                    ),
+                )
+            except StaleEpoch:
+                logger.info("Skipping replayed snapshot of %s: its health state was reset "
+                            "during the prediction", machine_id)
+            else:
+                latency_ms = (time.perf_counter() - start) * 1000.0
+                prediction_id = rul_store.persist_prediction(conn, result, reading_id=row["id"])
+                rul_store.log_inference(
+                    conn, machine_id=machine_id,
+                    model_version=result["model_version"],
+                    latency_ms=latency_ms, result=result,
+                )
+                if prediction_id is None:
+                    # Overtaken by a reset or re-arm: not stored, so no alerting (D6).
+                    logger.info("Skipping fan-out of a stale replayed prediction for %s", machine_id)
+                else:
+                    # The prediction row above is the durable record; alerting,
+                    # email and the realtime feed are consequences of it. A
+                    # failure in any of them is logged and dropped rather than
+                    # allowed to stall the replay loop or cost us the
+                    # prediction we just made.
+                    try:
+                        self._on_prediction(conn, result, base,
+                                            prediction_id=prediction_id, reading_id=row["id"])
+                    except Exception:
+                        logger.exception("Alert fan-out failed for %s", machine_id)
         finally:
             conn.close()
 

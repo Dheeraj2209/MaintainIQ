@@ -262,7 +262,8 @@ def _stored_base(row, required: frozenset) -> dict | None:
     return base
 
 
-def rehydrate(predictor, conn, machine_id: str, *, epoch: int, full: bool = False) -> int:
+def rehydrate(predictor, conn, machine_id: str, *, epoch: int, full: bool = False,
+              on_result=None) -> int:
     """Replay the stored readings of one health epoch back through the
     predictor so a cold instance rebuilds the state a warm one would have
     (plan D5). Call it on a freshly reset machine; restore_health afterwards
@@ -280,13 +281,15 @@ def rehydrate(predictor, conn, machine_id: str, *, epoch: int, full: bool = Fals
     Uses the already-extracted feature vector in readings.features_json (never
     recomputes a feature). A row that is empty, unparsable or missing a
     trained feature is skipped and logged. Returns the number replayed.
+    on_result(row, result), if given, sees each replayed row (with its
+    health_episode) and the result it produced (the D10 re-derive).
     """
     baseline_window = int(predictor.artifact.get("baseline_window", BASELINE_WINDOW))
     bound = "" if full else "WHERE n <= :head OR n > total - :tail"
     rows = conn.execute(
         f"""WITH e AS (
                 SELECT r.id AS reading_id, r.speed_rpm, r.load_kn, r.sample_rate_hz,
-                       r.features_json,
+                       r.features_json, p.health_episode,
                        ROW_NUMBER() OVER (ORDER BY p.id) AS n, COUNT(*) OVER () AS total
                 FROM predictions p JOIN readings r ON r.id = p.reading_id
                 WHERE p.machine_id = :m AND p.health_epoch = :epoch)
@@ -303,13 +306,15 @@ def rehydrate(predictor, conn, machine_id: str, *, epoch: int, full: bool = Fals
         # Across the skipped middle of a long epoch (and any skipped row)
         # each row keeps the cycle number a warm predictor gave it.
         predictor._seek_cycle(machine_id, row["n"] - 1)
-        predictor._predict_from_base(
+        result = predictor._predict_from_base(
             machine_id,
             base,
             sample_rate_hz=row["sample_rate_hz"],
             speed_rpm=row["speed_rpm"],
             load_kn=row["load_kn"],
         )
+        if on_result is not None:
+            on_result(row, result)
         replayed += 1
     if rows:
         predictor._seek_cycle(machine_id, rows[-1]["total"])
