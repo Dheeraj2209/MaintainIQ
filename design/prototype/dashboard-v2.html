@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MaintainIQ — Dashboard Prototype v2 (pick a direction)</title>
+<style>
+/* ============================================================================
+   DASHBOARD PROTOTYPE v2
+
+   Three dashboard directions, drawn from the three reference screens, plus two
+   independent labs so the shine treatment and the background can be chosen
+   separately from the layout.
+
+   CONSTRAINT CARRIED FORWARD: the references use orange (MAGURA danger) and
+   green (ORBIT active state) as accents. Those are NOT adopted — the status
+   ramp stays slate -> azure -> violet -> magenta, encoding severity by rising
+   intensity and always paired with a text label. What is borrowed from the
+   references is structure, texture, and density, not their hues.
+   ========================================================================= */
+
+:root {
+  --bg: #070912;
+  --surface: #111524;
+  --text: #eef1f8;
+  --muted: #939cb4;
+  --accent: #7c6cff;
+  --accent-2: #4dc9ff;
+
+  /* Status ramp — intensity, not hue. */
+  --s1: #5b6a86;   /* nominal  */
+  --s2: #3bb8c9;   /* watch    */
+  --s3: #9d6cf0;   /* elevated */
+  --s4: #e85ad0;   /* urgent   */
+
+  --glass: rgba(255,255,255,0.055);
+  --glass-border: rgba(255,255,255,0.12);
+  --glass-lip: rgba(255,255,255,0.08);
+
+  --radius: 20px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { letter-spacing: -0.015em; margin: 0; }
+.mono { font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+/* ===========================================================================
+   BACKGROUND OPTIONS — the oscilloscope grid is gone in all three. Each layer
+   is fixed behind the content and costs only compositor work.
+   ======================================================================== */
+
+#bgfield { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
+#bgfield > div { position: absolute; inset: -25% -15%; opacity: 0; transition: opacity 600ms ease; }
+#bgfield > div.on { opacity: 1; }
+
+/* BG-1 "Aurora ribbons" — iridescent light bleeding in from the corners, as in
+   the ORBIT reference. Large conic sweeps, heavily blurred, slowly counter-
+   rotating so the light never sits still. */
+.bg-aurora::before, .bg-aurora::after {
+  content: ''; position: absolute; inset: -20%;
+  filter: blur(90px); will-change: transform;
+}
+.bg-aurora::before {
+  background:
+    conic-gradient(from 200deg at 18% 108%, rgba(77,201,255,.40), rgba(124,108,255,.34), rgba(232,90,208,.18), transparent 58%);
+  animation: ribbon-a 34s ease-in-out infinite alternate;
+}
+.bg-aurora::after {
+  background:
+    conic-gradient(from 20deg at 88% -8%, rgba(157,108,240,.34), rgba(77,201,255,.22), transparent 55%);
+  animation: ribbon-b 44s ease-in-out infinite alternate;
+}
+@keyframes ribbon-a { to { transform: translate3d(6%, -4%, 0) rotate(8deg) scale(1.15); } }
+@keyframes ribbon-b { to { transform: translate3d(-5%, 5%, 0) rotate(-6deg) scale(1.12); } }
+
+/* BG-2 "Deep haze + grain" — the MAGURA treatment. Almost no colour: a wide
+   atmospheric gradient, a hard vignette, and a fine film grain so the flat
+   darkness has tooth instead of banding. */
+.bg-haze {
+  background:
+    radial-gradient(90% 70% at 50% -10%, rgba(59,184,201,.16), transparent 70%),
+    radial-gradient(70% 60% at 50% 110%, rgba(124,108,255,.12), transparent 70%),
+    radial-gradient(120% 120% at 50% 50%, transparent 35%, rgba(0,0,0,.75) 100%);
+}
+.bg-haze::after {
+  content: ''; position: absolute; inset: 0; opacity: .5;
+  /* feTurbulence grain, inlined so the prototype stays a single file. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.34'/%3E%3C/svg%3E");
+}
+
+/* BG-3 "Drifting orbs" — the current signal field with the grid removed, kept
+   as the conservative option: same familiar depth, one element less. */
+.bg-orbs::before {
+  content: ''; position: absolute; inset: 0;
+  background-image:
+    radial-gradient(38% 42% at 24% 18%, rgba(124,108,255,.22), transparent 70%),
+    radial-gradient(32% 36% at 82% 12%, rgba(77,201,255,.16), transparent 70%),
+    radial-gradient(46% 48% at 88% 88%, rgba(196,108,255,.15), transparent 72%),
+    radial-gradient(40% 44% at 8% 92%, rgba(60,120,220,.13), transparent 72%);
+  animation: orb-drift 42s ease-in-out infinite alternate;
+}
+@keyframes orb-drift { to { transform: translate3d(2%, 2%, 0) scale(1.08); } }
+
+/* ===========================================================================
+   HOVER SHINE OPTIONS — applied to any .tile. Exactly one is active at a time,
+   driven by a class on <body>, so they can be compared on identical cards.
+   ======================================================================== */
+
+.tile { position: relative; overflow: hidden; isolation: isolate; transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease; }
+.tile > * { position: relative; z-index: 1; }
+
+/* Shared lift — every option keeps it; only the light treatment differs. */
+.tile:hover { transform: translateY(-3px); }
+
+/* SHINE-1 "Sweep" (current, retuned). A diagonal specular bar crossing the
+   surface. The retune: steeper angle, a triple-stop core so the band has a hot
+   centre instead of a flat wash, and an ease that decelerates out — closer to
+   light raking across glass than a slider moving. */
+body.shine-sweep .tile::after {
+  content: ''; position: absolute; inset: -1px; z-index: 0; pointer-events: none;
+  background: linear-gradient(105deg,
+    transparent 30%,
+    rgba(255,255,255,.10) 44%,
+    rgba(255,255,255,.30) 50%,
+    rgba(255,255,255,.10) 56%,
+    transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 850ms cubic-bezier(.22,.8,.28,1);
+}
+body.shine-sweep .tile:hover::after { transform: translateX(120%); }
+body.shine-sweep .tile:hover { border-color: rgba(124,108,255,.45); }
+
+/* SHINE-2 "Glare" — a specular highlight that TRACKS THE CURSOR, the
+   holographic-card technique. Pointer position is written to --mx/--my, and a
+   radial gradient sits under it. Because the light follows the hand rather
+   than replaying a fixed animation, the surface reads as genuinely glossy —
+   this is the one that matches the reference screens most closely. */
+body.shine-glare .tile::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(220px circle at var(--mx,50%) var(--my,50%),
+    rgba(255,255,255,.16), rgba(255,255,255,.05) 40%, transparent 65%);
+  opacity: 0; transition: opacity 260ms ease;
+}
+body.shine-glare .tile:hover::after { opacity: 1; }
+body.shine-glare .tile:hover {
+  border-color: rgba(124,108,255,.40);
+  box-shadow: 0 0 0 1px rgba(124,108,255,.22), 0 22px 50px -20px rgba(0,0,0,.85);
+}
+
+/* SHINE-3 "Conic edge" — light travels around the BORDER rather than across
+   the face. A conic gradient is masked to a 1px ring, so the card is outlined
+   by a rotating arc of azure-into-violet. Reads as an instrument acquiring a
+   lock; leaves the content area completely untouched. */
+@property --ang { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+body.shine-conic .tile::before {
+  /* inset:0, not -1px — the tile clips its overflow, so a bleeding ring would
+     lose its outer edge. */
+  content: ''; position: absolute; inset: 0; z-index: 0; border-radius: inherit;
+  padding: 1px; pointer-events: none;
+  background: conic-gradient(from var(--ang),
+    transparent 0 55%, var(--accent-2) 72%, var(--accent) 84%, transparent 92%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  opacity: 0; transition: opacity 300ms ease;
+}
+body.shine-conic .tile:hover::before { opacity: 1; animation: ang-spin 2.4s linear infinite; }
+@keyframes ang-spin { to { --ang: 360deg; } }
+
+/* SHINE-4 "Spotlight" — cursor-tracked like Glare, but the light reveals a
+   tinted wash across the whole card plus a bloom in the card's own status
+   colour. The most dramatic; best if cards should feel like they light up. */
+body.shine-spot .tile::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(300px circle at var(--mx,50%) var(--my,50%),
+      color-mix(in srgb, var(--tone, var(--accent)) 26%, transparent), transparent 60%),
+    radial-gradient(160px circle at var(--mx,50%) var(--my,50%),
+      rgba(255,255,255,.14), transparent 55%);
+  opacity: 0; transition: opacity 280ms ease;
+}
+body.shine-spot .tile:hover::after { opacity: 1; }
+body.shine-spot .tile:hover {
+  border-color: color-mix(in srgb, var(--tone, var(--accent)) 55%, transparent);
+  box-shadow: 0 0 34px -10px color-mix(in srgb, var(--tone, var(--accent)) 60%, transparent),
+              0 22px 50px -20px rgba(0,0,0,.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile, .tile::after, .tile::before { transition: none !important; animation: none !important; }
+  .tile:hover { transform: none; }
+  .bg-aurora::before, .bg-aurora::after, .bg-orbs::before { animation: none; }
+}
+
+/* ===========================================================================
+   CONTROL BAR
+   ======================================================================== */
+.controls {
+  position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 18px;
+  align-items: center; padding: 12px 20px;
+  background: rgba(7,9,18,.72); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.ctl-group { display: flex; align-items: center; gap: 8px; }
+.ctl-label { font-size: 10px; text-transform: uppercase; letter-spacing: .18em; color: var(--muted); }
+.seg { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.seg button {
+  border: 0; cursor: pointer; padding: 6px 13px; border-radius: 999px; font-size: 12px;
+  background: transparent; color: var(--muted); font-family: inherit; transition: all 180ms ease;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: linear-gradient(180deg, var(--accent), #6a5ae0); color: #fff; font-weight: 600; }
+
+/* ===========================================================================
+   SHARED DASHBOARD ATOMS
+   ======================================================================== */
+.app { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 54px); }
+.sidebar { padding: 22px 14px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 10px; margin-bottom: 26px; font-weight: 700; }
+.brand-mark {
+  width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center;
+  background: linear-gradient(140deg, var(--accent-2), var(--accent) 60%, #6a5ae0);
+  box-shadow: 0 6px 20px -6px rgba(124,108,255,.7);
+}
+.navsec { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); padding: 0 12px; margin: 18px 0 8px; opacity: .7; }
+.nav-item {
+  display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px;
+  color: var(--muted); font-size: 13.5px; margin-bottom: 2px; cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.ico { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; flex: none; }
+
+main { padding: 26px 30px 60px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; gap: 20px; }
+.eyebrow { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.kpi-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .13em; color: var(--muted); }
+.kpi-value { font-size: 30px; font-weight: 600; margin-top: 6px; line-height: 1; }
+.kpi-sub { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; }
+.machines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11px; }
+.swatch { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+.alert-row { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.alert-row:last-child { border-bottom: 0; }
+.bar { height: 3px; border-radius: 999px; background: rgba(255,255,255,.09); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+
+/* Status tones as data attributes so a tile can expose its own --tone. */
+[data-tone="1"] { --tone: var(--s1); }
+[data-tone="2"] { --tone: var(--s2); }
+[data-tone="3"] { --tone: var(--s3); }
+[data-tone="4"] { --tone: var(--s4); }
+.tone-text { color: var(--tone); }
+.tone-bg { background: var(--tone); }
+.tone-badge { background: color-mix(in srgb, var(--tone) 18%, transparent); color: var(--tone); border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); }
+
+/* ===========================================================================
+   VARIANT A — "LIQUID GLASS"  (reference: AI Image Generation screen)
+   Heavy frost, generous radii, an iridescent orb motif, pill chrome. Airy and
+   soft: panels float well clear of each other and the light is diffuse.
+   ======================================================================== */
+body.v-glass .card {
+  background: var(--glass); backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid var(--glass-border); border-radius: var(--radius);
+  box-shadow: 0 18px 48px -22px rgba(0,0,0,.85), inset 0 1px 0 0 var(--glass-lip);
+  padding: 17px;
+}
+body.v-glass .sidebar { background: var(--glass); backdrop-filter: blur(26px); border-right: 1px solid var(--glass-border); margin: 10px 0 10px 10px; border-radius: 22px; }
+body.v-glass .nav-item.active { background: rgba(255,255,255,.1); color: var(--text); border: 1px solid var(--glass-border); }
+body.v-glass .orb {
+  width: 74px; height: 74px; border-radius: 999px; flex: none;
+  background:
+    radial-gradient(circle at 32% 28%, #fff, transparent 42%),
+    radial-gradient(circle at 70% 34%, rgba(232,90,208,.9), transparent 52%),
+    radial-gradient(circle at 34% 74%, rgba(77,201,255,.95), transparent 55%),
+    radial-gradient(circle at 66% 70%, rgba(157,108,240,.9), transparent 58%),
+    linear-gradient(140deg, #cfd6ff, #8ea2ff);
+  box-shadow: 0 14px 40px -12px rgba(124,108,255,.8), inset 0 -8px 20px -8px rgba(0,0,0,.4);
+  animation: orb-spin 14s ease-in-out infinite alternate;
+}
+@keyframes orb-spin { to { transform: rotate(22deg) scale(1.04); } }
+/* Live indicator: one ring expanding out and fading, independent of the orb. */
+@keyframes ping { to { transform: scale(2.4); opacity: 0; } }
+
+/* ===========================================================================
+   VARIANT B — "INSTRUMENT"  (reference: MAGURA maritime console)
+   Near-flat, hairline-ruled, dense. Chrome recedes almost to nothing; the
+   numbers carry the screen. Schematic ring gauges instead of filled charts.
+   ======================================================================== */
+body.v-instrument .card {
+  background: rgba(255,255,255,.022); border: 1px solid rgba(255,255,255,.075);
+  border-radius: 10px; padding: 15px; backdrop-filter: blur(8px);
+}
+body.v-instrument .sidebar { border-right: 1px solid rgba(255,255,255,.07); }
+body.v-instrument .nav-item { border-radius: 4px; font-size: 12.5px; letter-spacing: .02em; }
+body.v-instrument .nav-item.active { background: transparent; color: var(--text); box-shadow: inset 2px 0 0 0 var(--accent-2); }
+body.v-instrument .kpi-value { font-size: 27px; font-weight: 500; font-family: ui-monospace, monospace; }
+body.v-instrument .kpi-label { letter-spacing: .2em; font-size: 9.5px; }
+body.v-instrument h1 { font-size: 19px; font-weight: 500; }
+body.v-instrument .ring { width: 54px; height: 54px; flex: none; }
+body.v-instrument .ring circle, body.v-instrument .ring line { stroke: rgba(255,255,255,.22); fill: none; stroke-width: 1; }
+body.v-instrument .ring .live { stroke: var(--tone, var(--accent-2)); stroke-width: 1.6; }
+/* Corner ticks — the instrument tell. */
+body.v-instrument .card { position: relative; }
+body.v-instrument .card::before, body.v-instrument .card::after {
+  content: ''; position: absolute; width: 7px; height: 7px; pointer-events: none;
+  border-color: rgba(255,255,255,.28); border-style: solid; border-width: 0;
+}
+body.v-instrument .card::before { top: 5px; left: 5px; border-top-width: 1px; border-left-width: 1px; }
+body.v-instrument .card::after { bottom: 5px; right: 5px; border-bottom-width: 1px; border-right-width: 1px; }
+
+/* ===========================================================================
+   VARIANT C — "OBSIDIAN"  (reference: ORBIT / Imagio chat screen)
+   Pure black, no frost at all. Flat cards with a single hairline, generous
+   whitespace, a tab underline as the only active marker. The aurora background
+   does all the colour work; the UI itself stays almost monochrome.
+   ======================================================================== */
+body.v-obsidian { background: #000; }
+body.v-obsidian .card {
+  background: rgba(255,255,255,.028); border: 1px solid rgba(255,255,255,.07);
+  border-radius: 14px; padding: 16px;
+}
+body.v-obsidian .sidebar { background: rgba(255,255,255,.022); border-right: 1px solid rgba(255,255,255,.06); }
+body.v-obsidian .nav-item.active { background: rgba(255,255,255,.055); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+body.v-obsidian .tabs { display: flex; gap: 26px; border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 20px; }
+body.v-obsidian .tab { padding: 0 0 11px; font-size: 13.5px; color: var(--muted); cursor: pointer; position: relative; }
+body.v-obsidian .tab.on { color: var(--text); }
+body.v-obsidian .tab.on::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+}
+body.v-obsidian .kpi-value { font-size: 32px; font-weight: 650; }
+
+/* Tabs hidden outside Obsidian */
+.tabs { display: none; }
+
+/* Variant-scoped visibility helpers */
+.only-glass, .only-instrument, .only-obsidian { display: none; }
+body.v-glass .only-glass { display: flex; }
+body.v-instrument .only-instrument { display: flex; }
+body.v-obsidian .only-obsidian { display: flex; }
+</style>
+</head>
+
+<body class="v-glass shine-glare">
+
+<div id="bgfield">
+  <div class="bg-aurora on" data-bg="aurora"></div>
+  <div class="bg-haze" data-bg="haze"></div>
+  <div class="bg-orbs" data-bg="orbs"></div>
+</div>
+
+<!-- ======================= CONTROLS ======================= -->
+<div class="controls">
+  <div class="ctl-group">
+    <span class="ctl-label">Layout</span>
+    <div class="seg" id="seg-variant">
+      <button data-v="glass" aria-pressed="true">A · Liquid Glass</button>
+      <button data-v="instrument" aria-pressed="false">B · Instrument</button>
+      <button data-v="obsidian" aria-pressed="false">C · Obsidian</button>
+    </div>
+  </div>
+  <div class="ctl-group">
+    <span class="ctl-label">Background</span>
+    <div class="seg" id="seg-bg">
+      <button data-bg="aurora" aria-pressed="true">Aurora</button>
+      <button data-bg="haze" aria-pressed="false">Haze + grain</button>
+      <button data-bg="orbs" aria-pressed="false">Orbs</button>
+    </div>
+  </div>
+  <div class="ctl-group">
+    <span class="ctl-label">Hover shine</span>
+    <div class="seg" id="seg-shine">
+      <button data-s="sweep" aria-pressed="false">1 Sweep</button>
+      <button data-s="glare" aria-pressed="true">2 Glare</button>
+      <button data-s="conic" aria-pressed="false">3 Conic edge</button>
+      <button data-s="spot" aria-pressed="false">4 Spotlight</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= DASHBOARD ======================= -->
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg class="ico" viewBox="0 0 24 24" style="width:17px;height:17px"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </span>
+      <div>
+        <div style="font-size:15px;line-height:1">Maintain<span style="color:var(--accent)">IQ</span></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;font-weight:400">Predictive maintenance</div>
+      </div>
+    </div>
+
+    <div class="navsec">General</div>
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Machines</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>Alerts</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>Analytics</div>
+
+    <div class="navsec">Operations</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 8-8"/></svg>Model</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24"><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/></svg>Reports</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24"><path d="M14 6l4 4-8 8H6v-4z"/></svg>Maintenance</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24"><path d="M3 12c3-4 6-4 9 0s6 4 9 0"/></svg>Ingestion</div>
+  </aside>
+
+  <main>
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Fleet overview</div>
+        <h1 style="font-size:25px;margin-top:7px">Bearing fleet — live</h1>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12px;color:var(--muted)">
+          <span style="position:relative;display:inline-flex;width:7px;height:7px">
+            <span style="position:absolute;inset:0;border-radius:999px;background:var(--accent-2);opacity:.5;animation:ping 1.6s ease-out infinite"></span>
+            <span style="position:relative;width:7px;height:7px;border-radius:999px;background:var(--accent-2)"></span>
+          </span>
+          <span class="mono">Live · 32 sensors streaming</span>
+        </div>
+      </div>
+      <div class="only-glass" style="gap:14px;align-items:center">
+        <div class="orb"></div>
+      </div>
+      <div class="only-instrument mono" style="flex-direction:column;align-items:flex-end;gap:3px;font-size:10.5px;color:var(--muted);letter-spacing:.06em">
+        <div>NODE XJTU-SY / 35Hz / 12kN</div>
+        <div>UPTIME 412:06:19</div>
+        <div>LAST SYNC 00:00:02</div>
+      </div>
+    </div>
+
+    <div class="tabs only-obsidian" style="display:none">
+      <div class="tab on">Overview</div><div class="tab">Machines</div><div class="tab">Alerts</div><div class="tab">Model</div>
+    </div>
+
+    <!-- KPI ROW -->
+    <div class="kpis">
+      <div class="card tile" data-tone="1">
+        <div class="kpi-label">Machines</div>
+        <div class="kpi-value mono">15</div>
+        <div class="kpi-sub">under live monitoring</div>
+      </div>
+      <div class="card tile" data-tone="2">
+        <div class="kpi-label">Watch</div>
+        <div class="kpi-value mono tone-text">4</div>
+        <div class="kpi-sub">early degradation</div>
+      </div>
+      <div class="card tile" data-tone="3">
+        <div class="kpi-label">Elevated</div>
+        <div class="kpi-value mono tone-text">2</div>
+        <div class="kpi-sub">inspect this shift</div>
+      </div>
+      <div class="card tile" data-tone="4">
+        <div class="kpi-label">Urgent</div>
+        <div class="kpi-value mono tone-text">1</div>
+        <div class="kpi-sub">act before failure</div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <!-- LEFT -->
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="card tile">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+            <div class="kpi-label">Fleet pulse</div>
+            <div class="mono" style="font-size:11px;color:var(--muted)">last 24h</div>
+          </div>
+          <svg viewBox="0 0 520 110" style="width:100%;height:110px">
+            <defs>
+              <linearGradient id="gline" x1="0" x2="1"><stop offset="0" stop-color="#4dc9ff"/><stop offset="1" stop-color="#9d6cf0"/></linearGradient>
+              <linearGradient id="gfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#7c6cff" stop-opacity=".30"/><stop offset="1" stop-color="#7c6cff" stop-opacity="0"/></linearGradient>
+            </defs>
+            <path d="M0 86 L52 78 L104 82 L156 62 L208 68 L260 44 L312 52 L364 30 L416 38 L468 18 L520 24 L520 110 L0 110Z" fill="url(#gfill)"/>
+            <path d="M0 86 L52 78 L104 82 L156 62 L208 68 L260 44 L312 52 L364 30 L416 38 L468 18 L520 24" fill="none" stroke="url(#gline)" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="520" cy="24" r="3.5" fill="#4dc9ff"/>
+          </svg>
+        </div>
+
+        <div>
+          <div class="kpi-label" style="margin-bottom:10px">Machines</div>
+          <div class="machines">
+            <div class="card tile" data-tone="4">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="mono" style="font-weight:600;font-size:14px">Bearing1_1</span>
+                <span class="swatch tone-bg" style="box-shadow:0 0 10px 1px var(--tone)"></span>
+              </div>
+              <span class="badge tone-badge" style="margin-top:9px">Urgent</span>
+              <div class="mono" style="margin-top:11px;font-size:11.5px;color:var(--muted)"><span class="tone-text">Risk 100</span> · 0 open</div>
+              <div class="bar only-instrument" style="margin-top:10px;width:100%"><i style="width:100%"></i></div>
+            </div>
+            <div class="card tile" data-tone="3">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="mono" style="font-weight:600;font-size:14px">Bearing1_3</span>
+                <span class="swatch tone-bg" style="box-shadow:0 0 10px 1px var(--tone)"></span>
+              </div>
+              <span class="badge tone-badge" style="margin-top:9px">Elevated</span>
+              <div class="mono" style="margin-top:11px;font-size:11.5px;color:var(--muted)"><span class="tone-text">Risk 74</span> · 2 open</div>
+              <div class="bar only-instrument" style="margin-top:10px;width:100%"><i style="width:74%"></i></div>
+            </div>
+            <div class="card tile" data-tone="2">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="mono" style="font-weight:600;font-size:14px">Bearing2_1</span>
+                <span class="swatch tone-bg" style="box-shadow:0 0 10px 1px var(--tone)"></span>
+              </div>
+              <span class="badge tone-badge" style="margin-top:9px">Watch</span>
+              <div class="mono" style="margin-top:11px;font-size:11.5px;color:var(--muted)"><span class="tone-text">Risk 41</span> · 1 open</div>
+              <div class="bar only-instrument" style="margin-top:10px;width:100%"><i style="width:41%"></i></div>
+            </div>
+            <div class="card tile" data-tone="1">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="mono" style="font-weight:600;font-size:14px">Bearing2_3</span>
+                <span class="swatch tone-bg"></span>
+              </div>
+              <span class="badge tone-badge" style="margin-top:9px">Nominal</span>
+              <div class="mono" style="margin-top:11px;font-size:11.5px;color:var(--muted)"><span class="tone-text">Risk 12</span> · 0 open</div>
+              <div class="bar only-instrument" style="margin-top:10px;width:100%"><i style="width:12%"></i></div>
+            </div>
+            <div class="card tile" data-tone="1">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="mono" style="font-weight:600;font-size:14px">Bearing3_1</span>
+                <span class="swatch tone-bg"></span>
+              </div>
+              <span class="badge tone-badge" style="margin-top:9px">Nominal</span>
+              <div class="mono" style="margin-top:11px;font-size:11.5px;color:var(--muted)"><span class="tone-text">Risk 8</span> · 0 open</div>
+              <div class="bar only-instrument" style="margin-top:10px;width:100%"><i style="width:8%"></i></div>
+            </div>
+            <div class="card tile" data-tone="2">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="mono" style="font-weight:600;font-size:14px">Bearing3_4</span>
+                <span class="swatch tone-bg" style="box-shadow:0 0 10px 1px var(--tone)"></span>
+              </div>
+              <span class="badge tone-badge" style="margin-top:9px">Watch</span>
+              <div class="mono" style="margin-top:11px;font-size:11.5px;color:var(--muted)"><span class="tone-text">Risk 37</span> · 1 open</div>
+              <div class="bar only-instrument" style="margin-top:10px;width:100%"><i style="width:37%"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="card tile" data-tone="3">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+            <div class="kpi-label">Remaining useful life</div>
+            <span class="badge tone-badge">Elevated</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:15px">
+            <svg class="ring only-instrument" viewBox="0 0 60 60" style="display:none">
+              <circle cx="30" cy="30" r="26"/><circle cx="30" cy="30" r="19"/><circle cx="30" cy="30" r="11"/>
+              <line x1="30" y1="4" x2="30" y2="56"/><line x1="4" y1="30" x2="56" y2="30"/>
+              <circle class="live" cx="30" cy="30" r="26" stroke-dasharray="163" stroke-dashoffset="58" transform="rotate(-90 30 30)"/>
+            </svg>
+            <div>
+              <div class="kpi-value mono tone-text" style="font-size:34px">64<span style="font-size:15px;color:var(--muted);margin-left:5px">hrs</span></div>
+              <div class="kpi-sub">Bearing1_1 · 92% confidence</div>
+            </div>
+          </div>
+          <div class="bar" style="margin-top:14px"><i style="width:36%"></i></div>
+        </div>
+
+        <div class="card tile">
+          <div class="kpi-label" style="margin-bottom:6px">Open alerts</div>
+          <div class="alert-row">
+            <span class="swatch tone-bg" data-tone="4" style="margin-top:5px"></span>
+            <div>
+              <div style="font-size:13px">Bearing wear — stage 3</div>
+              <div class="mono" style="font-size:11px;color:var(--muted);margin-top:3px">Bearing1_1 · 4 min ago</div>
+            </div>
+          </div>
+          <div class="alert-row">
+            <span class="swatch tone-bg" data-tone="3" style="margin-top:5px"></span>
+            <div>
+              <div style="font-size:13px">Vibration RMS above band</div>
+              <div class="mono" style="font-size:11px;color:var(--muted);margin-top:3px">Bearing1_3 · 22 min ago</div>
+            </div>
+          </div>
+          <div class="alert-row">
+            <span class="swatch tone-bg" data-tone="2" style="margin-top:5px"></span>
+            <div>
+              <div style="font-size:13px">Kurtosis drift detected</div>
+              <div class="mono" style="font-size:11px;color:var(--muted);margin-top:3px">Bearing2_1 · 1 hr ago</div>
+            </div>
+          </div>
+          <div class="alert-row">
+            <span class="swatch tone-bg" data-tone="2" style="margin-top:5px"></span>
+            <div>
+              <div style="font-size:13px">Envelope peak rising</div>
+              <div class="mono" style="font-size:11px;color:var(--muted);margin-top:3px">Bearing3_4 · 2 hr ago</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card tile" data-tone="2">
+          <div class="kpi-label" style="margin-bottom:10px">Model</div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-size:13px">XJTU-SY RUL</span>
+            <span class="mono tone-text" style="font-size:19px">94.2%</span>
+          </div>
+          <div class="bar" style="margin-top:11px"><i style="width:94%"></i></div>
+          <div class="kpi-sub" style="margin-top:9px">gradient-boosting · retrained 6h ago</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // --- Segmented control wiring -------------------------------------------
+  function wire(id, apply) {
+    const root = document.getElementById(id);
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      root.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+      apply(btn.dataset);
+    });
+  }
+
+  const body = document.body;
+
+  wire('seg-variant', ({ v }) => {
+    body.classList.remove('v-glass', 'v-instrument', 'v-obsidian');
+    body.classList.add('v-' + v);
+    // Instrument mode swaps some filled elements for schematic ones.
+    document.querySelectorAll('.only-instrument').forEach(el => {
+      el.style.display = v === 'instrument' ? 'flex' : 'none';
+    });
+    document.querySelectorAll('.tabs').forEach(el => {
+      el.style.display = v === 'obsidian' ? 'flex' : 'none';
+    });
+  });
+
+  wire('seg-bg', ({ bg }) => {
+    document.querySelectorAll('#bgfield > div').forEach(el => {
+      el.classList.toggle('on', el.dataset.bg === bg);
+    });
+  });
+
+  wire('seg-shine', ({ s }) => {
+    body.classList.remove('shine-sweep', 'shine-glare', 'shine-conic', 'shine-spot');
+    body.classList.add('shine-' + s);
+  });
+
+  // --- Cursor tracking for the Glare and Spotlight options ------------------
+  // Written straight to CSS custom properties inside a rAF, so pointer motion
+  // never triggers layout or a framework re-render.
+  let queued = false, pending = null;
+  document.addEventListener('pointermove', (e) => {
+    const tile = e.target.closest('.tile');
+    if (!tile) return;
+    pending = { tile, x: e.clientX, y: e.clientY };
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      if (!pending) return;
+      const { tile, x, y } = pending;
+      const r = tile.getBoundingClientRect();
+      tile.style.setProperty('--mx', ((x - r.left) / r.width * 100).toFixed(1) + '%');
+      tile.style.setProperty('--my', ((y - r.top) / r.height * 100).toFixed(1) + '%');
+    });
+  }, { passive: true });
+
+  // Start with instrument-only bits hidden.
+  document.querySelectorAll('.only-instrument').forEach(el => el.style.display = 'none');
+</script>
+</body>
+</html>

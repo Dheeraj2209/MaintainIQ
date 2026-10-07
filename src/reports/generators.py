@@ -188,7 +188,22 @@ def model_performance(conn, *, scope="fleet", period_start=None, period_end=None
         "ood_rate": (ood_sum / ok_count) if ok_count else 0.0,
         "warming_up_rate": (warming_sum / ok_count) if ok_count else 0.0,
         "active_model": active_model,
+        "real_world": _real_world(conn, period_start, period_end),
     }
+
+
+def _real_world(conn, period_start, period_end) -> dict:
+    """Field accuracy from operator feedback over alerts created in the
+    period (prediction-feedback design, decision 13). Reports take free-text
+    period bounds; one that isn't a timestamp can't filter alerts, so the
+    section says so instead of failing the whole report."""
+    from src.feedback import accuracy
+
+    try:
+        return accuracy.real_world_accuracy(conn, period_start=period_start, period_end=period_end)
+    except ValueError as exc:
+        return accuracy.unfiltered_not_applicable(conn, reason=str(exc),
+                                                  period_start=period_start, period_end=period_end)
 
 
 def fleet_summary(conn, *, scope="fleet", period_start=None, period_end=None) -> dict:
@@ -400,6 +415,48 @@ def _md_model_performance(s: dict) -> str:
             f"- Trained at: {_md_cell(am['trained_at'])}",
             f"- Metrics: {_md_cell(json.dumps(metrics) if metrics is not None else None)}",
         ]
+    lines += ["", "## Real-World Accuracy (operator feedback)", ""]
+    rw = s.get("real_world")
+    if not rw or rw["status"] != "available":
+        lines.append("_No labelled alerts in this period._")
+        return "\n".join(lines) + "\n"
+    lead, rul, rc = rw["lead_time"], rw["rul_error"], rw["root_cause"]
+    lines += [
+        "| Metric | Value |",
+        "| --- | --- |",
+        f"| Labelled alerts | {rw['labelled_count']} of {rw['feedback_count']} |",
+        f"| Precision | {_md_cell(rw['precision'])} |",
+        f"| False-alarm rate | {_md_cell(rw['false_alarm_rate'])} |",
+        f"| Median lead time (min) | {_md_cell(lead['median_minutes'])} |",
+        f"| Within horizon / early / late | {lead['within_horizon_count']} / "
+        f"{lead['early_count']} / {lead['late_count']} |",
+        f"| RUL MAE (min, point estimates) | {_md_cell(rul['mae_minutes'])} |",
+        f"| Censored lower bounds respected | {rul['lower_bound_respected_count']} of "
+        f"{rul['lower_bound_count']} |",
+        f"| Root-cause accuracy | {_md_cell(rc['accuracy'])} ({rc['correct_count']} of "
+        f"{rc['labelled_count']}) |",
+        "",
+        "### By model version",
+        "",
+        "| Version | Labelled | Precision | False-alarm rate | Median lead (min) | RUL MAE (min) |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for g in rw["by_model_version"]:
+        lines.append(
+            f"| {_md_cell(g['model_version'] or '(pre-link alerts)')} | {g['labelled_count']} | "
+            f"{_md_cell(g['precision'])} | {_md_cell(g['false_alarm_rate'])} | "
+            f"{_md_cell(g['median_lead_minutes'])} | {_md_cell(g['rul_mae_minutes'])} |"
+        )
+    off = rw["offline"]
+    lines.append("")
+    if off is None:
+        lines.append("- Offline benchmark (per snapshot): none recorded for the active model")
+    else:
+        lines.append(
+            f"- Offline benchmark (per snapshot): precision {_md_cell(off['precision'])} · "
+            f"recall {_md_cell(off['recall'])} (model {_md_cell(off['model_version'])})"
+        )
+    lines.append(f"- Missed failures: {_md_cell(rw['missed_failures']['reason'])}")
     return "\n".join(lines) + "\n"
 
 

@@ -1,5 +1,5 @@
 import { animate, useReducedMotion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { cn } from '../../lib/cn'
 import { Card } from './card'
 import { Sparkline } from './sparkline'
@@ -19,7 +19,9 @@ const TONE_TEXT: Record<Tone, string> = {
 
 // A faint tone-tinted radial glow bloom behind the value, keyed off the same
 // CSS custom property the sparkline reads, so each card is subtly lit in its
-// own signal color.
+// own signal color. Also feeds `--spot-tone`, which colours the hover spotlight
+// (index.css) — with `default` falling back to the brand accent rather than
+// `transparent`, since an invisible spotlight isn't a spotlight.
 const TONE_GLOW: Record<Tone, string> = {
   default: 'transparent',
   accent: 'var(--color-accent)',
@@ -31,15 +33,18 @@ const TONE_GLOW: Record<Tone, string> = {
   unknown: 'var(--color-unknown)',
 }
 
+// Sparklines render through Recharts, which cannot read CSS custom properties
+// from stroke props — so these literals must be kept in step with the tokens
+// in index.css (and with FALLBACK in lib/chartColors.ts).
 const TONE_SPARKLINE: Record<Tone, string> = {
-  default: '#f2f0ec',
-  accent: '#e23a3a',
-  accent2: '#d4af37',
-  healthy: '#3ddc84',
-  degrading: '#f0a93a',
-  faulty: '#ff7a45',
-  critical: '#ff5470',
-  unknown: '#7a7a7a',
+  default: '#eef1f8',
+  accent: '#7c6cff',
+  accent2: '#4dc9ff',
+  healthy: '#5b6a86',
+  degrading: '#3bb8c9',
+  faulty: '#9d6cf0',
+  critical: '#e85ad0',
+  unknown: '#3f4657',
 }
 
 interface MetricCardProps {
@@ -77,14 +82,15 @@ export function MetricCard({ label, value, sub, tone = 'default', trend, classNa
   const displayValue = isNumeric ? animated : value
 
   return (
-    <Card className={cn('hover-glow relative overflow-hidden p-4', className)}>
-      {tone !== 'default' && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full opacity-20 blur-2xl"
-          style={{ backgroundColor: TONE_GLOW[tone] }}
-        />
-      )}
+    // No `overflow-hidden`: the proximity ring is drawn at `inset: -1px` and
+    // would be clipped away. The corner glow blob that used to live here is
+    // gone with it — it was a static stand-in for lighting, and now that the
+    // cursor actually lights the card there is no reason for an idle card to
+    // glow at all.
+    <Card
+      style={{ '--spot-tone': tone === 'default' ? 'var(--color-accent)' : TONE_GLOW[tone] } as CSSProperties}
+      className={cn('hover-glow relative p-4', className)}
+    >
       <p className="text-xs font-medium uppercase tracking-wide text-text-muted">{label}</p>
       <div className="mt-1.5 flex items-end justify-between gap-2">
         <p className={cn('font-mono text-2xl font-semibold tabular-nums', TONE_TEXT[tone])}>{displayValue}</p>

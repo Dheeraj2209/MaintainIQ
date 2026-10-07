@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { FormEvent } from 'react'
 import type { DemoSeverity, MachineSummary, SimulateFaultResponse } from '../api/types'
 import { api } from '../api/client'
@@ -73,14 +74,31 @@ export function DemoPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="rise-children space-y-6">
       <div>
         <h1 className="text-xl font-bold text-text">Demo control</h1>
         <p className="text-xs text-text-muted">
-          Simulate a sensor reading to drive the live prediction → alert → email → dashboard pipeline without
-          waiting on real hardware. Open the dashboard in another session to watch it update live.
+          Manually force a machine into a health state to drive the alert → email → dashboard pipeline on demand.
+          Open the dashboard in another session to watch it update live.
         </p>
       </div>
+
+      <section aria-labelledby="live-source-heading" className="glass rounded-2xl border-l-2 border-l-accent p-4 text-sm">
+        <h2 id="live-source-heading" className="mb-1 text-sm font-semibold text-text">
+          Primary live source: the MQTT simulator
+        </h2>
+        <p className="text-text-muted">
+          For a realistic live feed, run <code className="font-mono text-text">just broker</code>, start the API with{' '}
+          <code className="font-mono text-text">MQTT_BROKER_HOST=localhost</code>, then{' '}
+          <code className="font-mono text-text">just simulate</code>. Simulated sensor nodes publish vibration
+          snapshots over MQTT — with edge buffering through network drops — into the same prediction pipeline real
+          ESP32 nodes use, and the system KPIs come alive. Watch it on the{' '}
+          <Link to="/ingestion" className="text-accent underline-offset-2 hover:underline">
+            Ingestion page
+          </Link>
+          . The controls below skip the model and remain useful for quick, targeted alert walkthroughs.
+        </p>
+      </section>
 
       {error && (
         <div className="rounded-2xl border border-critical/40 bg-critical/10 p-3 text-sm text-critical backdrop-blur">{error}</div>

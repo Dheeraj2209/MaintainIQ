@@ -159,3 +159,75 @@ def test_predictor_value_error_is_logged(db_path, tmp_path, monkeypatch):
     assert log[0] == "error"
     assert "missing trained features" in log[1]
     assert _count(db_path, "predictions") == 0
+
+
+def _alert(db_path, machine_id):
+    c = sqlite3.connect(db_path)
+    c.row_factory = sqlite3.Row
+    try:
+        return c.execute(
+            "SELECT * FROM alerts WHERE machine_id = ? AND status = 'open'", (machine_id,)
+        ).fetchone()
+    finally:
+        c.close()
+
+
+def test_predict_opens_a_real_alert_and_pages(rul_client, db_path, monkeypatch):
+    """A live prediction must have the same consequences as any other: writing
+    the row is not enough, somebody has to be told. m2 has no open alert in the
+    seed, so a faulty prediction here exercises alert_created end to end."""
+    monkeypatch.setattr("src.notifications.dispatch.send_email", lambda to, subject, body: None)
+
+    # The model only commits to a late-life call once the warning persists for
+    # warning_persistence_snapshots; the first two are still "healthy".
+    for _ in range(3):
+        resp = rul_client.post("/api/predictions/rul", json=_payload(machine_id="m2"))
+        assert resp.status_code == 200, resp.text
+    assert resp.json()["health_state"] != "healthy"
+
+    alert = _alert(db_path, "m2")
+    assert alert is not None
+    assert alert["source"] == "xjtu_rul"          # attributable to the model
+    assert alert["health_state"] == resp.json()["health_state"]
+
+    c = sqlite3.connect(db_path)
+    try:
+        sent = c.execute(
+            "SELECT status FROM notifications WHERE alert_id = ?", (alert["id"],)
+        ).fetchall()
+    finally:
+        c.close()
+    assert sent and all(row[0] == "sent" for row in sent)
+
+
+def test_predict_classifies_cause_from_the_real_feature_vector(rul_client, db_path, monkeypatch):
+    """The probable cause has to come from the waveform the model actually saw.
+    A clean sine has low kurtosis and non-zero RMS -> imbalance; had the route
+    dropped the features, the classifier would fall back to
+    sensor_or_data_quality_issue instead."""
+    monkeypatch.setattr("src.notifications.dispatch.send_email", lambda to, subject, body: None)
+
+    for _ in range(3):
+        rul_client.post("/api/predictions/rul", json=_payload(machine_id="m2"))
+
+    assert _alert(db_path, "m2")["probable_cause"] == "imbalance"
+
+
+def test_predict_links_the_opened_alert_to_its_prediction(rul_client, db_path, monkeypatch):
+    """The route's alert carries the predictions.id it just wrote; it stores no
+    reading, so reading_id stays NULL (feedback design, decision 3)."""
+    monkeypatch.setattr("src.notifications.dispatch.send_email", lambda to, subject, body: None)
+    for _ in range(3):
+        rul_client.post("/api/predictions/rul", json=_payload(machine_id="m2"))
+
+    alert = _alert(db_path, "m2")
+    c = sqlite3.connect(db_path)
+    c.row_factory = sqlite3.Row
+    try:
+        prediction = c.execute("SELECT * FROM predictions WHERE id = ?", (alert["prediction_id"],)).fetchone()
+    finally:
+        c.close()
+    assert prediction is not None and prediction["machine_id"] == "m2"
+    assert prediction["health_state"] == alert["health_state"]
+    assert alert["reading_id"] is None
+    assert alert["model_version"] == "test-model"

@@ -17,6 +17,15 @@ function harness() {
 }
 
 describe('DemoPage', () => {
+  it('points to the MQTT simulator as the primary live source', async () => {
+    render(harness())
+    const section = await screen.findByRole('region', { name: /primary live source: the mqtt simulator/i })
+    expect(within(section).getByText('just simulate')).toBeInTheDocument()
+    expect(within(section).getByRole('link', { name: /ingestion page/i })).toHaveAttribute('href', '/ingestion')
+    // The manual controls stay available alongside it.
+    expect(screen.getByRole('button', { name: /simulate reading/i })).toBeInTheDocument()
+  })
+
   it('loads machines and preselects the first healthy one', async () => {
     render(harness())
     expect(await screen.findByText(/no simulations run yet this session/i)).toBeInTheDocument()

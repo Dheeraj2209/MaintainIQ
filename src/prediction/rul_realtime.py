@@ -241,4 +241,10 @@ class RealTimeRULPredictor:
             "out_of_distribution": outside_fraction > 0.10,
             "outside_training_features": outside[:20],
             "warnings": warnings,
+            # The snapshot features this prediction was made from. Carried on
+            # the result so downstream root-cause classification (see
+            # src/prediction/pipeline.py) reads the waveform the model actually
+            # saw instead of re-extracting it. Not part of the API response
+            # schema, so it never reaches the wire.
+            "input_features": dict(base),
         }

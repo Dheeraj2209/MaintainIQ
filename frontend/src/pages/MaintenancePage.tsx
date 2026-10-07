@@ -49,7 +49,7 @@ export function MaintenancePage() {
     })
 
   return (
-    <div className="space-y-6">
+    <div className="rise-children space-y-6">
       <div>
         <h1 className="text-xl font-bold text-text">Maintenance</h1>
         <p className="text-xs text-text-muted">Fleet-wide maintenance history and record logging</p>

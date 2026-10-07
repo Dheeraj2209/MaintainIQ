@@ -76,7 +76,7 @@ export function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="rise-children space-y-6">
       <div>
         <h1 className="text-xl font-bold text-text">Reports</h1>
         <p className="text-xs text-text-muted">Generate and download prognostic, model-performance, and fleet reports</p>

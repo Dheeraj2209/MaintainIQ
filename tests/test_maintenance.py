@@ -105,3 +105,22 @@ def test_get_history_pagination_is_stable_with_duplicate_performed_at(conn):
     assert len(set(combined_ids)) == len(ids)
     # stable order: most-recently-inserted id first, consistent across pages
     assert combined_ids == sorted(ids, reverse=True)
+
+
+def test_oversized_description_or_technician_rejected(conn):
+    with pytest.raises(m.MaintenanceError):
+        m.log_maintenance(conn, "m1", "2026-10-07T00:00:00+00:00",
+                                description="x" * (m.MAX_DESCRIPTION_LENGTH + 1))
+    with pytest.raises(m.MaintenanceError):
+        m.log_maintenance(conn, "m1", "2026-10-07T00:00:00+00:00",
+                                technician="x" * (m.MAX_TECHNICIAN_LENGTH + 1))
+    assert m.get_history(conn, "m1") == []
+
+
+@pytest.mark.parametrize("field, size", [("description", 2001), ("technician", 201),
+                                         ("machine_id", 129)])
+def test_maintenance_route_caps_text_fields(auth_client, field, size):
+    body = {"machine_id": "m1", "performed_at": "2026-10-07T00:00:00+00:00",
+            "description": "ok", "technician": "Sam", field: "x" * size}
+    resp = auth_client("operator").post("/api/maintenance", json=body)
+    assert resp.status_code == 422, resp.text

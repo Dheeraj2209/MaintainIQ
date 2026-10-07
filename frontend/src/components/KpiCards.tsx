@@ -17,6 +17,8 @@ export function KpiCards({ summary }: { summary: KpiSummary }) {
     { label: 'Critical', value: counts.critical ?? 0, sub: 'machines', tone: 'critical' },
     { label: 'Open alerts', value: summary.open_alert_count, sub: 'unresolved', tone: 'critical' },
     { label: 'Due for inspection', value: summary.machines_due_for_inspection, sub: 'machines', tone: 'degrading' },
+    // `?? 0`: a pre-work-orders backend omits the field.
+    { label: 'Open work orders', value: summary.open_work_order_count ?? 0, sub: 'active', tone: 'accent' },
   ]
 
   const pred = summary.prediction
@@ -30,7 +32,10 @@ export function KpiCards({ summary }: { summary: KpiSummary }) {
   }
 
   return (
-    <section aria-label="Fleet KPI summary" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
+    <section
+      aria-label="Fleet KPI summary"
+      className="rise-children grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8"
+    >
       {cards.map((c) => (
         <MetricCard key={c.label} {...c} />
       ))}

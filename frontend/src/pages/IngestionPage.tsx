@@ -5,6 +5,7 @@ import { Card } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input, Select } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
+import { LiveTelemetryPanel } from '../components/LiveTelemetryPanel'
 
 export function IngestionPage() {
   const [machines, setMachines] = useState<MachineSummary[]>([])
@@ -63,18 +64,24 @@ export function IngestionPage() {
   const rows = Object.entries(status)
 
   return (
-    <div className="space-y-6">
+    <div className="rise-children space-y-6">
       <div>
         <h1 className="text-xl font-bold text-text">Ingestion control</h1>
-        <p className="text-xs text-text-muted">Replay stored readings back through the live predict + persist path</p>
+        <p className="text-xs text-text-muted">
+          Live MQTT telemetry from sensor nodes, plus replay of stored readings through the same predict + persist path
+        </p>
       </div>
 
       {error && (
         <div className="rounded-2xl border border-critical/40 bg-critical/10 p-3 text-sm text-critical backdrop-blur">{error}</div>
       )}
 
+      <LiveTelemetryPanel />
+
+      <h2 className="pt-2 text-lg font-bold text-text">Dataset replay</h2>
+
       <Card className="panel-notch p-4">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Start / stop a replay</h2>
+        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Start / stop a replay</h3>
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-0.5 text-xs text-text-muted">
             Machine
@@ -110,7 +117,7 @@ export function IngestionPage() {
       </Card>
 
       <Card className="panel-notch overflow-x-auto p-0">
-        <table className="w-full text-left text-sm">
+        <table aria-label="Replay status" className="w-full text-left text-sm">
           <thead className="bg-white/[0.04]">
             <tr className="text-xs uppercase text-text-muted">
               <th className="px-3 py-2">Machine</th>

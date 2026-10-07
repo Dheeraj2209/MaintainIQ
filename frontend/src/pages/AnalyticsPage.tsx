@@ -75,7 +75,7 @@ export function AnalyticsPage() {
   })).filter((s) => s.value > 0)
 
   return (
-    <div className="space-y-6">
+    <div className="rise-children space-y-6">
       <div>
         <h1 className="text-xl font-bold text-text">Analytics</h1>
         <p className="text-xs text-text-muted">

@@ -14,12 +14,16 @@ const buttonVariants = cva(
         outline:
           'border border-white/10 bg-transparent text-text-muted hover:border-accent/50 hover:text-text hover:bg-white/5',
         ghost: 'text-text-muted hover:bg-white/5 hover:text-text',
-        // Primary: AMD-red gradient pill with a soft glow.
+        // Primary: violet gradient pill with a soft bloom.
         accent:
-          'bg-gradient-to-b from-accent to-red-700 text-text font-semibold shadow-[0_6px_20px_-6px_rgba(226,58,58,0.6)] hover:from-accent-hover hover:to-accent hover:shadow-[0_8px_28px_-6px_rgba(226,58,58,0.75)]',
-        // Attention: warm gold gradient.
+          'bg-gradient-to-b from-accent-hover to-accent text-text font-semibold shadow-[0_6px_20px_-6px_rgba(124,108,255,0.65)] hover:shadow-[0_8px_28px_-6px_rgba(124,108,255,0.85)]',
+        // Attention: azure gradient, dark text for contrast against the bright fill.
         accent2:
-          'bg-gradient-to-b from-accent-2 to-amber-600 text-bg font-semibold shadow-[0_6px_20px_-6px_rgba(212,175,55,0.55)] hover:from-accent-2-hover hover:to-accent-2',
+          'bg-gradient-to-b from-accent-2-hover to-accent-2 text-bg font-semibold shadow-[0_6px_20px_-6px_rgba(77,201,255,0.55)] hover:shadow-[0_8px_28px_-6px_rgba(77,201,255,0.7)]',
+        // Hero CTA: a liquid-glass lens. The paired inset shadows (light on the
+        // top edge, dark on the bottom) read as a refractive bevel rather than a
+        // flat fill, and the violet bloom ties it to the ambient signal field.
+        lens: 'bg-gradient-to-b from-white to-[#d9dcf2] text-bg font-semibold shadow-[inset_0_1px_0_0_rgba(255,255,255,0.75),inset_0_-1px_0_0_rgba(0,0,0,0.28),0_10px_34px_-12px_rgba(124,108,255,0.8)] hover:from-white hover:to-white hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.9),inset_0_-1px_0_0_rgba(0,0,0,0.22),0_14px_44px_-12px_rgba(124,108,255,0.95)]',
       },
       size: {
         sm: 'px-3 py-1.5 text-xs',

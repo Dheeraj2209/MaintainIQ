@@ -1,0 +1,7 @@
+# Per-device secrets (Wi-Fi password, broker credentials). Copy
+# include/config.example.h to include/config.h and edit; never commit it.
+include/config.h
+
+# PlatformIO build output and downloaded toolchains/libraries.
+.pio/
+.vscode/

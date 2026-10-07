@@ -73,7 +73,7 @@ export function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="rise-children space-y-6">
       <div>
         <h1 className="text-xl font-bold text-text">Users</h1>
         <p className="text-xs text-text-muted">Manage accounts, roles, and access</p>

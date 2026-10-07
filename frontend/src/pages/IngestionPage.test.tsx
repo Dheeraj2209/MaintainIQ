@@ -21,7 +21,7 @@ describe('IngestionPage', () => {
   it('renders the replay status table', async () => {
     render(harness())
 
-    const table = await screen.findByRole('table')
+    const table = await screen.findByRole('table', { name: /replay status/i })
     const m1Row = (await within(table).findByText('m1')).closest('tr')!
     expect(within(m1Row).getByText(/running/i)).toBeInTheDocument()
     expect(within(m1Row).getByText('1500')).toBeInTheDocument()

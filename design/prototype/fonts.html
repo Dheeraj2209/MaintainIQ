@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MaintainIQ — type pairing prototype</title>
+
+<!-- All candidate faces, loaded up front so switching is instant.
+     Weights here were probed against the Fontshare API first: Array has no
+     500, so it ships 400/700 only.
+
+     These were ONE request with ten `f[]` parameters, and that request was
+     silently lying. Fontshare answered it with 200 and valid CSS carrying only
+     what the first `f[]` returns on its own — so eight of the ten candidates
+     were rendering as system-ui while claiming to be themselves, and every
+     pairing on this page looked like Segoe UI in two sizes.
+
+     The drop is combination-dependent, not a clean "first one wins": with two
+     families, `synonym@400,700&zodiak@400,700` comes back with both, while the
+     same two reversed comes back with Zodiak alone. There is no rule here worth
+     learning. One request per family; each is individually reliable, and this is
+     a local prototype where ten round trips cost nothing. -->
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=clash-display@500,600,700&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=satoshi@400,500,700&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=cabinet-grotesk@500,700,800&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=switzer@400,500,600,700&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=general-sans@400,500,600,700&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=zodiak@400,700&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=synonym@400,500,600&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=supreme@400,500,700&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=array@400,700&display=swap" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=excon@400,500,700&display=swap" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" />
+
+<style>
+:root {
+  --bg: #000000;
+  --surface: #0b0d15;
+  --border: #1e2130;
+  --text: #eef1f8;
+  --text-muted: #939cb4;
+  --accent: #7c6cff;
+  --accent-2: #4dc9ff;
+  --healthy: #5b6a86;
+  --degrading: #3bb8c9;
+  --faulty: #9d6cf0;
+  --critical: #e85ad0;
+
+  /* Swapped by the switcher. */
+  --f-display: 'Clash Display', system-ui, sans-serif;
+  --f-body: 'Satoshi', system-ui, sans-serif;
+  --f-num: 'JetBrains Mono', ui-monospace, monospace;
+  --w-display: 600;
+  --t-h1: -0.038em;
+  --t-h2: -0.03em;
+  --num-feat: 'tnum' 1;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--f-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Aurora ground, same idea as the app: two slow counter-rotating sweeps far
+   off-canvas, heavily blurred. Type has to be judged on the surface it will
+   actually sit on. */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: -40vmax;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(90px);
+  opacity: 0.5;
+}
+body::before {
+  background: conic-gradient(from 0deg at 30% 30%, transparent 0deg, rgba(124,108,255,0.5) 70deg, transparent 150deg);
+  animation: spin-a 34s linear infinite;
+}
+body::after {
+  background: conic-gradient(from 180deg at 70% 65%, transparent 0deg, rgba(77,201,255,0.38) 80deg, transparent 170deg);
+  animation: spin-b 44s linear infinite;
+}
+@keyframes spin-a { to { transform: rotate(360deg); } }
+@keyframes spin-b { to { transform: rotate(-360deg); } }
+
+.num {
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--num-feat);
+}
+
+/* ----------------------------------------------------------------- chrome */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(18px);
+  background: rgba(0,0,0,0.72);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+}
+.bar-inner { max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.bar h1 {
+  margin: 0;
+  font-family: var(--f-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+  transition: color .18s, border-color .18s, background .18s;
+}
+.pill:hover { color: var(--text); border-color: rgba(255,255,255,0.22); }
+.pill[aria-pressed="true"] {
+  color: #06070c;
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  font-weight: 600;
+}
+.pill kbd {
+  font-family: var(--f-num);
+  font-size: 10px;
+  opacity: .55;
+  margin-right: 5px;
+}
+.bar-note { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--text-muted); }
+
+.toggle-group { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.toggle-group span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-muted); }
+
+/* ---------------------------------------------------------------- layout */
+
+main { max-width: 1180px; margin: 0 auto; padding: 0 24px 96px; }
+
+.slab { margin-top: 56px; }
+.slab-label {
+  margin: 0 0 16px;
+  font-family: var(--f-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.glass {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015));
+  backdrop-filter: blur(14px);
+}
+
+/* ------------------------------------------------------------- specimens */
+
+.hero { text-align: center; padding: 56px 32px 64px; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 999px;
+  border: 1px solid rgba(77,201,255,0.25);
+  background: rgba(77,201,255,0.08);
+  color: var(--accent-2); font-size: 12.5px;
+}
+.dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent-2); box-shadow: 0 0 10px 1px var(--accent-2); }
+
+.hero h2 {
+  font-family: var(--f-display);
+  font-weight: var(--w-display);
+  letter-spacing: var(--t-h1);
+  font-size: clamp(2.6rem, 6.2vw, 4.4rem);
+  line-height: 1.0;
+  margin: 24px auto 0;
+  max-width: 15ch;
+}
+.iri {
+  background: linear-gradient(100deg, var(--accent-2), var(--accent) 55%, var(--critical));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero p {
+  max-width: 48ch; margin: 22px auto 0;
+  font-size: 1.05rem; line-height: 1.65; color: var(--text-muted);
+}
+.cta {
+  margin-top: 30px; display: inline-block;
+  padding: 13px 26px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(140deg, rgba(124,108,255,0.9), rgba(77,201,255,0.75));
+  color: #06070c; font-weight: 600; font-size: 15px; text-decoration: none;
+}
+
+.cards { display: grid; gap: 20px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .cards { grid-template-columns: 2fr 3fr; } }
+
+.card { padding: 24px; }
+.card-eyebrow {
+  margin: 0; font-size: 11px; font-weight: 500;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-muted);
+}
+
+.headline { display: flex; align-items: flex-end; gap: 14px; margin-top: 12px; }
+.headline .big {
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--num-feat);
+  font-size: 3.1rem; font-weight: 600; line-height: 1;
+}
+.headline span.sub { font-size: 14px; line-height: 1.35; color: var(--text-muted); padding-bottom: 4px; max-width: 20ch; }
+.card .foot { margin: 14px 0 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+th {
+  text-align: left; font-size: 10px; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(147,156,180,0.7); padding: 0 0 8px;
+}
+th:last-child, td:last-child { text-align: right; }
+td { padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.06); font-size: 14px; }
+.mid { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-feature-settings: var(--num-feat); }
+.badge {
+  display: inline-block; margin-left: 8px; padding: 2px 9px;
+  border-radius: 999px; font-size: 10.5px; letter-spacing: .02em;
+  border: 1px solid currentColor;
+}
+.b-crit { color: var(--critical); }
+.b-fault { color: var(--faulty); }
+.b-deg { color: var(--degrading); }
+.bar-track { display: inline-block; vertical-align: middle; width: 76px; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.09); overflow: hidden; margin-right: 9px; }
+.bar-fill { display: block; height: 100%; border-radius: 999px; }
+
+/* ------------------------------------------------------------ the tests */
+
+.tests { display: grid; gap: 20px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .tests { grid-template-columns: 1fr 1fr; } }
+.test { padding: 24px; }
+.test h3 {
+  margin: 0 0 14px; font-family: var(--f-body);
+  font-size: 11px; font-weight: 500; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.glyphs { font-size: 2.1rem; letter-spacing: 0.02em; line-height: 1.5; }
+.glyphs small { display: block; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-top: 6px; }
+.reading { font-size: 14px; line-height: 1.62; color: var(--text-muted); margin: 0; }
+.reading + .reading { margin-top: 12px; }
+.scale > div { font-family: var(--f-display); font-weight: var(--w-display); letter-spacing: var(--t-h2); line-height: 1.15; }
+
+/* -------------------------------------------------------------- compare */
+
+#compare { display: none; }
+#compare.on { display: block; }
+#specimen.off { display: none; }
+
+.cmp-row { padding: 26px 24px; margin-top: 14px; }
+.cmp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+.cmp-name { font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+.cmp-why { font-size: 12.5px; color: var(--text-muted); }
+.cmp-h { margin: 14px 0 0; font-size: clamp(1.6rem, 3.4vw, 2.3rem); line-height: 1.08; }
+.cmp-b { margin: 10px 0 0; font-size: 14px; line-height: 1.6; color: var(--text-muted); max-width: 62ch; }
+.cmp-n { margin-top: 10px; font-size: 1.25rem; letter-spacing: .04em; color: var(--text); }
+.cmp-pick { margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="bar-inner">
+    <h1>Type pairing</h1>
+    <div class="pills" id="pills"></div>
+
+    <div class="toggle-group">
+      <span>Numbers</span>
+      <button class="pill" id="mono-jb" aria-pressed="true">JetBrains Mono</button>
+      <button class="pill" id="mono-body" aria-pressed="false">Body face</button>
+      <button class="pill" id="cmp-toggle" aria-pressed="false" style="margin-left:10px">Compare all</button>
+    </div>
+
+    <p class="bar-note" id="note"></p>
+  </div>
+</div>
+
+<main>
+  <div id="specimen">
+    <section class="slab">
+      <p class="slab-label">Landing — hero</p>
+      <div class="glass hero">
+        <span class="eyebrow"><span class="dot"></span> Live sensor telemetry, on every line</span>
+        <h2>Predict Failures Before They <span class="iri">Happen</span></h2>
+        <p>MaintainIQ turns raw vibration, temperature, and pressure signals into a live risk score for every machine on your floor — so maintenance stops being a guessing game.</p>
+        <a class="cta" href="#">Start Monitoring →</a>
+      </div>
+    </section>
+
+    <section class="slab">
+      <p class="slab-label">Dashboard — widgets</p>
+      <div class="cards">
+        <div class="glass card">
+          <p class="card-eyebrow">Risk horizon</p>
+          <div class="headline">
+            <span class="big">6 d</span>
+            <span class="sub">until projected fleet risk reaches the intervention threshold</span>
+          </div>
+          <p class="foot">Projected forward from live remaining-life estimates for <span class="num">24</span> machines · mean model confidence <span class="num">71%</span></p>
+        </div>
+
+        <div class="glass card">
+          <p class="card-eyebrow">Machines at risk</p>
+          <table>
+            <thead>
+              <tr><th>Machine</th><th>Risk</th><th>Life left</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="mid">BEARING-07</span><span class="badge b-crit">Critical</span></td>
+                <td><span class="bar-track"><span class="bar-fill" style="width:94%;background:var(--critical)"></span></span><span class="mid">94</span></td>
+                <td class="mid">18 h</td>
+              </tr>
+              <tr>
+                <td><span class="mid">PUMP-13</span><span class="badge b-fault">Faulty</span></td>
+                <td><span class="bar-track"><span class="bar-fill" style="width:81%;background:var(--faulty)"></span></span><span class="mid">81</span></td>
+                <td class="mid">3 d</td>
+              </tr>
+              <tr>
+                <td><span class="mid">SPINDLE-02</span><span class="badge b-deg">Degrading</span></td>
+                <td><span class="bar-track"><span class="bar-fill" style="width:58%;background:var(--degrading)"></span></span><span class="mid">58</span></td>
+                <td class="mid">11 d</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="slab">
+      <p class="slab-label">Stress tests</p>
+      <div class="tests">
+        <div class="glass test">
+          <h3>Figures &amp; ambiguous glyphs</h3>
+          <div class="glyphs num">
+            0123456789
+            <small>Numerals, tabular</small>
+          </div>
+          <div class="glyphs num" style="margin-top:14px">
+            Il1 O0 5S 8B rn
+            <small>The pairs that go wrong at 12px</small>
+          </div>
+        </div>
+
+        <div class="glass test">
+          <h3>Body at reading size</h3>
+          <p class="reading">Remaining-useful-life estimates stream in over WebSockets as new sensor data lands — no polling, no stale dashboards. Threshold and anomaly alerts route to the right shift, with an acknowledge workflow so nothing gets double-worked.</p>
+          <p class="reading">Health escalates by intensity, not by red/amber/green. Every state carries a written label, so the meaning survives greyscale printing and colour-vision differences alike.</p>
+        </div>
+
+        <div class="glass test scale" style="grid-column:1/-1">
+          <h3>Display face down the size ramp</h3>
+          <div style="font-size:3rem">Fleet overview 64</div>
+          <div style="font-size:2rem;margin-top:10px">One console. Every machine.</div>
+          <div style="font-size:1.25rem;margin-top:10px">Severity you can read at a glance</div>
+          <div style="font-size:1rem;margin-top:10px">Model transparency</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="compare">
+    <section class="slab">
+      <p class="slab-label">All pairings, same words</p>
+      <div id="cmp-list"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+/* Each pairing carries its own tracking, because tracking is a property of the
+   typeface, not of the layout: what looks tight set in Clash looks loose set in
+   Zodiak, and Array wants no negative tracking at all. Comparing faces at one
+   fixed tracking value would rig the test. */
+const PAIRS = [
+  {
+    id: 'clash',
+    name: 'Clash Display + Satoshi',
+    why: 'What is in the app right now — the one you are rejecting.',
+    display: "'Clash Display'", body: "'Satoshi'",
+    weight: 600, h1: '-0.038em', h2: '-0.03em',
+  },
+  {
+    id: 'cabinet',
+    name: 'Cabinet Grotesk + Switzer',
+    why: 'Flat terminals and tight joints — reads as precision hardware. Switzer underneath is a plain Swiss workhorse that never competes.',
+    display: "'Cabinet Grotesk'", body: "'Switzer'",
+    weight: 700, h1: '-0.032em', h2: '-0.026em',
+  },
+  {
+    id: 'general',
+    name: 'General Sans (one family)',
+    why: 'Single family, two weights. Deliberately quiet: nothing about the type asks for attention, so the numbers are the loudest thing on screen.',
+    display: "'General Sans'", body: "'General Sans'",
+    weight: 600, h1: '-0.028em', h2: '-0.022em',
+  },
+  {
+    id: 'zodiak',
+    name: 'Zodiak + Synonym',
+    why: 'Editorial serif on black. The biggest departure here — financial-press authority rather than software-startup. Closest to the premium mood of your reference.',
+    display: "'Zodiak'", body: "'Synonym'",
+    weight: 700, h1: '-0.018em', h2: '-0.012em',
+  },
+  {
+    id: 'supreme',
+    name: 'Supreme + Switzer',
+    why: 'Tight grotesk with slightly odd terminals. Distinctive at a glance without being a novelty face.',
+    display: "'Supreme'", body: "'Switzer'",
+    weight: 700, h1: '-0.03em', h2: '-0.024em',
+  },
+  {
+    id: 'array',
+    name: 'Array + General Sans',
+    why: 'Squared-off techno display — instrument panel, trading terminal. Strongest personality, and the one most likely to date.',
+    display: "'Array'", body: "'General Sans'",
+    weight: 700, h1: '0em', h2: '0.005em',
+  },
+  {
+    id: 'excon',
+    name: 'Excon + Switzer',
+    why: 'Industrial squared grotesk, but with enough humanist warmth in the body that long paragraphs still read easily.',
+    display: "'Excon'", body: "'Switzer'",
+    weight: 700, h1: '-0.028em', h2: '-0.022em',
+  },
+]
+
+const root = document.documentElement
+const pillsEl = document.getElementById('pills')
+const noteEl = document.getElementById('note')
+
+let activeId = PAIRS[0].id
+let monoMode = 'jb'
+
+function apply(id) {
+  const p = PAIRS.find((x) => x.id === id)
+  activeId = id
+  root.style.setProperty('--f-display', p.display + ', system-ui, sans-serif')
+  root.style.setProperty('--f-body', p.body + ', system-ui, sans-serif')
+  root.style.setProperty('--w-display', p.weight)
+  root.style.setProperty('--t-h1', p.h1)
+  root.style.setProperty('--t-h2', p.h2)
+  applyMono()
+  noteEl.textContent = p.why
+  for (const b of pillsEl.children) b.setAttribute('aria-pressed', String(b.dataset.id === id))
+  location.hash = id
+}
+
+/* The mono question is separate from the pairing question: it asks whether the
+   product keeps a true monospace for data, or sets figures in the body face
+   with tabular figures turned on. */
+function applyMono() {
+  const p = PAIRS.find((x) => x.id === activeId)
+  root.style.setProperty('--f-num', monoMode === 'jb' ? "'JetBrains Mono', ui-monospace, monospace" : p.body + ', system-ui, sans-serif')
+  document.getElementById('mono-jb').setAttribute('aria-pressed', String(monoMode === 'jb'))
+  document.getElementById('mono-body').setAttribute('aria-pressed', String(monoMode !== 'jb'))
+}
+
+PAIRS.forEach((p, i) => {
+  const b = document.createElement('button')
+  b.className = 'pill'
+  b.dataset.id = p.id
+  b.innerHTML = '<kbd>' + (i + 1) + '</kbd>' + p.name
+  b.addEventListener('click', () => apply(p.id))
+  pillsEl.appendChild(b)
+})
+
+document.getElementById('mono-jb').addEventListener('click', () => { monoMode = 'jb'; applyMono() })
+document.getElementById('mono-body').addEventListener('click', () => { monoMode = 'body'; applyMono() })
+
+/* Compare view: same sentence, same size, seven faces — the only way to judge
+   the faces against each other rather than against your memory of the last one. */
+const cmpList = document.getElementById('cmp-list')
+PAIRS.forEach((p) => {
+  const d = document.createElement('div')
+  d.className = 'glass cmp-row'
+  d.innerHTML =
+    '<div class="cmp-head"><span class="cmp-name">' + p.name + '</span><span class="cmp-why">' + p.why + '</span></div>' +
+    '<div class="cmp-h" style="font-family:' + p.display + ',system-ui,sans-serif;font-weight:' + p.weight + ';letter-spacing:' + p.h2 + '">Predict failures before they happen</div>' +
+    '<p class="cmp-b" style="font-family:' + p.body + ',system-ui,sans-serif">Remaining-useful-life estimates stream in over WebSockets as new sensor data lands — no polling, no stale dashboards.</p>' +
+    '<div class="cmp-n" style="font-family:' + p.body + ',system-ui,sans-serif;font-variant-numeric:tabular-nums">0123456789 · 94 risk · 18 h · Il1 O0</div>' +
+    '<button class="pill cmp-pick" data-id="' + p.id + '">See this one in full →</button>'
+  d.querySelector('.cmp-pick').addEventListener('click', () => {
+    apply(p.id)
+    toggleCompare(false)
+    window.scrollTo({ top: 0 })
+  })
+  cmpList.appendChild(d)
+})
+
+function toggleCompare(on) {
+  document.getElementById('compare').classList.toggle('on', on)
+  document.getElementById('specimen').classList.toggle('off', on)
+  document.getElementById('cmp-toggle').setAttribute('aria-pressed', String(on))
+}
+document.getElementById('cmp-toggle').addEventListener('click', function () {
+  toggleCompare(this.getAttribute('aria-pressed') !== 'true')
+})
+
+addEventListener('keydown', (e) => {
+  const n = Number(e.key)
+  if (n >= 1 && n <= PAIRS.length) apply(PAIRS[n - 1].id)
+})
+
+apply(PAIRS.find((p) => p.id === location.hash.slice(1)) ? location.hash.slice(1) : PAIRS[0].id)
+</script>
+</body>
+</html>

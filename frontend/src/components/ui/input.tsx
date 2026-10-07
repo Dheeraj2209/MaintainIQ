@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn'
 
 const fieldClasses =
@@ -10,6 +10,10 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={cn(fieldClasses, className)} {...props} />
+}
+
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className={cn(fieldClasses, 'min-h-[4.5rem] resize-y', className)} {...props} />
 }
 
 export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {

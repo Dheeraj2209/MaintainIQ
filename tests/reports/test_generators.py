@@ -250,3 +250,40 @@ def test_render_rejects_unknown_format(rconn):
     s = generators.machine_prognostic(rconn, scope="m1")
     with pytest.raises(ValueError):
         generators.render("pdf", s)
+
+
+# ---- model_performance: real-world accuracy (prediction-feedback design, decision 13) ----
+
+def _feedback(conn, alert_id, outcome):
+    conn.execute(
+        "INSERT INTO alert_feedback (alert_id, outcome, recorded_by, recorded_at) "
+        "VALUES (?, ?, 1, '2030-01-02T00:00:00+00:00')", (alert_id, outcome))
+    conn.commit()
+
+
+def test_model_performance_real_world_not_applicable_without_feedback(rconn):
+    s = generators.model_performance(rconn, scope="fleet")
+    assert s["real_world"]["status"] == "not_applicable"
+    md = generators.render_markdown(s)
+    assert "## Real-World Accuracy (operator feedback)" in md
+    assert "_No labelled alerts in this period._" in md
+
+
+def test_model_performance_real_world_with_feedback_and_period(rconn):
+    _machine(rconn, "m1")
+    _alert(rconn, opened_at="2030-01-01T00:00:00+00:00", status="resolved")
+    _alert(rconn, opened_at="2030-03-01T00:00:00+00:00", status="resolved")
+    _feedback(rconn, 1, "confirmed_failure")
+    _feedback(rconn, 2, "false_alarm")
+
+    s = generators.model_performance(rconn, scope="fleet")
+    assert s["real_world"]["status"] == "available"
+    assert s["real_world"]["precision"] == 0.5
+    md = generators.render_markdown(s)
+    assert "| Precision | 0.5 |" in md
+    assert "### By model version" in md
+
+    s = generators.model_performance(rconn, scope="fleet",
+                                     period_start="2030-01-01T00:00:00+00:00",
+                                     period_end="2030-01-31T00:00:00+00:00")
+    assert s["real_world"]["labelled_count"] == 1 and s["real_world"]["precision"] == 1.0

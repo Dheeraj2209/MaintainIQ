@@ -1,6 +1,7 @@
 """Machine endpoints: fleet summary, per-machine detail, metric trends."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from src.alerts import live
 from src.api.deps import get_db
 from src.api.schemas import Alert, MachineDetail, MachineSummary, MaintenanceRecord, TrendPoint
 from src.kpi import calculations as kpi
@@ -40,13 +41,11 @@ def get_machine(machine_id: str, db=Depends(get_db)):
     maint = kpi.maintenance_kpis(db, machine_id)[0]
 
     alert_rows = db.execute(
-        """SELECT id, machine_id, opened_at, resolved_at, severity, health_state,
-                  probable_cause, message, status, source,
-                  acknowledged_at, acknowledged_by
-           FROM alerts WHERE machine_id = ? ORDER BY opened_at DESC""",
+        f"""SELECT {live.API_ALERT_COLUMNS}
+            FROM alerts WHERE machine_id = ? ORDER BY opened_at DESC""",
         (machine_id,),
     ).fetchall()
-    alerts = [Alert(**dict(row)) for row in alert_rows]
+    alerts = [Alert(**live.api_alert(row)) for row in alert_rows]
 
     history = [MaintenanceRecord(**rec) for rec in maintenance.get_history(db, machine_id, limit=10)]
 

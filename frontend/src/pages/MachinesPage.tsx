@@ -37,7 +37,7 @@ export function MachinesPage() {
   }, [machines, filter, search])
 
   return (
-    <div className="space-y-4">
+    <div className="rise-children space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-text">Machines</h1>

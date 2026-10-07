@@ -3,14 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Display + data faces loaded as progressive enhancement; the app falls
-         back to the system / mono stacks in src/index.css when offline. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Installable PWA (design/2026-10-07-mobile-operator-pwa-design.md): the
+         manifest launches straight into the operator view at /m. The service
+         worker is registered from src/pwa/registerServiceWorker.ts in
+         production builds only. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MaintainIQ" />
+    <!-- Display + text faces loaded as progressive enhancement; the app falls
+         back to the system / mono stacks in src/index.css when offline.
+
+         Zodiak and Synonym come from Fontshare (fontshare.com), which licenses
+         its families free for commercial use. Zodiak is a serif, and that is the
+         point: it gives headings financial-press authority rather than the
+         software-startup grotesk every other tool on the floor uses. Synonym is
+         the reader — a neutral sans with open counters that holds at 12–14px and
+         renders identically on Windows, macOS, and Linux. The data face stays
+         JetBrains Mono; Fontshare has no monospace with comparable figure
+         legibility at 12px.
+
+         Weights are requested explicitly, not left to the CDN default, because a
+         weight the browser cannot find is silently faked or snapped to the
+         nearest available one. Note what Zodiak does NOT ship: no 500, no 600.
+         It steps 400 -> 700, which is why every display heading in the app sets
+         `font-bold` rather than `font-semibold`.
+
+         ONE LINK PER FAMILY, and it has to stay that way. Fontshare's API
+         accepts multiple `f[]` parameters in a single request and then, for some
+         combinations, quietly returns a subset — `?f[]=zodiak@400,700&
+         f[]=synonym@400,700` comes back with Zodiak only, while the same two
+         families in the opposite order come back with both. It answers 200 with
+         valid CSS either way, so the failure is invisible: the missing family
+         just falls through to the stack in index.css and the page still looks
+         plausible. Separate requests are individually reliable, and the extra
+         round trip is to a host already preconnected above. -->
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=zodiak@400,700&display=swap" />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f%5B%5D=synonym@400,500,600,700&display=swap" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
     <title>MaintainIQ — Predictive maintenance</title>
   </head>

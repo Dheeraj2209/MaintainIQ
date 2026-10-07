@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MaintainIQ — Dashboard Prototype (Deep Field)</title>
+<style>
+  /* Same "Deep Field" tokens as landing.html — the console and the marketing
+     page share one palette so the vibe carries across the login boundary. */
+  :root {
+    --color-bg: #070912;
+    --color-surface: #111524;
+    --color-border: #272e44;
+    --color-text: #eef1f8;
+    --color-text-muted: #939cb4;
+
+    --color-accent: #7c6cff;
+    --color-accent-2: #4dc9ff;
+
+    /* STATUS RAMP — intensity, not hue. Escalation runs
+       slate -> azure -> violet -> magenta: saturation and luminance climb
+       together, so it survives greyscale and colour-vision differences.
+       No red / amber / green anywhere, and every swatch has a text label. */
+    --status-1: #5b6a86;  /* nominal  */
+    --status-2: #4dc9ff;  /* watch    */
+    --status-3: #7c6cff;  /* elevated */
+    --status-4: #c46cff;  /* urgent   */
+
+    --glass-bg: rgba(255,255,255,0.055); --glass-bg-strong: rgba(255,255,255,0.05);
+    --glass-border: rgba(255,255,255,0.12); --glass-highlight: rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--color-bg); color:var(--color-text); font-family: system-ui, 'Segoe UI', Roboto, sans-serif; }
+  h1,h2,h3 { font-family:'Space Grotesk', sans-serif; letter-spacing:-0.01em; }
+  body::before {
+    content:''; position:fixed; inset:-20% -10%; z-index:-2; pointer-events:none;
+    background-image:
+      radial-gradient(38% 42% at 24% 18%, rgba(124,108,255,0.20), transparent 70%),
+      radial-gradient(32% 36% at 82% 12%, rgba(77,201,255,0.14), transparent 70%),
+      radial-gradient(46% 48% at 88% 88%, rgba(196,108,255,0.14), transparent 72%);
+    animation: drift 42s ease-in-out infinite alternate;
+  }
+  @keyframes drift { 0%{transform:translate3d(-2%,-1%,0) scale(1);} 100%{transform:translate3d(2%,2%,0) scale(1.08);} }
+  @media (prefers-reduced-motion: reduce) { body::before { animation:none; } }
+
+  .glass { background:var(--glass-bg); backdrop-filter:blur(20px) saturate(140%); border:1px solid var(--glass-border);
+    box-shadow:0 16px 44px -20px rgba(0,0,0,.8), inset 0 1px 0 0 var(--glass-highlight); border-radius:20px; }
+  .glass-panel { background:var(--glass-bg-strong); backdrop-filter:blur(26px) saturate(140%); border:1px solid var(--glass-border);
+    box-shadow:0 16px 44px -24px rgba(0,0,0,.7), inset 0 1px 0 0 var(--glass-highlight); }
+
+  .app { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+  .sidebar { padding:20px 16px; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; margin-bottom:28px; padding:0 8px; }
+  .dot { width:10px; height:10px; border-radius:999px;
+    background:radial-gradient(circle at 30% 30%, #fff, var(--color-accent-2) 45%, var(--color-accent) 100%);
+    box-shadow:0 0 12px 2px rgba(124,108,255,.65); }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; color:var(--color-text-muted); font-size:14px; margin-bottom:2px; }
+  .nav-item.active { background:rgba(255,255,255,0.07); color:var(--color-text); border:1px solid var(--glass-border); }
+  main { padding:28px 32px; }
+  .topbar { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
+  .topbar h1 { font-size:24px; margin:0; }
+  .topbar p { color:var(--color-text-muted); font-size:12.5px; margin:4px 0 0; }
+
+  /* Hero strip — the orb accent that rhymes the console with the landing hero */
+  .hero-strip { position:relative; padding:28px 30px; overflow:hidden; margin-bottom:22px; }
+  .hero-orb { position:absolute; width:420px; height:420px; border-radius:999px; right:-120px; top:-160px;
+    background:
+      radial-gradient(circle at 35% 30%, rgba(255,255,255,.6), rgba(255,255,255,0) 30%),
+      radial-gradient(circle at 70% 75%, rgba(77,201,255,.55), transparent 55%),
+      radial-gradient(circle at 75% 20%, rgba(196,108,255,.52), transparent 45%),
+      radial-gradient(circle at 25% 75%, rgba(124,108,255,.55), transparent 50%),
+      radial-gradient(circle at 50% 50%, #17193a, #04050d 72%);
+    filter: blur(.5px) saturate(1.2); opacity:.9;
+  }
+  /* Gradient hairline across the top edge (the `.panel-notch` equivalent). */
+  .hero-strip::after { content:''; position:absolute; inset:0 0 auto 0; height:1px; pointer-events:none;
+    background:linear-gradient(90deg, transparent, rgba(124,108,255,.65) 22%, rgba(77,201,255,.75) 52%, rgba(196,108,255,.5) 84%, transparent); opacity:.8; }
+  .hero-strip .content { position:relative; z-index:2; display:flex; justify-content:space-between; align-items:flex-end; gap:24px; }
+  .stat-big { font-family:'Space Grotesk',sans-serif; font-size:44px; font-weight:700; }
+
+  .legend { display:flex; gap:22px; }
+  .legend div { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--color-text-muted); }
+  .legend .swatch { width:9px; height:9px; border-radius:999px; }
+  .legend b { color:var(--color-text); font-weight:600; }
+
+  /* Tracker: one cell per machine, opacity+hue climbing with severity. */
+  .tracker { display:flex; gap:3px; margin-top:22px; position:relative; z-index:2; }
+  .tracker span { flex:1; height:28px; border-radius:4px; }
+
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:22px 0; }
+  .kpi { padding:18px 20px; }
+  .kpi .label { font-size:11px; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.1em; }
+  .kpi .value { font-family:'Space Grotesk',sans-serif; font-size:28px; margin-top:6px; }
+  /* Deltas are NEUTRAL: direction is carried by the ▲/▼ glyph and the words,
+     never by colour. Nothing here says "green = good, red = bad". */
+  .kpi .delta { font-size:12px; margin-top:4px; color:var(--color-text-muted); }
+  .kpi .delta .g { color:var(--color-text); font-weight:600; }
+
+  .cols { display:grid; grid-template-columns: 1.4fr 1fr; gap:18px; }
+  .panel { padding:20px; }
+  .panel h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-muted); margin:0 0 14px; }
+  .row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:13.5px; }
+  .row:last-child { border-bottom:none; }
+
+  /* Status pill: swatch + word. The word does the work; the swatch reinforces. */
+  .badge { display:inline-flex; align-items:center; gap:7px; font-size:11px; padding:4px 11px 4px 8px;
+           border-radius:999px; font-weight:600; border:1px solid var(--glass-border); background:rgba(255,255,255,.05); color:var(--color-text); }
+  .badge i { width:8px; height:8px; border-radius:999px; display:block; }
+  .badge.s1 i { background:var(--status-1); }
+  .badge.s2 i { background:var(--status-2); box-shadow:0 0 8px 0 rgba(77,201,255,.7); }
+  .badge.s3 i { background:var(--status-3); box-shadow:0 0 9px 1px rgba(124,108,255,.75); }
+  .badge.s4 i { background:var(--status-4); box-shadow:0 0 11px 2px rgba(196,108,255,.85); }
+  .badge.s4 { border-color:rgba(196,108,255,.45); background:rgba(196,108,255,.10); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar glass-panel">
+    <div class="brand"><span class="dot"></span> MaintainIQ</div>
+    <div class="nav-item active">Dashboard</div>
+    <div class="nav-item">Machines</div>
+    <div class="nav-item">Alerts</div>
+    <div class="nav-item">Analytics</div>
+    <div class="nav-item">Model</div>
+    <div class="nav-item">Reports</div>
+    <div class="nav-item">Maintenance</div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <div>
+        <h1>Fleet overview</h1>
+        <p>Live health, risk, and open alerts across all machines</p>
+      </div>
+    </div>
+
+    <section class="hero-strip glass">
+      <div class="hero-orb"></div>
+      <div class="content">
+        <div>
+          <p style="font-size:11px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.18em;margin:0 0 6px;">Fleet pulse</p>
+          <div class="stat-big">24 <span style="font-size:14px;color:var(--color-text-muted);font-weight:400;">machines under live monitoring</span></div>
+          <p style="margin:8px 0 0;font-size:13px;color:var(--color-text-muted);">
+            <strong style="color:var(--color-text);">2 urgent</strong> · 3 elevated — inspect before failure
+          </p>
+        </div>
+        <div class="legend">
+          <div><span class="swatch" style="background:var(--status-1)"></span>Nominal <b>17</b></div>
+          <div><span class="swatch" style="background:var(--status-2)"></span>Watch <b>2</b></div>
+          <div><span class="swatch" style="background:var(--status-3)"></span>Elevated <b>3</b></div>
+          <div><span class="swatch" style="background:var(--status-4)"></span>Urgent <b>2</b></div>
+        </div>
+      </div>
+      <div class="tracker">
+        <span style="background:var(--status-1)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-1)"></span><span style="background:var(--status-4)"></span>
+        <span style="background:var(--status-1)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-3)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-1)"></span><span style="background:var(--status-2)"></span>
+        <span style="background:var(--status-1)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-3)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-1)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-4)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-2)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-3)"></span><span style="background:var(--status-1)"></span>
+        <span style="background:var(--status-1)"></span><span style="background:var(--status-1)"></span>
+      </div>
+    </section>
+
+    <div class="grid3">
+      <div class="kpi glass"><div class="label">Avg. RUL</div><div class="value">128h</div>
+        <div class="delta"><span class="g">▲ 4%</span> vs last week</div></div>
+      <div class="kpi glass"><div class="label">Open alerts</div><div class="value">7</div>
+        <div class="delta"><span class="g">▼ 2</span> since yesterday</div></div>
+      <div class="kpi glass"><div class="label">Model confidence</div><div class="value">96%</div>
+        <div class="delta"><span class="g">■ stable</span> over 14 days</div></div>
+    </div>
+
+    <div class="cols">
+      <div class="panel glass">
+        <h2>Machines</h2>
+        <div class="row"><span>PUMP-014</span><span class="badge s4"><i></i>Urgent</span></div>
+        <div class="row"><span>CONV-002</span><span class="badge s3"><i></i>Elevated</span></div>
+        <div class="row"><span>MOTOR-071</span><span class="badge s2"><i></i>Watch</span></div>
+        <div class="row"><span>FAN-118</span><span class="badge s1"><i></i>Nominal</span></div>
+      </div>
+      <div class="panel glass">
+        <h2>Open alerts</h2>
+        <div class="row"><span>Bearing wear — PUMP-014</span><span class="badge s4"><i></i>Urgent</span></div>
+        <div class="row"><span>Vibration spike — CONV-002</span><span class="badge s3"><i></i>Elevated</span></div>
+        <div class="row"><span>Temp drift — FAN-118</span><span class="badge s2"><i></i>Watch</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

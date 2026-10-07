@@ -2,7 +2,7 @@
 
 Tracks concrete next-work items identified against `design/SRS_Document.md`,
 `design/DESIGN_BASELINE.md`, and the rendered UML/architecture diagrams.
-See `IMPLEMENTATION_PLAN.md` for the milestone history (M1-M5 done, M6 pending).
+See `IMPLEMENTATION_PLAN.md` for the milestone history (M1-M5 and M7-M11 done, M6 in progress).
 
 ## 1. Alert acknowledge workflow (highest priority — designed, never built)
 
@@ -29,13 +29,84 @@ Auth (JWT/RBAC), WebSocket realtime, email notifications, and the demo
 injection endpoint are all working (61 backend / 107 frontend tests green)
 but still uncommitted on top of `016d040`. Commit before starting new work.
 
-## 3. M6 — Real hardware ingestion (documented future milestone)
+## 3. M6 — Live telemetry over MQTT (in progress)
 
-- [ ] ESP32 + DS18B20 (temperature) + ADXL345/MPU6050 (vibration) per machine
-- [ ] MQTT over Wi-Fi telemetry upstream, alert topic downstream
-- [ ] Replace the `/demo` injection endpoint with real telemetry ingestion
-      feeding the same `prediction/live.py` -> `alerts/live.py` pipeline
-- [ ] Edge-side offline buffering + resync on reconnect (FR-09, FR-07/08)
+Contract: `design/M6_LIVE_TELEMETRY.md`.
+
+- [x] Mosquitto broker in `docker-compose.yml` + `deploy/mosquitto/mosquitto.conf`
+      (`just broker`, `just broker-check`)
+- [x] Wire protocol, settings, `telemetry_messages` / `device_status` tables
+      (`src/telemetry/protocol.py`, `src/telemetry/config.py`, migration 2)
+- [ ] MQTT ingest service feeding `src/prediction/pipeline.py` (same path as
+      replay and `/demo`), alert topic downstream
+- [ ] Simulator (`just simulate`) as the primary live demo source in place of
+      `/demo` (which stays as a manual tool)
+- [ ] ESP32 + ADXL345 firmware (`firmware/esp32-node/`) with edge-side
+      offline buffering + resync on reconnect (FR-09, FR-07/08)
+- [ ] DS18B20 temperature channel — out of M6 scope (model is vibration-only)
+- [x] Device health: node status page + silence incidents
+      (design/2026-10-06-device-health-design.md) — backend: shared state
+      rule, `device_incidents` (migration 3), background scheduler + silence
+      watchdog, email paging, `device_offline`/`device_online` events,
+      incident list/acknowledge routes
+- [x] Work orders + paging escalation
+      (design/2026-10-07-work-orders-escalation-design.md) — backend:
+      `work_orders` / `work_order_events` + `alerts.page_level` /
+      `last_paged_at` (migration 4, lazily applied by `get_db`), work-order
+      service + routes with RBAC, completion writes a maintenance record,
+      paging ladder job (`ESCALATION_L1/L2_MINUTES`), demo routes through the
+      shared `pipeline.fan_out`, work-order KPIs; frontend: Work orders page
+      + drawer (`/work-orders/:id`), create dialog on Alerts / Machine Detail,
+      "Paged L{n}" badges, open-work-order KPI card and facts, live events
+- [x] Prediction feedback + field accuracy
+      (design/2026-10-07-prediction-feedback-design.md) — backend:
+      `alert_feedback` + `alerts.prediction_id` / `reading_id` /
+      `model_version` / `closed_by` (migration 5), prediction→alert links
+      threaded from `persist_prediction` through `pipeline.handle_prediction`,
+      close / feedback service + routes (`POST /api/alerts/{id}/close`,
+      `PUT|GET /api/alerts/{id}/feedback`), `GET /api/model/feedback-accuracy`,
+      retraining export (`GET /api/model/feedback/export`,
+      `python -m src.feedback.export`), KPI `real_world` + operator-labelled
+      `root_cause_accuracy`, report section, `alert_closed` /
+      `alert_feedback_recorded` events (close clears the device LED as
+      `alert_resolved`)
+- [x] Prediction feedback frontend: AlertCloseForm / AlertCloseDialog
+      (Alerts page, Machine Detail, work-order completion "Record what
+      happened" step), outcome badges, Model page field-accuracy card + CSV
+      export, `alert_closed` / `alert_feedback_recorded` toasts (never light
+      the notification bell)
+- [x] Why this alert? backend (design/2026-10-07-alert-explanation-design.md):
+      `alert_explanations` snapshots at create/escalate (migration 6) written
+      in `pipeline.fan_out` (demo included), `src/root_cause/explain.py`
+      (triggering readings, key factors vs. the machine's baseline × model
+      importance, prediction + OOD, rule trace via
+      `rule_based.explain_probable_cause`, similar incidents with outcomes,
+      work orders and maintenance), `GET /api/alerts/{id}/explanation`
+      (snapshot, else reconstructed)
+- [x] Why this alert? frontend: AlertExplanationPanel drawer (content in
+      AlertExplanationView for feature 5's mobile route), "Why?" on Alerts /
+      dashboard AlertsPanel / Machine Detail, `/alerts/:id` deep link,
+      TrendChart trigger marker, OOD banner
+- [x] Mobile operator view (PWA) backend: push subscriptions, VAPID, push
+      channel (design/2026-10-07-mobile-operator-pwa-design.md):
+      `push_subscriptions` + `notifications.channel` (migration 7),
+      `src/notifications/push.py` (env VAPID keys, disabled gracefully,
+      endpoint host allowlist, 404/410 deactivates, `--generate-vapid` CLI),
+      dispatch push audience (operators at level 0 and device silence, ladder
+      roles above), `/api/push/*` routes, `?channel=` on the notifications log,
+      `spa_file_response` (sw.js / manifest MIME + no-cache, traversal guard,
+      `/api` JSON 404)
+- [x] Mobile operator view frontend: /m shell, quick actions, QR labels +
+      scan, responsive AppShell, manifest + service worker + icons, push toggle
+      (usePush + PushToggle on /m/settings and the header "This device" menu),
+      logout unsubscribes the device, login keeps path + search + hash, the
+      live socket checks /auth/me when it closes before opening
+- [ ] Bulk QR label sheet from the Machines page
+- [ ] Per-user notification preferences (quiet hours, severity floor)
+- [ ] Offline acknowledgement queue (Background Sync)
+- [ ] Fix stale `vibration_h_high_band_energy_ratio` key in
+      `kpi._vibration_severity` (`src/kpi/calculations.py:86`) and the Machine
+      Detail metric list (`MachineDetail.tsx:31`)
 
 ## 4. KPIs unlocked once M6 lands
 
@@ -43,7 +114,8 @@ Currently reported as `not_applicable` in `src/kpi/calculations.py`, by
 design — revisit once real telemetry exists:
 
 - [ ] `sensor_collection_rate`, `transmission_success_rate`,
-      `edge_buffer_health`, `cloud_sync_health` (System-Performance KPIs)
+      `edge_buffer_health`, `cloud_sync_health` (System-Performance KPIs) —
+      being computed from live telemetry in M6 (contract §9)
 - [ ] `breakdown_reduction`, `emergency_maintenance_reduction`
       (Operational KPIs — need longitudinal before/after real-world data)
 
@@ -257,8 +329,12 @@ hardware; it's pure ingestion/validation work against existing code.
 
 ## 10. Deferred / explicitly out of scope for now
 
-- Root-cause accuracy KPI — no labeled ground truth in the IMS dataset
-- SMS/mobile alert delivery (FR-30) — email-only for now
+- ~~Root-cause accuracy KPI~~ — now measured from operator feedback
+  (`root_cause_accuracy.source = "operator_feedback"`) once alerts are closed
+  with an actual cause; the XJTU-SY dataset itself still has no labels
+- Missed-failure recall from the field — needs failures recorded
+  independently of alerts (feedback design, decision 11)
+- ~~SMS/mobile~~ alert delivery (FR-30) — mobile Web Push shipped in M11 (mobile operator PWA); SMS is still deferred
 - 1D-CNN/LSTM raw-signal deep model — noted as a future option in
   `IMPLEMENTATION_PLAN.md`, not needed while classical ML performs adequately
 

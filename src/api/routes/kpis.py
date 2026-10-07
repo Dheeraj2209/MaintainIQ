@@ -26,9 +26,9 @@ def get_kpi_detail(db=Depends(get_db)):
     return {
         "machine_health": kpi.machine_health_kpis(db),
         "maintenance": kpi.maintenance_kpis(db),
-        "prediction": kpi.prediction_kpis(),
+        "prediction": kpi.prediction_kpis(db),
         "operational": kpi.operational_kpis(db),
-        "system": kpi.system_kpis(),
+        "system": kpi.system_kpis(db),
     }
 
 

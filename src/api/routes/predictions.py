@@ -1,4 +1,5 @@
 """Online prediction endpoints."""
+import logging
 import os
 import time
 from functools import lru_cache
@@ -8,9 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.deps import get_db
 from src.api.schemas import RULPredictionRequest, RULPredictionResponse
-from src.prediction import rul_store
+from src.prediction import pipeline, rul_store
 from src.prediction.rul_realtime import RealTimeRULPredictor
 from src.training.xjtu_rul import REPO_ROOT
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -61,11 +64,26 @@ def predict_rul(payload: RULPredictionRequest, db=Depends(get_db), predictor=Dep
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     latency_ms = (time.perf_counter() - start) * 1000.0
-    rul_store.persist_prediction(db, result, reading_id=None)
+    prediction_id = rul_store.persist_prediction(db, result, reading_id=None)
     rul_store.log_inference(
         db, machine_id=payload.machine_id, model_version=model_version,
         latency_ms=latency_ms, result=result,
     )
+    # Same fan-out the replay ingestion path uses: the prediction row is the
+    # durable record, but an operator only hears about a failing machine if it
+    # also reaches the alert state machine, email paging and the realtime feed.
+    # Failures there are logged and dropped rather than costing the caller the
+    # prediction that already succeeded.
+    try:
+        pipeline.handle_prediction(
+            db, result,
+            source=rul_store.PREDICTION_SOURCE,
+            features=result.get("input_features") or {},
+            # No reading is stored on this route, so only the prediction links.
+            prediction_id=prediction_id,
+        )
+    except Exception:
+        logger.exception("Alert fan-out failed for %s", payload.machine_id)
     return result
 
 

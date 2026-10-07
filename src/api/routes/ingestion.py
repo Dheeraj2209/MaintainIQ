@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.schemas import ReplayStartRequest, ReplayStopRequest
 from src.auth.deps import require_role
-from src.ingestion.replay_service import ReplayService
+from src.ingestion.replay_service import LiveMachineError, ReplayService
 from src.storage.db import get_connection
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
@@ -46,6 +46,9 @@ def start_replay(
 ):
     try:
         svc.start(payload.machine_id, payload.speed_multiplier)
+    except LiveMachineError as exc:
+        # The machine exists and has data; it is busy with live telemetry.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {

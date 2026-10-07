@@ -14,6 +14,11 @@ function MachineDetailPlaceholder() {
   return <div>Selected machine: {id}</div>
 }
 
+function AlertPlaceholder() {
+  const { id } = useParams()
+  return <div>Explaining alert: {id}</div>
+}
+
 function harness() {
   return (
     <MemoryRouter initialEntries={['/']}>
@@ -22,6 +27,7 @@ function harness() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/machines/:id" element={<MachineDetailPlaceholder />} />
+            <Route path="/alerts/:id" element={<AlertPlaceholder />} />
           </Routes>
         </LiveEventsProvider>
       </AuthProvider>
@@ -60,6 +66,14 @@ describe('DashboardPage', () => {
     await userEvent.click(await alertsSection.findByText(/m1 critical/i))
 
     expect(await screen.findByText('Selected machine: m1')).toBeInTheDocument()
+  })
+
+  it('opens the "Why this alert?" route from an open alert', async () => {
+    render(harness())
+    const alertsSection = within(await screen.findByRole('region', { name: /open alerts/i }))
+    await userEvent.click(await alertsSection.findByRole('button', { name: 'Why this alert? Alert #2' }))
+
+    expect(await screen.findByText('Explaining alert: 2')).toBeInTheDocument()
   })
 
   it('shows an error banner when fleet data fails to load', async () => {

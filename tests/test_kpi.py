@@ -67,8 +67,8 @@ def test_operational_kpis_detect_documented_failure(conn):
     assert op["breakdown_reduction"]["status"] == "not_applicable"
 
 
-def test_system_kpis_all_not_applicable():
-    sys = kpi.system_kpis()
+def test_system_kpis_all_not_applicable(conn):
+    sys = kpi.system_kpis(conn)
     assert all(v["status"] == "not_applicable" for v in sys.values())
 
 
@@ -95,3 +95,81 @@ def test_maintenance_kpis_avg_acknowledgement_hours_computed(conn):
     conn.commit()
     m1 = kpi.maintenance_kpis(conn, "m1")[0]
     assert m1["avg_alert_acknowledgement_hours"] == round(30 / 60, 2)
+
+
+
+# --- Work orders (work-orders design, decision 14) --------------------------------------
+
+def _wo(conn, machine_id, status, created_at="2026-10-07T10:00:00+00:00", completed_at=None):
+    conn.execute(
+        "INSERT INTO work_orders (machine_id, status, title, created_at, updated_at, completed_at) "
+        "VALUES (?, ?, 't', ?, ?, ?)",
+        (machine_id, status, created_at, created_at, completed_at),
+    )
+    conn.commit()
+
+
+def test_work_order_kpis_per_machine_and_fleet(conn):
+    m1 = kpi.maintenance_kpis(conn, "m1")[0]
+    assert m1["open_work_order_count"] == 0
+    assert m1["avg_work_order_completion_hours"] is None
+
+    _wo(conn, "m1", "open")
+    _wo(conn, "m1", "in_progress")
+    _wo(conn, "m1", "cancelled")
+    _wo(conn, "m1", "done", completed_at="2026-10-07T12:00:00+00:00")
+    _wo(conn, "m1", "done", completed_at="2026-10-07T14:00:00Z")
+    _wo(conn, "m2", "assigned")
+
+    m1 = kpi.maintenance_kpis(conn, "m1")[0]
+    assert m1["open_work_order_count"] == 2
+    assert m1["avg_work_order_completion_hours"] == 3.0
+    assert kpi.maintenance_kpis(conn, "m2")[0]["open_work_order_count"] == 1
+    assert kpi.summary(conn)["open_work_order_count"] == 3
+
+
+def test_work_order_kpis_without_table(conn):
+    conn.execute("DROP TABLE work_order_events")
+    conn.execute("DROP TABLE work_orders")
+    conn.commit()
+    m1 = kpi.maintenance_kpis(conn, "m1")[0]
+    assert m1["open_work_order_count"] == 0
+    assert m1["avg_work_order_completion_hours"] is None
+    assert kpi.summary(conn)["open_work_order_count"] == 0
+
+
+# --- Real-world accuracy from operator feedback (prediction-feedback design, decision 12)
+
+def test_prediction_kpis_without_conn_has_not_applicable_real_world():
+    pred = kpi.prediction_kpis()
+    assert pred["real_world"]["status"] == "not_applicable"
+    assert pred["root_cause_accuracy"]["status"] == "not_applicable"
+
+
+def test_prediction_kpis_with_feedback(conn):
+    conn.execute(
+        "INSERT INTO alert_feedback (alert_id, outcome, actual_cause, recorded_by, recorded_at) "
+        "VALUES (1, 'confirmed_failure', 'bearing_wear', 3, '2026-10-07T12:00:00+00:00')")
+    conn.commit()
+    pred = kpi.prediction_kpis(conn)
+    rc = pred["root_cause_accuracy"]
+    assert rc["status"] == "available" and rc["accuracy"] == 1.0 and rc["source"] == "operator_feedback"
+    assert pred["real_world"]["precision"] == 1.0
+    assert kpi.summary(conn)["prediction"]["real_world"]["labelled_count"] == 1
+
+
+def test_prediction_kpis_no_root_cause_feedback_extends_reason(conn):
+    reason = kpi.prediction_kpis(conn)["root_cause_accuracy"]["reason"]
+    assert "XJTU-SY" in reason and "no operator feedback has labelled a root cause yet" in reason
+
+
+def test_kpis_survive_a_db_without_alert_feedback(conn):
+    conn.execute("DROP TABLE alert_feedback")
+    assert kpi.summary(conn)["prediction"]["real_world"]["status"] == "not_applicable"
+
+
+def test_kpi_route_still_validates(client):
+    resp = client.get("/api/kpis")
+    assert resp.status_code == 200, resp.text
+    assert "real_world" in resp.json()["prediction"]
+    assert "real_world" in client.get("/api/kpis/detail").json()["prediction"]

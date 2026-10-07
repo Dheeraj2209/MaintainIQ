@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
+import type { CSSProperties } from 'react'
 import type { MachineSummary } from '../api/types'
-import { healthClasses, healthLabel } from './healthStyles'
+import { healthClasses, healthLabel, healthTone } from './healthStyles'
 
 interface Props {
   machines: MachineSummary[]
@@ -28,15 +29,17 @@ export function MachineGrid({ machines, selectedId, onSelect }: Props) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: i * 0.04, ease: 'easeOut' }}
             whileHover={{ y: -3 }}
-            className={`glass hover-glow group relative overflow-hidden rounded-2xl p-4 text-left ${
+            // The proximity light picks up the tile's own health color, so a
+            // critical machine catches magenta and a healthy one stays slate.
+            style={{ '--spot-tone': healthTone(m.health_state) } as CSSProperties}
+            // No `overflow-hidden` — the edge-catch ring sits at `inset: -1px`
+            // and clipping would erase it. The corner glow blob that used to
+            // need that clipping is gone: it lit the tile at all times, which
+            // the cursor lamp now does only when you're actually near it.
+            className={`glass hover-glow group relative rounded-2xl p-4 text-left ${
               selected ? 'border-accent/60 ring-1 ring-accent/40' : ''
             }`}
           >
-            {/* Health-tinted glow bloom in the corner keys the tile to its state. */}
-            <div
-              aria-hidden
-              className={`pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full opacity-25 blur-2xl ${cls.dot}`}
-            />
             <div className="relative flex items-center justify-between gap-2">
               <span className="font-mono font-semibold text-text">{m.machine_id}</span>
               <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${cls.dot} ${cls.glow}`} aria-hidden />

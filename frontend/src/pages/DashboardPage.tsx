@@ -4,7 +4,7 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type D
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
-import type { Alert, KpiSummary, MachineSummary } from '../api/types'
+import type { Alert, HealthState, KpiSummary, MachineSummary } from '../api/types'
 import { api } from '../api/client'
 import { KpiCards } from '../components/KpiCards'
 import { MachineGrid } from '../components/MachineGrid'
@@ -12,8 +12,9 @@ import { AlertsPanel } from '../components/AlertsPanel'
 import { useLiveEvents } from '../realtime/LiveEventsProvider'
 import { cn } from '../lib/cn'
 import { Button } from '../components/ui/button'
-import { Tracker } from '../components/tremor/tracker'
-import { healthClasses, healthLabel } from '../components/healthStyles'
+import { RiskHorizon } from '../components/dashboard/RiskHorizon'
+import { FleetRings } from '../components/dashboard/FleetRings'
+import { MachinesAtRisk } from '../components/dashboard/MachinesAtRisk'
 
 type WidgetId = 'kpis' | 'machines' | 'alerts'
 
@@ -32,6 +33,20 @@ function loadOrder(): WidgetId[] {
     // malformed storage — fall back to default order
   }
   return DEFAULT_ORDER
+}
+
+/* Shimmering placeholders that hold the shape of the real content while the
+   first fetch is in flight, so the layout doesn't jump when data lands. They
+   are hidden from assistive tech — a screen reader gains nothing from a
+   description of empty boxes. */
+function CardSkeletons({ count, className }: { count: number; className: string }) {
+  return (
+    <div aria-hidden className={className}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="skeleton h-[4.75rem] rounded-2xl" />
+      ))}
+    </div>
+  )
 }
 
 function SortableWidget({ id, children }: { id: WidgetId; children: ReactNode }) {
@@ -100,34 +115,52 @@ export function DashboardPage() {
     })
   }
 
+  // The first fetch resolves KPIs, machines, and alerts together, so a null
+  // summary with no error means nothing has arrived yet.
+  const loading = kpis === null && error === null
+
   const widgetContent: Record<WidgetId, ReactNode> = {
-    kpis: kpis && <KpiCards summary={kpis} />,
+    kpis: kpis ? (
+      <KpiCards summary={kpis} />
+    ) : (
+      loading && <CardSkeletons count={7} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7" />
+    ),
     machines: (
       <section aria-label="Machine list">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Machines</h2>
-        <MachineGrid machines={machines} selectedId={null} onSelect={goToMachine} />
+        {/* Same eyebrow treatment as the widgets above, so the page has one
+            section-label style rather than two. */}
+        <h2 className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted">Machines</h2>
+        {loading ? (
+          <CardSkeletons count={6} className="grid grid-cols-2 gap-3 sm:grid-cols-3" />
+        ) : (
+          <MachineGrid machines={machines} selectedId={null} onSelect={goToMachine} />
+        )}
       </section>
     ),
     alerts: (
       <section aria-label="Open alerts">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-muted">Open alerts</h2>
-        <AlertsPanel alerts={alerts} onSelect={(alert) => goToMachine(alert.machine_id)} />
+        <h2 className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted">Open alerts</h2>
+        <AlertsPanel
+          alerts={alerts}
+          onSelect={(alert) => goToMachine(alert.machine_id)}
+          onExplain={(alert) => navigate(`/alerts/${alert.id}`)}
+        />
       </section>
     ),
   }
 
-  const healthCounts = machines.reduce<Record<string, number>>((acc, m) => {
+  // Counted from the machine list rather than read off `kpis.health_state_counts`
+  // so the rings can never disagree with the grid rendered directly below them.
+  const healthCounts = machines.reduce<Partial<Record<HealthState, number>>>((acc, m) => {
     acc[m.health_state] = (acc[m.health_state] ?? 0) + 1
     return acc
   }, {})
-  const needsAttention = (healthCounts.critical ?? 0) + (healthCounts.faulty ?? 0)
-  const legend = ['healthy', 'degrading', 'faulty', 'critical'] as const
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-text">Fleet overview</h1>
+          <h1 className="text-[1.75rem] font-bold leading-tight tracking-[-0.012em] text-text">Fleet overview</h1>
           <p className="mt-0.5 text-xs text-text-muted">Live health, risk, and open alerts across all machines</p>
         </div>
         <Button variant="outline" size="sm" onClick={loadFleet}>
@@ -145,49 +178,23 @@ export function DashboardPage() {
         </div>
       )}
 
+      {/* The fixed head of the dashboard: where the fleet is going, what it is
+          made of, and who to look at first. Deliberately outside the sortable
+          region below — this is the part you should always meet first, so it
+          isn't something the user can accidentally drag to the bottom. */}
       {machines.length > 0 && (
-        <section aria-label="Fleet pulse" className="panel-notch glass relative overflow-hidden rounded-3xl p-6">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted">Fleet pulse</p>
-              <div className="mt-2 flex items-end gap-3">
-                <span className="font-mono text-5xl font-semibold leading-none tabular-nums text-text">
-                  {machines.length}
-                </span>
-                <span className="pb-1 text-sm text-text-muted">machines under live monitoring</span>
-              </div>
-              {needsAttention > 0 ? (
-                <p className="mt-2.5 text-sm text-text-muted">
-                  <span className="font-semibold text-critical">{healthCounts.critical ?? 0} critical</span>
-                  {' · '}
-                  <span className="text-faulty">{healthCounts.faulty ?? 0} faulty</span>
-                  {' — inspect before failure'}
-                </p>
-              ) : (
-                <p className="mt-2.5 text-sm text-healthy">All machines reading nominal</p>
-              )}
+        <div className="space-y-6">
+          <RiskHorizon machines={machines} onSelect={goToMachine} />
+
+          <div className="grid gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              <FleetRings counts={healthCounts} total={machines.length} />
             </div>
-            <dl className="flex flex-wrap gap-x-6 gap-y-2">
-              {legend.map((s) => (
-                <div key={s} className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${healthClasses(s).dot}`} aria-hidden />
-                  <dt className="text-xs text-text-muted">{healthLabel(s)}</dt>
-                  <dd className="font-mono text-sm tabular-nums text-text">{healthCounts[s] ?? 0}</dd>
-                </div>
-              ))}
-            </dl>
+            <div className="lg:col-span-3">
+              <MachinesAtRisk machines={machines} onSelect={goToMachine} />
+            </div>
           </div>
-          <div className="mt-6">
-            <Tracker
-              cells={machines.map((m) => ({
-                key: m.machine_id,
-                className: healthClasses(m.health_state).dot,
-                tooltip: `${m.machine_id} — ${healthLabel(m.health_state)}`,
-                onClick: () => goToMachine(m.machine_id),
-              }))}
-            />
-          </div>
-        </section>
+        </div>
       )}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

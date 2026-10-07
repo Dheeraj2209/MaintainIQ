@@ -1,8 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import type { Alert } from '../api/types'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import type { Alert, WorkOrder } from '../api/types'
 import { api } from '../api/client'
-import { healthLabel, severityClasses } from '../components/healthStyles'
+import { useAuth } from '../auth/AuthContext'
+import { AlertCloseDialog } from '../components/AlertCloseDialog'
+import { AlertExplanationPanel } from '../components/AlertExplanationPanel'
+import type { AlertCloseResult } from '../components/AlertCloseForm'
+import { CreateWorkOrderDialog } from '../components/CreateWorkOrderDialog'
+import {
+  causeLabel,
+  feedbackOutcomeLabel,
+  feedbackOutcomeTone,
+  healthLabel,
+  pageLevelTone,
+  wasLadderPaged,
+  severityClasses,
+} from '../components/healthStyles'
+import { Badge } from '../components/ui/badge'
+import { canEditFeedback } from '../lib/feedback'
 import { useLiveEvents } from '../realtime/LiveEventsProvider'
 
 type StatusFilter = 'all' | 'open' | 'resolved'
@@ -16,8 +32,20 @@ export function AlertsPage() {
   const [sortKey, setSortKey] = useState<SortKey>('opened_at')
   const [error, setError] = useState<string | null>(null)
   const [acknowledgingId, setAcknowledgingId] = useState<number | null>(null)
+  // The alert the "Create work order" dialog is open for. Held here, outside
+  // the rows, so a live-event re-render of the table can't drop it.
+  const [workOrderAlert, setWorkOrderAlert] = useState<Alert | null>(null)
+  // Likewise the alert the close / record-outcome dialog is open for.
+  const [closeAlert, setCloseAlert] = useState<Alert | null>(null)
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { lastEvent } = useLiveEvents()
+  // /alerts/:id opens the "Why this alert?" drawer over the list
+  // (design/2026-10-07-alert-explanation-design.md); anything that isn't a
+  // positive integer just shows the list.
+  const { id: idParam } = useParams<{ id: string }>()
+  const explainId = idParam && /^\d+$/.test(idParam) ? Number(idParam) : null
+  const closeExplanation = useCallback(() => navigate('/alerts'), [navigate])
 
   const load = useCallback((s: StatusFilter) => {
     setError(null)
@@ -58,8 +86,34 @@ export function AlertsPage() {
     }
   }
 
+  function handleCreateWorkOrder(e: React.MouseEvent, alert: Alert) {
+    e.stopPropagation()
+    setWorkOrderAlert(alert)
+  }
+
+  const closeWorkOrderDialog = useCallback(() => setWorkOrderAlert(null), [])
+
+  function handleWorkOrderCreated(order: WorkOrder) {
+    setWorkOrderAlert(null)
+    toast.success(`Work order #${order.id} created`)
+    load(status)
+  }
+
+  function handleOpenClose(e: React.MouseEvent, alert: Alert) {
+    e.stopPropagation()
+    setCloseAlert(alert)
+  }
+
+  const closeCloseDialog = useCallback(() => setCloseAlert(null), [])
+
+  function handleOutcomeSaved(result: AlertCloseResult) {
+    setCloseAlert(null)
+    toast.success(result.closed ? `Alert #${result.alert.id} closed` : 'Outcome recorded')
+    load(status)
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="rise-children space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-text">Alerts</h1>
@@ -128,22 +182,66 @@ export function AlertsPage() {
                   </td>
                   <td className="px-3 py-2 text-text-muted">{healthLabel(a.health_state)}</td>
                   <td className="px-3 py-2 text-text-muted">{a.message ?? '—'}</td>
-                  <td className="px-3 py-2 text-text-muted">{a.status}</td>
+                  <td className="px-3 py-2 text-text-muted">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {a.status}
+                      {wasLadderPaged(a) && (
+                        <Badge
+                          variant={pageLevelTone(a.page_level)}
+                          title={a.last_paged_at ? `Last paged ${a.last_paged_at}` : undefined}
+                        >
+                          Paged L{a.page_level}
+                        </Badge>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 text-text-muted">{a.opened_at}</td>
                   <td className="px-3 py-2 text-text-muted">{a.resolved_at ?? '—'}</td>
                   <td className="px-3 py-2">
-                    {a.acknowledged_at ? (
-                      <span className="text-xs text-text-muted">Acknowledged</span>
-                    ) : (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        disabled={acknowledgingId === a.id}
-                        onClick={(e) => handleAcknowledge(e, a.id)}
-                        className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-text backdrop-blur transition hover:border-accent/50 hover:bg-white/10 disabled:opacity-50"
+                        aria-label={`Why this alert? Alert #${a.id}`}
+                        title="Why this alert?"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/alerts/${a.id}`)
+                        }}
+                        className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent backdrop-blur transition hover:border-accent/60 hover:bg-accent/15"
                       >
-                        {acknowledgingId === a.id ? 'Acknowledging…' : 'Acknowledge'}
+                        Why?
                       </button>
-                    )}
+                      {a.acknowledged_at ? (
+                        <span className="text-xs text-text-muted">Acknowledged</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={acknowledgingId === a.id}
+                          onClick={(e) => handleAcknowledge(e, a.id)}
+                          className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-text backdrop-blur transition hover:border-accent/50 hover:bg-white/10 disabled:opacity-50"
+                        >
+                          {acknowledgingId === a.id ? 'Acknowledging…' : 'Acknowledge'}
+                        </button>
+                      )}
+                      {a.active_work_order_id != null ? (
+                        <Link
+                          to={`/work-orders/${a.active_work_order_id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs font-medium text-accent hover:text-accent-hover"
+                        >
+                          WO #{a.active_work_order_id}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => handleCreateWorkOrder(e, a)}
+                          className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent backdrop-blur transition hover:border-accent/60 hover:bg-accent/15"
+                        >
+                          Create work order
+                        </button>
+                      )}
+                      <OutcomeControl alert={a} canEdit={canEditFeedback(user, a.feedback)} onOpen={handleOpenClose} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -151,6 +249,72 @@ export function AlertsPage() {
           </table>
         </div>
       )}
+
+      <CreateWorkOrderDialog
+        open={workOrderAlert != null}
+        alert={workOrderAlert}
+        onClose={closeWorkOrderDialog}
+        onCreated={handleWorkOrderCreated}
+      />
+      <AlertCloseDialog
+        open={closeAlert != null}
+        alert={closeAlert}
+        onClose={closeCloseDialog}
+        onSaved={handleOutcomeSaved}
+      />
+      {explainId != null && <AlertExplanationPanel key={explainId} alertId={explainId} onClose={closeExplanation} />}
     </div>
+  )
+}
+
+// The prediction-feedback action of a row: close an open alert, record the
+// outcome of a resolved one, or show the recorded outcome (a button into the
+// edit dialog when this user may change it). Every click stops propagation,
+// since the row itself navigates.
+function OutcomeControl({
+  alert,
+  canEdit,
+  onOpen,
+}: {
+  alert: Alert
+  canEdit: boolean
+  onOpen: (e: React.MouseEvent, alert: Alert) => void
+}) {
+  const feedback = alert.feedback
+  if (alert.status === 'open') {
+    return (
+      <button
+        type="button"
+        onClick={(e) => onOpen(e, alert)}
+        className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-text backdrop-blur transition hover:border-accent/50 hover:bg-white/10"
+      >
+        Close…
+      </button>
+    )
+  }
+  if (!feedback) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => onOpen(e, alert)}
+        className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs text-accent backdrop-blur transition hover:border-accent/60 hover:bg-accent/15"
+      >
+        Record outcome
+      </button>
+    )
+  }
+  const title = `${causeLabel(feedback.actual_cause)} · recorded by ${feedback.recorded_by_name ?? `user #${feedback.recorded_by}`}`
+  const badge = <Badge variant={feedbackOutcomeTone(feedback.outcome)}>{feedbackOutcomeLabel(feedback.outcome)}</Badge>
+  if (!canEdit) {
+    return (
+      <span title={title} onClick={(e) => e.stopPropagation()}>
+        {badge}
+      </span>
+    )
+  }
+  return (
+    <button type="button" title={title} onClick={(e) => onOpen(e, alert)} className="rounded-full transition hover:brightness-125">
+      {badge}
+    </button>
   )
 }

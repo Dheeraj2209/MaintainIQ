@@ -14,6 +14,13 @@ import json
 from datetime import datetime, timezone
 
 
+# The `source` stamped on every row the model produces — prediction rows and,
+# via src/prediction/pipeline.py, the alerts they raise. One definition so an
+# alert can always be traced back to the model run rather than a demo or a
+# manual entry.
+PREDICTION_SOURCE = "xjtu_rul"
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -28,7 +35,7 @@ def persist_prediction(conn, result: dict, reading_id: int | None = None) -> int
         "reading_id": reading_id,
         "timestamp": _now_iso(),
         "health_state": result["health_state"],
-        "source": "xjtu_rul",
+        "source": PREDICTION_SOURCE,
         "predicted_rul_minutes": result.get("predicted_rul_minutes"),
         "rul_estimate_kind": result.get("rul_estimate_kind"),
         "failure_within_horizon_probability": result.get("failure_within_horizon_probability"),

@@ -8,7 +8,7 @@ import { useAuth } from './AuthContext'
 export function RequireRole({ allow }: { allow: Role[] }) {
   const { user } = useAuth()
   if (!user || !allow.includes(user.role)) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/dashboard" replace />
   }
   return <Outlet />
 }

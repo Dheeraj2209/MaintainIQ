@@ -3,6 +3,13 @@ requested severity and drives it through the same live prediction -> alert
 -> notify -> broadcast pipeline a real future M6 telemetry feed would use.
 This is what makes "realtime email" and "realtime dashboard" demoable
 without hardware.
+
+Both routes go through the shared fan-out (src/prediction/pipeline.fan_out,
+work-orders design decision 9) rather than paging and broadcasting
+themselves, so demo alerts get exactly what model alerts get: the level-0
+email and its last_paged_at stamp, the realtime event, and eligibility for
+the paging ladder. They are sync so FastAPI runs them in its threadpool; the
+broadcast is the manager's thread-safe, fire-and-forget one, as for replay.
 """
 from datetime import datetime, timezone
 
@@ -12,9 +19,8 @@ from src.alerts.live import apply_reading
 from src.api.deps import get_db
 from src.api.schemas import Alert, SimulateFaultRequest, SimulateFaultResponse
 from src.auth.deps import require_role
-from src.notifications.dispatch import notify_alert
+from src.prediction import pipeline
 from src.prediction.live import UnknownMachineError, evaluate_new_reading
-from src.realtime.manager import manager
 
 router = APIRouter(prefix="/demo", tags=["demo"], dependencies=[Depends(require_role("admin"))])
 
@@ -24,7 +30,7 @@ def _machine_exists(conn, machine_id: str) -> bool:
 
 
 @router.post("/simulate-fault", response_model=SimulateFaultResponse)
-async def simulate_fault(payload: SimulateFaultRequest, db=Depends(get_db)):
+def simulate_fault(payload: SimulateFaultRequest, db=Depends(get_db)):
     if not _machine_exists(db, payload.machine_id):
         raise HTTPException(status_code=404, detail=f"unknown machine: {payload.machine_id}")
 
@@ -42,37 +48,30 @@ async def simulate_fault(payload: SimulateFaultRequest, db=Depends(get_db)):
         timestamp=prediction["timestamp"],
     )
 
-    alert_out = None
-    emails_sent = 0
-
-    if result is not None:
-        event_type, alert = result
-        alert_out = Alert(**alert)
-        await manager.broadcast({
-            "type": event_type,
-            "machine_id": payload.machine_id,
-            "alert": alert,
-            "at": datetime.now(timezone.utc).isoformat(),
-        })
-        # Resolutions don't get an email: the alert dict's severity/health_state
-        # still reflect its last abnormal state, so composing a notification off
-        # of it here would read as "CRITICAL" for an issue that just closed.
-        if event_type in ("alert_created", "alert_escalated"):
-            emails_sent = notify_alert(db, alert)
+    # Resolutions don't get an email (pipeline._PAGING_EVENTS): the alert
+    # dict's severity/health_state still reflect its last abnormal state, so
+    # a notification composed off of it would read as "CRITICAL" for an issue
+    # that just closed.
+    # The demo reading is the explanation's trigger; there is no prediction
+    # id, because insert_predictions returns none.
+    outcome = pipeline.fan_out(db, result, at=_now(), reading_id=prediction["reading_id"])
+    alert = outcome["alert"]
 
     return SimulateFaultResponse(
         machine_id=payload.machine_id,
         health_state=prediction["health_state"],
         probable_cause=prediction["probable_cause"],
-        alert=alert_out,
-        emails_sent=emails_sent,
+        alert=Alert(**alert) if alert is not None else None,
+        emails_sent=outcome["emails_sent"],
     )
 
 
 @router.post("/reset-machine/{machine_id}", response_model=SimulateFaultResponse)
-async def reset_machine(machine_id: str, db=Depends(get_db)):
-    """Resolve machine_id's open alert (if any) by replaying a 'healthy'
-    reading through the same state machine simulate_fault uses. Lets a demo
+def reset_machine(machine_id: str, db=Depends(get_db)):
+    """Resolve machine_id's open *demo* alert (if any) by replaying a
+    'healthy' reading through the same state machine simulate_fault uses.
+    Demo and real readings keep separate episodes (src/alerts/live.py), so a
+    real alert on the same machine is never touched. Lets a demo
     re-trigger a fresh email for a machine without waiting for a real
     escalation — apply_reading's escalate-only-mid-episode rule otherwise
     makes repeat same/lower-severity simulations on an already-open alert a
@@ -94,21 +93,18 @@ async def reset_machine(machine_id: str, db=Depends(get_db)):
         timestamp=prediction["timestamp"],
     )
 
-    alert_out = None
-    if result is not None:
-        event_type, alert = result
-        alert_out = Alert(**alert)
-        await manager.broadcast({
-            "type": event_type,
-            "machine_id": machine_id,
-            "alert": alert,
-            "at": datetime.now(timezone.utc).isoformat(),
-        })
+    # alert_resolved is not a paging event, so this sends no email.
+    outcome = pipeline.fan_out(db, result, at=_now())
+    alert = outcome["alert"]
 
     return SimulateFaultResponse(
         machine_id=machine_id,
         health_state=prediction["health_state"],
         probable_cause=prediction["probable_cause"],
-        alert=alert_out,
-        emails_sent=0,
+        alert=Alert(**alert) if alert is not None else None,
+        emails_sent=outcome["emails_sent"],
     )
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()

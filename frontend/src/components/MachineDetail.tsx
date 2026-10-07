@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { Alert, MachineDetail as Detail, MaintenanceRecord, TrendPoint } from '../api/types'
+import type { Alert, MachineDetail as Detail, MaintenanceRecord, TelemetryDevice, TrendPoint } from '../api/types'
 import { api } from '../api/client'
-import { healthClasses, healthLabel } from './healthStyles'
+import { useAuth } from '../auth/AuthContext'
+import { FEEDBACK_MODE_TITLE, canEditFeedback, feedbackMode } from '../lib/feedback'
+import { deviceStateLabel, deviceStateTone, healthClasses, healthLabel } from './healthStyles'
 import { TrendChart } from './TrendChart'
 import { AlertsPanel } from './AlertsPanel'
 import { MaintenanceForm } from './MaintenanceForm'
@@ -12,6 +14,19 @@ import { Select } from './ui/input'
 
 interface Props {
   machineId: string
+  // Opens the page-owned CreateWorkOrderDialog: with the selected alert, or
+  // null for a free-standing order. The dialog can't live here, because
+  // MachineDetailPage remounts this component on every live event for the
+  // machine. No handler, no button.
+  onCreateWorkOrder?: (alert: Alert | null) => void
+  // Opens the page-owned AlertCloseDialog for the selected alert (close it,
+  // or record / edit its outcome). Page-owned for the same remount reason.
+  // No handler, no button.
+  onRecordOutcome?: (alert: Alert) => void
+  // Opens the page-owned "Why this alert?" panel, from an alert row or for
+  // the selected alert. Page-owned for the same remount reason. No handler,
+  // no buttons.
+  onExplain?: (alert: Alert) => void
 }
 
 const METRICS = [
@@ -23,7 +38,18 @@ const METRICS = [
 
 const HISTORY_PAGE_SIZE = 10
 
-export function MachineDetail({ machineId }: Props) {
+// Worst first: the chip shows the node that most needs attention.
+const DEVICE_STATE_RANK: Record<string, number> = { offline: 3, stale: 2, never_reported: 1, online: 0 }
+
+function worstNode(nodes: TelemetryDevice[]): TelemetryDevice | null {
+  return nodes.reduce<TelemetryDevice | null>(
+    (worst, n) => (!worst || (DEVICE_STATE_RANK[n.state] ?? 0) > (DEVICE_STATE_RANK[worst.state] ?? 0) ? n : worst),
+    null,
+  )
+}
+
+export function MachineDetail({ machineId, onCreateWorkOrder, onRecordOutcome, onExplain }: Props) {
+  const { user } = useAuth()
   const [detail, setDetail] = useState<Detail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [metric, setMetric] = useState('vibration_h_rms')
@@ -33,6 +59,7 @@ export function MachineDetail({ machineId }: Props) {
   const [history, setHistory] = useState<MaintenanceRecord[]>([])
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [nodes, setNodes] = useState<TelemetryDevice[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -57,6 +84,20 @@ export function MachineDetail({ machineId }: Props) {
       cancelled = true
     }
   }, [machineId, metric])
+
+  // Sensor nodes on this machine. Independent of the detail fetch: a failure
+  // here (or an older backend) just shows "—". MachineDetailPage remounts
+  // this component on a device event for the machine, which re-runs it.
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getTelemetryDevices({ machineId })
+      .then((d) => !cancelled && setNodes(d))
+      .catch(() => !cancelled && setNodes([]))
+    return () => {
+      cancelled = true
+    }
+  }, [machineId])
 
   useEffect(() => {
     if (detail) {
@@ -125,6 +166,7 @@ export function MachineDetail({ machineId }: Props) {
           value={health.out_of_distribution == null ? '—' : health.out_of_distribution ? 'Yes' : 'No'}
         />
         <Fact label="Last reading" value={health.last_reading_at ?? '—'} mono />
+        <SensorNodeFact nodes={nodes} />
       </dl>
 
       <div className="mt-4">
@@ -164,9 +206,38 @@ export function MachineDetail({ machineId }: Props) {
               value={maintenance.avg_alert_acknowledgement_hours != null ? maintenance.avg_alert_acknowledgement_hours.toFixed(2) : '—'}
               mono
             />
+            <Fact label="Open work orders" value={String(maintenance.open_work_order_count ?? 0)} mono />
+            <Fact
+              label="Avg WO completion (h)"
+              value={maintenance.avg_work_order_completion_hours != null ? maintenance.avg_work_order_completion_hours.toFixed(2) : '—'}
+              mono
+            />
           </dl>
           {maintenance.due_for_inspection && (
             <p className="mt-1 text-xs font-medium text-accent-2">Due for inspection</p>
+          )}
+          {onCreateWorkOrder && (
+            <WorkOrderButton
+              alert={selectedAlert}
+              canCreateFreeStanding={user?.role === 'admin' || user?.role === 'supervisor'}
+              onCreate={onCreateWorkOrder}
+            />
+          )}
+          {onRecordOutcome && (
+            <OutcomeButton alert={selectedAlert} canEdit={canEditFeedback(user, selectedAlert?.feedback)} onOpen={onRecordOutcome} />
+          )}
+          {onExplain && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-2 mt-3"
+              disabled={!selectedAlert}
+              title={selectedAlert ? `Alert #${selectedAlert.id}` : 'Select an alert first'}
+              onClick={() => selectedAlert && onExplain(selectedAlert)}
+            >
+              Why this alert?
+            </Button>
           )}
           <MaintenanceForm machineId={health.machine_id} onSubmit={handleLog} linkedAlert={selectedAlert} />
         </div>
@@ -174,7 +245,12 @@ export function MachineDetail({ machineId }: Props) {
         <div>
           <h3 className="text-sm font-semibold text-text">Alerts</h3>
           <div className="mt-1">
-            <AlertsPanel alerts={alerts} selectedAlertId={selectedAlert?.id ?? null} onSelect={setSelectedAlert} />
+            <AlertsPanel
+              alerts={alerts}
+              selectedAlertId={selectedAlert?.id ?? null}
+              onSelect={setSelectedAlert}
+              onExplain={onExplain}
+            />
           </div>
         </div>
       </div>
@@ -213,11 +289,99 @@ export function MachineDetail({ machineId }: Props) {
   )
 }
 
+// Raise a work order from the selected alert; with none selected only admins
+// and supervisors may raise a free-standing one (the server's rule too).
+function WorkOrderButton({
+  alert,
+  canCreateFreeStanding,
+  onCreate,
+}: {
+  alert: Alert | null
+  canCreateFreeStanding: boolean
+  onCreate: (alert: Alert | null) => void
+}) {
+  if (alert?.active_work_order_id != null) {
+    return (
+      <Button type="button" variant="outline" size="sm" className="mt-3" disabled>
+        WO #{alert.active_work_order_id} open
+      </Button>
+    )
+  }
+  const blocked = !alert && !canCreateFreeStanding
+  return (
+    <Button
+      type="button"
+      variant="accent2"
+      size="sm"
+      className="mt-3"
+      disabled={blocked}
+      title={blocked ? 'Select an alert first' : alert ? `From alert #${alert.id}` : 'Not tied to an alert'}
+      onClick={() => onCreate(alert)}
+    >
+      Create work order
+    </Button>
+  )
+}
+
+// Close the selected alert, or record / edit its outcome. An outcome someone
+// else recorded is only editable by them, an admin or a supervisor.
+function OutcomeButton({
+  alert,
+  canEdit,
+  onOpen,
+}: {
+  alert: Alert | null
+  canEdit: boolean
+  onOpen: (alert: Alert) => void
+}) {
+  if (!alert) {
+    return (
+      <Button type="button" variant="outline" size="sm" className="ml-2 mt-3" disabled title="Select an alert first">
+        Close / record outcome
+      </Button>
+    )
+  }
+  const mode = feedbackMode(alert)
+  const blocked = mode === 'edit' && !canEdit
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="ml-2 mt-3"
+      disabled={blocked}
+      title={blocked ? 'Only the recorder, an admin or a supervisor can change this outcome' : `Alert #${alert.id}`}
+      onClick={() => onOpen(alert)}
+    >
+      {FEEDBACK_MODE_TITLE[mode]}
+    </Button>
+  )
+}
+
 function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
       <dt className="text-xs uppercase tracking-wide text-text-muted">{label}</dt>
       <dd className={mono ? 'font-mono text-text' : 'text-text'}>{value}</dd>
+    </div>
+  )
+}
+
+function SensorNodeFact({ nodes }: { nodes: TelemetryDevice[] }) {
+  const worst = worstNode(nodes)
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-wide text-text-muted">Sensor node</dt>
+      <dd className="text-text">
+        {worst ? (
+          <Badge variant={deviceStateTone(worst.state)} title={`${nodes.length} node(s) on this machine`}>
+            {deviceStateLabel(worst.state)} · <span className="font-mono">{worst.device_id}</span>
+            {nodes.length > 1 && <span className="text-text-muted"> +{nodes.length - 1}</span>}
+          </Badge>
+        ) : (
+          '—'
+        )}
+      </dd>
     </div>
   )
 }

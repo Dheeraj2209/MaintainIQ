@@ -1,0 +1,14 @@
+# MaintainIQ ESP32 node partition table (4 MB flash, esp32dev).
+#
+# Why custom: the stock `default.csv` splits flash into two OTA app slots and
+# leaves ~1.4 MB for the filesystem. This node has no OTA path yet, so one
+# 1.875 MB app slot is plenty and the remaining 2 MB goes to LittleFS, which
+# holds the edge buffer: 50 snapshots x ~16.6 KB = ~830 KB, plus headroom for
+# LittleFS metadata and the free-space reserve the buffer keeps.
+#
+# Name,    Type, SubType,  Offset,   Size,     Flags
+nvs,       data, nvs,      0x9000,   0x5000,
+otadata,   data, ota,      0xe000,   0x2000,
+app0,      app,  ota_0,    0x10000,  0x1E0000,
+littlefs,  data, spiffs,   0x1F0000, 0x200000,
+coredump,  data, coredump, 0x3F0000, 0x10000,

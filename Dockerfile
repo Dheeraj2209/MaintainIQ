@@ -1,6 +1,13 @@
 # --- Stage 1: build the React/Vite SPA -------------------------------------
 FROM node:22-alpine AS frontend-build
 WORKDIR /frontend
+
+# Extra CA certs for corporate TLS inspection (e.g. Zscaler). certs/ is
+# gitignored and may hold only .gitkeep, in which case this is a no-op.
+COPY certs/ /tmp/certs/
+RUN cat /tmp/certs/*.crt > /usr/local/share/extra-ca.pem 2>/dev/null || true
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/extra-ca.pem
+
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
@@ -14,6 +21,11 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
+
+# Same extra CA certs, added to the system store so pip and requests trust them.
+COPY certs/ /usr/local/share/ca-certificates/extra/
+RUN update-ca-certificates
+ENV PIP_CERT=/etc/ssl/certs/ca-certificates.crt     REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

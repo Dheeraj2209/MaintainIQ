@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { http, HttpResponse, delay } from 'msw'
 import { AuthProvider } from '../auth/AuthContext'
 import { LoginPage } from './LoginPage'
@@ -12,12 +12,24 @@ function harness(initialEntry: string | { pathname: string; state?: unknown } = 
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<div>dashboard placeholder</div>} />
+          <Route path="/dashboard" element={<div>dashboard placeholder</div>} />
           <Route path="/alerts" element={<div>alerts placeholder</div>} />
+          <Route path="/m/alerts/:id" element={<FullLocation />} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>
   )
+}
+
+function FullLocation() {
+  const { pathname, search, hash } = useLocation()
+  return <div data-testid="landed">{pathname + search + hash}</div>
+}
+
+async function signIn() {
+  await userEvent.type(await screen.findByLabelText(/email/i), 'admin@maintainiq.local')
+  await userEvent.type(screen.getByLabelText(/password/i), 'secret')
+  await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 }
 
 describe('LoginPage', () => {
@@ -56,5 +68,24 @@ describe('LoginPage', () => {
   it('redirects an already-authenticated visitor to the originally requested page', async () => {
     render(harness({ pathname: '/login', state: { from: { pathname: '/alerts' } } }))
     expect(await screen.findByText('alerts placeholder')).toBeInTheDocument()
+  })
+
+  it('returns to the full deep link, search and hash included, after signing in', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ detail: 'unauthorized' }, { status: 401 })))
+    render(harness({ pathname: '/login', state: { from: { pathname: '/m/alerts/3', search: '?x=1', hash: '#why' } } }))
+    await signIn()
+    expect(await screen.findByTestId('landed')).toHaveTextContent('/m/alerts/3?x=1#why')
+  })
+
+  it('ignores a protocol-relative return path and goes to the dashboard', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ detail: 'unauthorized' }, { status: 401 })))
+    render(harness({ pathname: '/login', state: { from: { pathname: '//evil.com' } } }))
+    await signIn()
+    expect(await screen.findByText('dashboard placeholder')).toBeInTheDocument()
+  })
+
+  it('keeps the search and hash when an already-signed-in visitor is bounced back', async () => {
+    render(harness({ pathname: '/login', state: { from: { pathname: '/m/alerts/3', search: '?x=1', hash: '#why' } } }))
+    expect(await screen.findByTestId('landed')).toHaveTextContent('/m/alerts/3?x=1#why')
   })
 })

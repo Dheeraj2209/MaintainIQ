@@ -14,6 +14,31 @@ from src.auth.seed import DEMO_USERS
 from src.storage.db import init_schema
 
 
+@pytest.fixture(autouse=True)
+def _no_live_mqtt_from_shell(monkeypatch):
+    """Keep the developer's shell out of the suite's MQTT config.
+
+    Every TestClient(app) runs the lifespan, which starts live MQTT ingest
+    whenever MQTT_BROKER_HOST is set — wired to the REAL maintainiq.db (the
+    ingestor's connection factory, not the overridable get_db) and to the
+    fixed client id `maintainiq-ingest` with a persistent session. A
+    developer who exported MQTT_BROKER_HOST for the live quick start would
+    otherwise have `just test` take over the running app's broker session,
+    drain its queued telemetry, and write readings and alerts into their
+    database. Tests that exercise ingest set the variables they need.
+    """
+    import os
+
+    # Same for background jobs: MAINTAINIQ_SWEEP_INTERVAL_S would start the
+    # scheduler, whose connection factory is the real maintainiq.db too.
+    # And push: VAPID_* keys would turn Web Push on for every paging test
+    # (design/2026-10-07-mobile-operator-pwa-design.md); tests that exercise
+    # it set keys through the push_enabled fixture.
+    prefixes = ("MQTT_", "MAINTAINIQ_SWEEP_", "DEVICE_SILENT_", "ESCALATION_", "VAPID_", "PUSH_")
+    for name in [key for key in os.environ if key.startswith(prefixes)]:
+        monkeypatch.delenv(name, raising=False)
+
+
 def _iso(y, mo, d, h=0, mi=0, s=0):
     return datetime(y, mo, d, h, mi, s, tzinfo=timezone.utc).isoformat()
 
@@ -191,3 +216,90 @@ def anon_client(_db_override):
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+# --- Web Push (design/2026-10-07-mobile-operator-pwa-design.md) ---------------------
+
+class FakeWebPush:
+    """Stands in for pywebpush.webpush behind push._webpush: records every call
+    and fails endpoints listed in `fail` with the given exception (or an HTTP
+    status, raised as a WebPushException carrying a fake response)."""
+
+    def __init__(self):
+        self.calls = []
+        self.fail = {}
+
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        outcome = self.fail.get(kwargs["subscription_info"]["endpoint"])
+        if outcome is None:
+            return None
+        if isinstance(outcome, int):
+            from types import SimpleNamespace
+
+            from pywebpush import WebPushException
+
+            raise WebPushException("push failed", response=SimpleNamespace(
+                status_code=outcome, text="", headers={}))
+        raise outcome
+
+    @property
+    def endpoints(self):
+        return [c["subscription_info"]["endpoint"] for c in self.calls]
+
+
+_VAPID_KEYS = None
+
+
+def vapid_keys():
+    """One generated VAPID key pair per test session (generation is cheap,
+    but stable keys make failures easier to read)."""
+    global _VAPID_KEYS
+    if _VAPID_KEYS is None:
+        from src.notifications.push import generate_vapid_keys
+
+        _VAPID_KEYS = generate_vapid_keys()
+    return _VAPID_KEYS
+
+
+# A valid browser key pair shape: p256dh is an uncompressed P-256 point (65
+# bytes, leading 0x04), auth is 16 random bytes; both base64url, unpadded.
+def b64url(raw: bytes) -> str:
+    import base64
+
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+SUB_P256DH = b64url(b"" + bytes(range(64)))
+SUB_AUTH = b64url(bytes(range(16)))
+
+
+def add_push_subscription(conn, user_id, endpoint, *, is_active=1):
+    conn.execute(
+        """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, is_active,
+                                           created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, '2026-10-07T00:00:00+00:00', '2026-10-07T00:00:00+00:00')""",
+        (user_id, endpoint, SUB_P256DH, SUB_AUTH, is_active),
+    )
+    conn.commit()
+
+
+@pytest.fixture
+def push_enabled(monkeypatch):
+    """Configure VAPID keys from env and swap the push sender for a recorder."""
+    from src.notifications import push
+
+    public, private = vapid_keys()
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", public)
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", private)
+    monkeypatch.setenv("VAPID_SUBJECT", "mailto:ops@example.com")
+    fake = FakeWebPush()
+    monkeypatch.setattr(push, "_webpush", fake)
+    return fake
+
+
+@pytest.fixture
+def add_sub():
+    """add_sub(conn, user_id, endpoint, is_active=1) inserts a push subscription
+    with valid-shaped browser keys."""
+    return add_push_subscription

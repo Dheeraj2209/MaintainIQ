@@ -20,4 +20,9 @@ describe('KpiCards', () => {
     render(<KpiCards summary={summary} />)
     expect(screen.queryByText(/Model accuracy/i)).not.toBeInTheDocument()
   })
+
+  it('shows the open work order count', () => {
+    render(<KpiCards summary={kpiSummary} />)
+    expect(screen.getByText('Open work orders').parentElement).toHaveTextContent('1')
+  })
 })

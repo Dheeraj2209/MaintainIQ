@@ -6,19 +6,85 @@ import { AuthProvider } from '../auth/AuthContext'
 import { MachineDetail } from './MachineDetail'
 import { server } from '../test/server'
 import { api } from '../api/client'
-import { machineDetailWithFullHistory, maintenanceHistoryPage2 } from '../test/fixtures'
+import {
+  machineDetail,
+  machineDetailWithFullHistory,
+  maintenanceHistoryPage2,
+  operatorUser,
+  resolvedAlertWithFeedback,
+  telemetryDevices,
+} from '../test/fixtures'
+import type { Alert } from '../api/types'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
 
-function harness(machineId = 'm1') {
+function harness(
+  machineId = 'm1',
+  onCreateWorkOrder?: (alert: Alert | null) => void,
+  onRecordOutcome?: (alert: Alert) => void,
+) {
   return (
     <AuthProvider>
-      <MachineDetail machineId={machineId} />
+      <MachineDetail machineId={machineId} onCreateWorkOrder={onCreateWorkOrder} onRecordOutcome={onRecordOutcome} />
     </AuthProvider>
   )
 }
 
 describe('MachineDetail', () => {
+  it('shows the sensor-node state and device id for a machine with a node', async () => {
+    render(harness('sim-02'))
+
+    const fact = await screen.findByText('Sensor node')
+    await waitFor(() => expect(fact.nextElementSibling).toHaveTextContent('Offline · simdev-02'))
+  })
+
+  it('picks the worst state across several nodes on one machine', async () => {
+    server.use(
+      http.get('/api/telemetry/devices', () =>
+        HttpResponse.json([
+          { ...telemetryDevices[0], device_id: 'a', machine_id: 'm1', state: 'online' },
+          { ...telemetryDevices[0], device_id: 'b', machine_id: 'm1', state: 'stale' },
+          { ...telemetryDevices[0], device_id: 'c', machine_id: 'm1', state: 'never_reported' },
+        ]),
+      ),
+    )
+    render(harness())
+
+    const fact = await screen.findByText('Sensor node')
+    await waitFor(() => expect(fact.nextElementSibling).toHaveTextContent('Stale · b'))
+  })
+
+  it('shows a dash for a machine without a sensor node', async () => {
+    let requested = ''
+    server.use(
+      http.get('/api/telemetry/devices', ({ request }) => {
+        requested = request.url
+        return HttpResponse.json([])
+      }),
+    )
+    render(harness())
+
+    const fact = await screen.findByText('Sensor node')
+    await waitFor(() => expect(requested).toContain('machine_id=m1'))
+    expect(fact.nextElementSibling).toHaveTextContent(/^—$/)
+  })
+
+  it('shows a dash when the device lookup fails', async () => {
+    let calls = 0
+    server.use(
+      http.get('/api/telemetry/devices', () => {
+        calls += 1
+        return HttpResponse.json({ detail: 'boom' }, { status: 500 })
+      }),
+    )
+    render(harness('sim-02'))
+
+    const fact = await screen.findByText('Sensor node')
+    await waitFor(() => expect(calls).toBe(1))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(fact.nextElementSibling).toHaveTextContent(/^—$/)
+  })
+
   it('loads and shows health facts for the machine', async () => {
     render(harness())
 
@@ -136,5 +202,119 @@ describe('MachineDetail', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalled())
     expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument()
     expect(screen.getAllByRole('row')).toHaveLength(11)
+  })
+
+  it('shows the open work order count and average completion time', async () => {
+    render(harness())
+
+    const open = await screen.findByText('Open work orders')
+    expect(open.nextElementSibling).toHaveTextContent(/^1$/)
+    expect(screen.getByText('Avg WO completion (h)').nextElementSibling).toHaveTextContent('2.50')
+  })
+
+  it('creates a work order for the selected alert', async () => {
+    const onCreate = vi.fn()
+    render(harness('m1', onCreate))
+
+    await userEvent.click(await screen.findByText('m1 critical'))
+    await userEvent.click(screen.getByRole('button', { name: /create work order/i }))
+
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }))
+  })
+
+  it('creates a free-standing work order for an admin with no alert selected', async () => {
+    const onCreate = vi.fn()
+    render(harness('m1', onCreate))
+    await screen.findByText('m1 critical')
+
+    const button = await screen.findByRole('button', { name: /create work order/i })
+    await waitFor(() => expect(button).toBeEnabled())
+    await userEvent.click(button)
+    expect(onCreate).toHaveBeenCalledWith(null)
+  })
+
+  it('disables the button for an operator until an alert is selected', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(operatorUser)))
+    const onCreate = vi.fn()
+    render(harness('m1', onCreate))
+    await screen.findByText('m1 critical')
+    await new Promise((r) => setTimeout(r, 50))
+
+    const button = screen.getByRole('button', { name: /create work order/i })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'Select an alert first')
+
+    await userEvent.click(screen.getByText('m1 critical'))
+    expect(screen.getByRole('button', { name: /create work order/i })).toBeEnabled()
+  })
+
+  it('points at the open work order when the selected alert already has one', async () => {
+    server.use(
+      http.get('/api/machines/:id', () =>
+        HttpResponse.json({
+          ...machineDetail,
+          alerts: [{ ...machineDetail.alerts[0], active_work_order_id: 7 }],
+        }),
+      ),
+    )
+    render(harness('m1', vi.fn()))
+
+    await userEvent.click(await screen.findByText('m1 critical'))
+    expect(screen.getByRole('button', { name: /wo #7 open/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /create work order/i })).not.toBeInTheDocument()
+  })
+
+  it('has no work-order button without a handler', async () => {
+    render(harness())
+    await screen.findByText('m1 critical')
+    expect(screen.queryByRole('button', { name: /create work order/i })).not.toBeInTheDocument()
+  })
+
+  describe('close / record outcome', () => {
+    function serveAlerts(alerts: Alert[]) {
+      server.use(http.get('/api/machines/:id', () => HttpResponse.json({ ...structuredClone(machineDetail), alerts })))
+    }
+
+    it('is disabled until an alert is selected', async () => {
+      render(harness('m1', undefined, vi.fn()))
+      await screen.findByText('m1 critical')
+
+      const button = screen.getByRole('button', { name: /close \/ record outcome/i })
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('title', 'Select an alert first')
+    })
+
+    it('reads "Close alert" for an open alert and hands it to the handler', async () => {
+      const onRecord = vi.fn()
+      render(harness('m1', undefined, onRecord))
+
+      await userEvent.click(await screen.findByText('m1 critical'))
+      await userEvent.click(screen.getByRole('button', { name: /^close alert$/i }))
+      expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }))
+    })
+
+    it('reads "Record outcome" for a resolved alert without feedback', async () => {
+      serveAlerts([{ ...structuredClone(resolvedAlertWithFeedback), feedback: null }])
+      render(harness('m1', undefined, vi.fn()))
+
+      await userEvent.click(await screen.findByText('m1 faulty'))
+      expect(screen.getByRole('button', { name: /^record outcome$/i })).toBeEnabled()
+    })
+
+    it('reads "Edit outcome", disabled for an operator who did not record it', async () => {
+      serveAlerts([structuredClone(resolvedAlertWithFeedback)])
+      server.use(http.get('/api/auth/me', () => HttpResponse.json(operatorUser)))
+      render(harness('m1', undefined, vi.fn()))
+      await new Promise((r) => setTimeout(r, 50))
+
+      await userEvent.click(await screen.findByText('m1 faulty'))
+      expect(screen.getByRole('button', { name: /^edit outcome$/i })).toBeDisabled()
+    })
+
+    it('has no outcome button without a handler', async () => {
+      render(harness())
+      await userEvent.click(await screen.findByText('m1 critical'))
+      expect(screen.queryByRole('button', { name: /close alert|record outcome/i })).not.toBeInTheDocument()
+    })
   })
 })

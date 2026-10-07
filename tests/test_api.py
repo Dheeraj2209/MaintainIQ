@@ -178,3 +178,61 @@ def test_machine_detail_maintenance_history_capped_at_ten(client):
         })
     resp = client.get("/api/machines/m1")
     assert len(resp.json()["maintenance_history"]) == 10
+
+
+
+def test_acknowledge_goes_through_live_acknowledge_alert(client, monkeypatch):
+    from src.alerts import live
+
+    calls = []
+    real = live.acknowledge_alert
+
+    def spy(conn, alert_id, user_id, **kw):
+        calls.append(alert_id)
+        return real(conn, alert_id, user_id, **kw)
+
+    monkeypatch.setattr(live, "acknowledge_alert", spy)
+    assert client.post("/api/alerts/2/acknowledge").status_code == 200
+    assert calls == [2]
+    body = client.post("/api/alerts/2/acknowledge").json()
+    assert body["page_level"] == 0
+
+
+def test_racing_acknowledgements_keep_the_first_writer(db_path):
+    import sqlite3
+    import threading
+
+    from src.alerts import live
+
+    barrier = threading.Barrier(2)
+    results = {}
+
+    def worker(user_id):
+        c = sqlite3.connect(db_path, check_same_thread=False, timeout=10)
+        c.row_factory = sqlite3.Row
+        try:
+            barrier.wait()
+            results[user_id] = live.acknowledge_alert(c, 2, user_id)
+        finally:
+            c.close()
+
+    threads = [threading.Thread(target=worker, args=(uid,)) for uid in (1, 2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+
+    changed = [uid for uid, (_alert, did) in results.items() if did]
+    assert len(changed) == 1
+    c = sqlite3.connect(db_path)
+    by = c.execute("SELECT acknowledged_by FROM alerts WHERE id = 2").fetchone()[0]
+    c.close()
+    assert by == changed[0]
+    # Both callers see the winning acknowledgement.
+    assert {alert["acknowledged_by"] for alert, _ in results.values()} == {changed[0]}
+
+
+def test_acknowledge_alert_unknown_returns_none(conn):
+    from src.alerts import live
+
+    assert live.acknowledge_alert(conn, 9999, 1) == (None, False)

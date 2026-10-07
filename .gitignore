@@ -58,3 +58,10 @@ frontend/.env.local
 # tooling state, not source.
 /.serena/
 /logs/
+
+# Corporate TLS-inspection CA certs (machine-specific; see Dockerfile)
+/certs/*
+!/certs/.gitkeep
+
+# Mosquitto password file for the hardened broker config (M6)
+deploy/mosquitto/secrets/

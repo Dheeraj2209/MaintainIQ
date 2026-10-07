@@ -12,6 +12,23 @@ State (per-machine worklist cursor + status) is in memory, mirroring the
 academic predictor's in-memory design. Each worker thread owns its own SQLite
 connection (SQLite connections are not shared across threads).
 
+Each replayed prediction is then fanned out through src.prediction.pipeline —
+alert state machine, email paging, realtime broadcast — so a model prediction
+has the same operational consequences as any other. Without that step the
+model would run invisibly: prediction rows accumulate while no alert is ever
+raised and nobody is told a machine is failing.
+
+Replay and live MQTT ingest (src/telemetry/ingest.py) must never drive the
+same machine at once. Both feed the one RealTimeRULPredictor, whose rolling
+window, baseline and cycle counter are keyed by machine_id alone, so
+interleaving old replayed snapshots with new live ones would corrupt the live
+RUL and health state; and both run the alert state machine, so a "healthy"
+replayed prediction would resolve an alert a live one just opened (and page
+again when the next live one reopens it). Hence two guards: live readings
+(dataset 'live_mqtt') are never part of a replay worklist — they already have
+their prediction — and start() refuses a machine that has received live
+telemetry recently.
+
 Note: replay does not register the model (model_registry is populated by the
 /predictions/rul endpoint); log_inference only needs the model_version string,
 which the predictor result already carries. Registration is a model-lifecycle
@@ -20,30 +37,75 @@ concern, not part of the predict+persist path replay reuses.
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from src.prediction import rul_store
+from src.prediction import pipeline, rul_store
+
+logger = logging.getLogger(__name__)
+
+# Alerts raised from replayed predictions carry the same `source` as the
+# prediction rows themselves (rul_store.PREDICTION_SOURCE), so an alert can be
+# traced back to the model run that raised it.
+REPLAY_SOURCE = rul_store.PREDICTION_SOURCE
+
+# readings.dataset written by live MQTT ingest (src/telemetry/ingest.py
+# LIVE_DATASET; not imported, to keep replay free of the paho-side package).
+LIVE_DATASET = "live_mqtt"
+
+# A machine that got a live reading within this long is treated as "being fed
+# live" and cannot be replayed. Generous on purpose: a device in a network
+# outage is still live, it is just buffering at the edge.
+LIVE_GUARD = timedelta(minutes=10)
 
 _WORKLIST_SQL = """
     SELECT id, cycle, speed_rpm, load_kn, sample_rate_hz, features_json
     FROM readings
     WHERE machine_id = ? AND features_json IS NOT NULL AND features_json != '{}'
+      AND dataset != 'live_mqtt'
     ORDER BY cycle ASC
 """
+
+_LAST_LIVE_SQL = "SELECT MAX(timestamp) FROM readings WHERE machine_id = ? AND dataset = ?"
+
+
+class LiveMachineError(ValueError):
+    """Raised by start() for a machine currently fed by live MQTT telemetry."""
+
+
+def _parse_iso(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _default_fan_out(conn, result: dict, features: dict, *, prediction_id=None, reading_id=None) -> dict:
+    """Production fan-out: alerts + email + realtime, off the same connection
+    the prediction was written on. The ids link an opened alert to the
+    replayed reading and its prediction row."""
+    return pipeline.handle_prediction(conn, result, source=REPLAY_SOURCE, features=features,
+                                      prediction_id=prediction_id, reading_id=reading_id)
+
+
 class ReplayService:
     def __init__(self, *, predictor_provider, connection_factory,
-                 base_interval_seconds: float = 1.0):
+                 base_interval_seconds: float = 1.0, on_prediction=None):
         self._predictor_provider = predictor_provider
         self._connection_factory = connection_factory
         self._base_interval_seconds = base_interval_seconds
+        # Injectable so tests can observe the fan-out without an SMTP server
+        # or an event loop; production uses the default below.
+        self._on_prediction = on_prediction or _default_fan_out
         self._worklists: dict[str, list[dict]] = {}
         self._cursors: dict[str, int] = {}
         self._state: dict[str, dict] = {}
@@ -58,6 +120,14 @@ class ReplayService:
             return [dict(row) for row in cur.fetchall()]
         finally:
             conn.close()
+
+    def _last_live_reading(self, machine_id: str):
+        conn = self._connection_factory()
+        try:
+            row = conn.execute(_LAST_LIVE_SQL, (machine_id, LIVE_DATASET)).fetchone()
+        finally:
+            conn.close()
+        return _parse_iso(row[0]) if row is not None else None
 
     def _fresh_state(self) -> dict:
         return {"cycle": None, "running": False, "last_ts": None, "replayed": 0, "error": None}
@@ -90,12 +160,21 @@ class ReplayService:
 
         conn = self._connection_factory()
         try:
-            rul_store.persist_prediction(conn, result, reading_id=row["id"])
+            prediction_id = rul_store.persist_prediction(conn, result, reading_id=row["id"])
             rul_store.log_inference(
                 conn, machine_id=machine_id,
                 model_version=result["model_version"],
                 latency_ms=latency_ms, result=result,
             )
+            # The prediction row above is the durable record; alerting, email
+            # and the realtime feed are consequences of it. A failure in any
+            # of them is logged and dropped rather than allowed to stall the
+            # replay loop or cost us the prediction we just made.
+            try:
+                self._on_prediction(conn, result, base,
+                                    prediction_id=prediction_id, reading_id=row["id"])
+            except Exception:
+                logger.exception("Alert fan-out failed for %s", machine_id)
         finally:
             conn.close()
 
@@ -113,6 +192,12 @@ class ReplayService:
             existing = self._threads.get(machine_id)
             if existing is not None and existing.is_alive():
                 return  # already running; idempotent
+            last_live = self._last_live_reading(machine_id)
+            if last_live is not None and datetime.now(timezone.utc) - last_live < LIVE_GUARD:
+                raise LiveMachineError(
+                    f"machine {machine_id} is receiving live telemetry (last reading "
+                    f"{last_live.isoformat()}); replay would corrupt its live predictions and alerts"
+                )
             # Fresh worklist each start so a re-start replays from the beginning.
             worklist = self._load_worklist(machine_id)
             if not worklist:

@@ -46,6 +46,16 @@ def _alert_exists_for_machine(conn, alert_id: int, machine_id: str) -> bool:
     return cur.fetchone() is not None
 
 
+# Service-side caps, enforced on every write path. The API schema
+# (schemas.MaintenanceCreate) is stricter on description (2000); this leaves
+# room for the description a completed work order writes ("Work order #n:
+# <title up to 200> — <notes up to 2000>") and for the technician it names
+# (the assignee's user name, which has no length limit of its own). The point
+# is to refuse multi-megabyte input, not to second-guess those writers.
+MAX_DESCRIPTION_LENGTH = 4000
+MAX_TECHNICIAN_LENGTH = 1000
+
+
 def log_maintenance(conn, machine_id: str, performed_at: str,
                     description: str = None, technician: str = None,
                     alert_id: int = None, type: str = None) -> dict:
@@ -56,6 +66,10 @@ def log_maintenance(conn, machine_id: str, performed_at: str,
     reference an alert that belongs to this machine — otherwise a stale or
     cross-machine form submission could mislink a record.
     """
+    if description is not None and len(description) > MAX_DESCRIPTION_LENGTH:
+        raise MaintenanceError(f"description is longer than {MAX_DESCRIPTION_LENGTH} characters")
+    if technician is not None and len(technician) > MAX_TECHNICIAN_LENGTH:
+        raise MaintenanceError(f"technician is longer than {MAX_TECHNICIAN_LENGTH} characters")
     if not _machine_exists(conn, machine_id):
         raise MaintenanceError(f"unknown machine_id: {machine_id!r}")
     if alert_id is not None and not _alert_exists_for_machine(conn, alert_id, machine_id):

@@ -138,3 +138,28 @@ def test_admin_can_start_and_stop(auth_client, replay_svc):
     assert resp.status_code == 200, resp.text
     resp = client.post("/api/ingestion/replay/stop", json={"machine_id": "m1"})
     assert resp.status_code == 200
+
+
+def test_start_on_machine_fed_by_live_telemetry_returns_409(auth_client, replay_svc, db_path):
+    """Replay and live MQTT ingest must not drive one machine at once (shared
+    predictor history, racing alert state) — the route says so with a 409."""
+    from datetime import datetime, timezone
+
+    conn = _row_conn(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO readings (machine_id, timestamp, cycle, elapsed_minutes, speed_rpm,
+                                     load_kn, sample_rate_hz, vibration_h_rms,
+                                     vibration_h_kurtosis, vibration_v_rms, vibration_v_kurtosis,
+                                     cross_axis_rms_ratio, cross_axis_correlation,
+                                     features_json, dataset)
+               VALUES ('m1', ?, 999, 0, 2100.0, 12.0, 25600.0, 1, 3, 1, 3, 1, 0.5,
+                       '{"h_rms": 1.0}', 'live_mqtt')""",
+            (datetime.now(timezone.utc).isoformat(),),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    resp = auth_client("supervisor").post("/api/ingestion/replay/start", json={"machine_id": "m1"})
+    assert resp.status_code == 409
+    assert "live telemetry" in resp.json()["detail"]

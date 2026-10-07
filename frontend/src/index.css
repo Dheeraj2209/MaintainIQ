@@ -1,149 +1,229 @@
 @import 'tailwindcss';
 
 /* ============================================================================
-   "Signal Glass" theme — a maintenance console that reads like a precision
-   instrument. Frosted-glass panels float over a slow-drifting SIGNAL FIELD
-   (ambient red/gold/teal orbs + a faint oscilloscope grid), so the glass has
-   real structure behind it to refract instead of sitting on flat black.
+   "OBSIDIAN" theme — a maintenance console on a pure black ground. Flat cards
+   carry a single hairline edge and no frost of their own; all the colour in the
+   room comes from AURORA RIBBONS bleeding in from the page corners, so the UI
+   itself stays almost monochrome and the data is the brightest thing on screen.
 
-   The AMD-flavored red stays the brand/interactive accent; warm gold is the
-   secondary "attention / due" accent. The SATURATED health ramp
-   (healthy → degrading → faulty → critical) is reserved for status only and
-   always ships with a label or badge — never color alone.
+   Cards light up under the pointer instead of being lit all the time: a
+   SPOTLIGHT tracks the cursor and washes the surface in that card's own status
+   colour (see `.hover-glow`). Idle chrome therefore costs no attention.
 
-   Token *names* are kept identical to the previous theme so every existing
+   TWO RULES GOVERN COLOR HERE:
+
+   1. COOL BLUE = CHROME. Violet (--color-accent) and azure (--color-accent-2)
+      mean "interactive / brand". They never encode status.
+
+   2. SEVERITY IS INTENSITY, NEVER HUE. The status ramp climbs
+      slate -> teal -> purple -> magenta, with saturation and luminance rising
+      together. There is deliberately NO red, amber, or green anywhere in this
+      theme: traffic-light encoding fails for ~8% of men, dies in greyscale, and
+      conflates "urgent" with "error". Because the signal here is brightness,
+      the ramp survives both. Status is ALWAYS paired with a text label --
+      color is reinforcement, never the sole carrier of meaning.
+
+      The ramp is also kept clear of the brand blues on purpose, so an alarm
+      badge can never be mistaken for interactive chrome.
+
+   Token *names* are unchanged from the previous theme so every existing
    `bg-surface` / `text-accent` utility, the chartColors reader, and
-   healthStyles keep resolving — only the values and surface treatments change.
+   healthStyles keep resolving -- only the values change.
    ========================================================================== */
 @theme {
-  --color-bg: #070809;
+  /* Pure black. The aurora does the colour work; the ground gives it maximum
+     contrast to bleed into. */
+  --color-bg: #000000;
   /* Solid surface, kept opaque on purpose: native <select> option popups,
      recharts tooltips, and table bands need a real fill (glass/blur can't
-     apply there). Cooler than before to sit under the glass chrome. */
-  --color-surface: #12141a;
-  --color-surface-hover: #1b1e26;
-  --color-border: #2b2f39;
+     apply there). Pulled down toward the black ground so a popup doesn't read
+     as a lighter slab floating over it. */
+  --color-surface: #0b0d15;
+  --color-surface-hover: #141723;
+  --color-border: #1e2130;
 
-  --color-text: #f2f4f8;
-  --color-text-muted: #9aa1ad;
+  --color-text: #eef1f8;
+  --color-text-muted: #939cb4;
 
-  /* Primary accent: AMD-flavored red (interactive / brand). */
-  --color-accent: #e23a3a;
-  --color-accent-hover: #ff5c52;
-  --color-accent-soft: #2a0f0d;
+  /* Primary accent: violet (interactive / brand). */
+  --color-accent: #7c6cff;
+  --color-accent-hover: #9d90ff;
+  --color-accent-soft: #171633;
 
-  /* Secondary accent: warm gold — "due for inspection / attention". */
-  --color-accent-2: #d4af37;
-  --color-accent-2-hover: #eccb6b;
-  --color-accent-2-soft: #2e2408;
+  /* Secondary accent: azure — "due for inspection / attention". */
+  --color-accent-2: #4dc9ff;
+  --color-accent-2-hover: #7edcff;
+  --color-accent-2-soft: #0c2233;
 
-  /* Reserved status ramp (heat: good → hottest). Critical is a hot rose-red,
-     kept distinct from the brand red by lightness/hue so an alarm badge is
-     never mistaken for interactive chrome. */
-  --color-healthy: #3ddc84;
-  --color-degrading: #f0a93a;
-  --color-faulty: #ff7a45;
-  --color-critical: #ff5470;
-  --color-unknown: #7a7a7a;
+  /* Status ramp — intensity, not hue. Quiet at nominal, loudest at critical.
+     Kept out of the brand-blue band so status never reads as chrome. */
+  --color-healthy: #5b6a86;
+  --color-degrading: #3bb8c9;
+  --color-faulty: #9d6cf0;
+  --color-critical: #e85ad0;
+  --color-unknown: #3f4657;
 
-  --font-display: 'Space Grotesk', system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Three faces, three jobs. Zodiak is the voice — a contemporary serif whose
+     high-contrast strokes read as editorial authority on black, which is what
+     separates this from every other grotesk-on-dark dashboard. Synonym is the
+     reader: a neutral sans with open counters that holds up at 12–14px and,
+     unlike the old `system-ui`, looks the same on every OS. JetBrains Mono keeps
+     the numbers, because figure legibility at small sizes beats stylistic unity.
+
+     The serif/sans split is load-bearing, not decorative: a reader can tell at a
+     glance whether a line is the product talking (serif) or the interface
+     labelling something (sans). That only works if the serif stays scarce — see
+     the base layer below, where it is opt-in rather than automatic.
+
+     Both Fontshare faces load in index.html; the fallbacks below are what
+     renders if that request fails. Zodiak falls back to a serif stack so a
+     failed load degrades to the same voice, not a different one. */
+  --font-display: 'Zodiak', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-body: 'Synonym', system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
 }
 
-/* Glass mechanics live as plain custom properties so the surface treatment is
-   tunable in one place and reused by every `.glass` / `.glass-panel`. */
+/* Surface mechanics live as plain custom properties so the treatment is tunable
+   in one place and reused by every `.glass` / `.glass-panel`. The names are
+   historical — under Obsidian these describe a flat card, not a frosted one. */
 :root {
   color-scheme: dark;
 
-  --glass-bg: rgba(255, 255, 255, 0.055);
-  --glass-bg-strong: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-highlight: rgba(255, 255, 255, 0.07);
-  --glass-blur: 20px;
+  /* Card fill: barely-there white over black. Low enough that the aurora
+     behind it still reads through as a tint. */
+  --glass-bg: rgba(255, 255, 255, 0.028);
+  /* Top-level chrome (sidebar / sticky header) has to OCCLUDE content
+     scrolling under it, so it gets a near-opaque black fill rather than a
+     lighter one — flat, but not see-through. */
+  --glass-bg-strong: rgba(6, 7, 11, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.075);
+  /* The glass lip survives, much dimmer: one pixel of top light is what keeps
+     a flat card from looking like a cut-out hole. */
+  --glass-highlight: rgba(255, 255, 255, 0.045);
+  --glass-blur: 18px;
   /* Opaque scrim for text that must stay legible regardless of what drifts
-     behind the glass — apply with the `.glass-scrim` helper where a contrast
-     check fails. */
-  --glass-scrim: rgba(8, 10, 14, 0.72);
+     behind it — apply with the `.glass-scrim` helper where a contrast check
+     fails. */
+  --glass-scrim: rgba(0, 0, 0, 0.8);
+
+  /* Size of the spotlight pool on a hovered card — the radius of the edge-catch
+     gradient, and via a multiplier the interior wash below it. Raising it makes
+     the light broader and flatter until the whole card reads as uniformly lit;
+     lowering it tightens the pool around the cursor. It no longer has anything
+     to do with how far the light reaches BEYOND a card, because it doesn't. */
+  --lume-radius: 195px;
 }
 
 body {
   margin: 0;
   background-color: var(--color-bg);
   color: var(--color-text);
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Headings carry the display face; body text stays on the neutral system
-   stack. Applied globally so pages get the treatment without per-file edits. */
-h1,
-h2,
-h3,
-.font-display {
-  font-family: var(--font-display);
-  letter-spacing: -0.01em;
+/* Page titles and anything explicitly marked `.font-display` carry the display
+   face. Deliberately NOT h2 and h3.
+
+   That used to include them, and it was harmless while the display face was a
+   grotesk: Clash next to Satoshi at 14px is a difference you have to look for.
+   A serif next to a sans is not. The app uses `<h2>` for two unrelated things —
+   real section headings and 11–14px uppercase micro-labels — so a blanket rule
+   would have put Zodiak on labels like "Prediction model", while the visually
+   identical labels inside the dashboard widgets are `<p>` and would have stayed
+   sans. One control, two faces, for no reason the reader could infer.
+
+   Opt-in fixes that: the serif appears where someone asked for it, chrome stays
+   in the body face, and the p/h2 mismatch resolves itself.
+
+   These live in `@layer base` on purpose. Unlayered rules beat every Tailwind
+   utility in v4, so declaring `letter-spacing` at the top level here would
+   silently swallow any `tracking-*` class a page sets on a heading. In the base
+   layer they are defaults that a utility can still override. */
+@layer base {
+  h1,
+  .font-display {
+    font-family: var(--font-display);
+    /* Zodiak carries generous sidebearings and needs only a hair of tightening
+       at text sizes — Clash wanted roughly three times this. Headings set above
+       ~28px override it with their own value, because optical tracking is a
+       function of rendered size, not of the element. */
+    letter-spacing: -0.008em;
+  }
 }
 
 /* ---------------------------------------------------------------------------
-   THE SIGNAL FIELD — the one signature element. Rendered on fixed body
-   pseudo-elements so it sits behind all app content and is present on every
-   route (including login), giving the frosted panels something to refract.
+   THE AURORA — the one signature element, and the only source of colour in the
+   idle UI. Two enormous conic sweeps anchored OFF-CANVAS at opposite corners
+   (bottom-left, top-right) bleed inward across the black ground. Rendered on
+   fixed body pseudo-elements so they sit behind all app content and are
+   present on every route, including login.
 
-   `::before` = drifting ambient orbs (red brand, gold attention, cool teal for
-   depth variety). `::after` = a faint oscilloscope grid + horizontal baseline.
+   The `blur(90px)` is the whole effect — it turns the hard conic bands into a
+   smooth wash. It costs one rasterization at paint time; from then on only
+   `transform` animates, so the ribbons stay on the compositor and never
+   repaint. The two run at different periods (34s / 44s) and drift in opposite
+   directions, so the field never visibly repeats.
    ------------------------------------------------------------------------- */
-body::before {
-  content: '';
-  position: fixed;
-  inset: -20% -10%;
-  z-index: -2;
-  pointer-events: none;
-  background-image:
-    radial-gradient(38% 42% at 24% 18%, rgba(226, 58, 58, 0.20), transparent 70%),
-    radial-gradient(32% 36% at 82% 12%, rgba(212, 175, 55, 0.14), transparent 70%),
-    radial-gradient(46% 48% at 88% 88%, rgba(45, 130, 150, 0.16), transparent 72%),
-    radial-gradient(40% 44% at 8% 92%, rgba(226, 58, 58, 0.10), transparent 72%);
-  animation: signal-drift 42s ease-in-out infinite alternate;
-}
-
+body::before,
 body::after {
   content: '';
   position: fixed;
-  inset: 0;
-  z-index: -1;
+  /* Oversized so the blurred edge is always outside the viewport — a blur that
+     ends on screen reads as a visible seam. */
+  inset: -20%;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
-    /* faint oscilloscope baseline through the vertical middle */
-    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05));
-  background-size:
-    44px 44px,
-    44px 44px,
-    100% 1px;
-  background-position:
-    center,
-    center,
-    center 52%;
-  background-repeat: repeat, repeat, no-repeat;
-  -webkit-mask-image: radial-gradient(120% 120% at 50% 40%, black, transparent 92%);
-  mask-image: radial-gradient(120% 120% at 50% 40%, black, transparent 92%);
+  filter: blur(90px);
+  will-change: transform;
 }
 
-@keyframes signal-drift {
-  0% {
-    transform: translate3d(-2%, -1%, 0) scale(1);
+/* Ribbon A — rises from below the bottom-left corner. Carries the full ramp
+   (azure -> violet -> magenta), so it's the warmer, more saturated of the two. */
+body::before {
+  z-index: -2;
+  background: conic-gradient(
+    from 200deg at 18% 108%,
+    rgba(77, 201, 255, 0.4),
+    rgba(124, 108, 255, 0.34),
+    rgba(232, 90, 208, 0.18),
+    transparent 58%
+  );
+  animation: miq-ribbon-a 34s ease-in-out infinite alternate;
+}
+
+/* Ribbon B — falls in from above the top-right corner. Dimmer and cooler, so
+   the two read as depth rather than as a symmetrical frame. */
+body::after {
+  z-index: -1;
+  background: conic-gradient(
+    from 20deg at 88% -8%,
+    rgba(157, 108, 240, 0.34),
+    rgba(77, 201, 255, 0.22),
+    transparent 55%
+  );
+  animation: miq-ribbon-b 44s ease-in-out infinite alternate;
+}
+
+@keyframes miq-ribbon-a {
+  to {
+    transform: translate3d(6%, -4%, 0) rotate(8deg) scale(1.15);
   }
-  100% {
-    transform: translate3d(2%, 2%, 0) scale(1.08);
+}
+
+@keyframes miq-ribbon-b {
+  to {
+    transform: translate3d(-5%, 5%, 0) rotate(-6deg) scale(1.12);
   }
 }
 
 /* ---------------------------------------------------------------------------
-   Frosted card surface: translucent white over the signal field, real blur,
-   a high-contrast hairline edge, a top inner highlight (the "glass lip"), and
-   a soft outer shadow for lift. `.bg-aurora` is now transparent so the body
-   field shows through; `.bg-blueprint` is kept as an alias for older refs.
+   Card surface. Under Obsidian these are FLAT: a near-invisible white fill and
+   a single hairline edge, with no blur of their own. The aurora reads straight
+   through them, which is what keeps a screen full of cards from looking like a
+   stack of grey slabs. Lighting happens on hover only (see `.hover-glow`).
+   `.bg-aurora` is transparent so the body field shows through; `.bg-blueprint`
+   is kept as an alias for older refs.
    ------------------------------------------------------------------------- */
 .bg-aurora,
 .bg-blueprint {
@@ -152,23 +232,24 @@ body::after {
 
 .glass {
   background-color: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   border: 1px solid var(--glass-border);
+  /* No backdrop-filter: a flat card is the point. The shadow is a drop, not a
+     lift — just enough to seat the card on the black. */
   box-shadow:
-    0 16px 44px -20px rgba(0, 0, 0, 0.75),
+    0 14px 40px -28px rgba(0, 0, 0, 0.9),
     inset 0 1px 0 0 var(--glass-highlight);
 }
 
-/* Heavier panel for top-level chrome (sidebar / header): a touch more blur so
-   scrolling content behind it stays readable. */
+/* Top-level chrome (sidebar / sticky header). This one KEEPS its blur: it sits
+   over content that scrolls beneath it, and a flat translucent fill would let
+   that content ghost through. Dark fill + modest blur = real occlusion. */
 .glass-panel {
   background-color: var(--glass-bg-strong);
-  backdrop-filter: blur(26px) saturate(140%);
-  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(130%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(130%);
   border-color: var(--glass-border);
   box-shadow:
-    0 16px 44px -24px rgba(0, 0, 0, 0.7),
+    0 16px 44px -30px rgba(0, 0, 0, 0.8),
     inset 0 1px 0 0 var(--glass-highlight);
 }
 
@@ -178,26 +259,310 @@ body::after {
 }
 
 /* ---------------------------------------------------------------------------
-   Hover animation for interactive tiles (KPI/metric cards, machine tiles): a
-   small lift plus a red/gold glow, so hovering a card feels alive rather than
-   just swapping a border color.
+   MOTION SYSTEM
+
+   Hand-rolled so it costs nothing at runtime beyond compositor work. Every
+   animation moves only `transform` and `opacity` (GPU-friendly, no layout
+   thrash), and every one is disabled under `prefers-reduced-motion`.
+   ------------------------------------------------------------------------- */
+
+/* Entrance: content rises into place. Applied to page sections and cards. */
+@keyframes miq-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Entrance for panels that should feel like they're focusing into view. */
+@keyframes miq-settle {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Slow breathing glow for live/streaming indicators. */
+@keyframes miq-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.88);
+  }
+}
+
+/* Expanding ring behind a live dot. */
+@keyframes miq-ping {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+/* Skeleton shimmer for loading states. */
+@keyframes miq-shimmer {
+  from {
+    background-position: -180% 0;
+  }
+  to {
+    background-position: 180% 0;
+  }
+}
+
+.animate-rise {
+  animation: miq-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-settle {
+  animation: miq-settle 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-pulse-dot {
+  animation: miq-pulse 2.2s ease-in-out infinite;
+}
+
+/* Stagger helpers: put `.animate-rise .stagger-N` on successive children so a
+   grid resolves in sequence instead of snapping in all at once. */
+.stagger-1 {
+  animation-delay: 60ms;
+}
+.stagger-2 {
+  animation-delay: 120ms;
+}
+.stagger-3 {
+  animation-delay: 180ms;
+}
+.stagger-4 {
+  animation-delay: 240ms;
+}
+.stagger-5 {
+  animation-delay: 300ms;
+}
+.stagger-6 {
+  animation-delay: 360ms;
+}
+
+/* Route transition. AppShell keys the wrapper on the pathname, so navigating
+   remounts it and replays this — every page in the console gets the same
+   entrance without each one having to opt in. */
+.page-enter {
+  animation: miq-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Auto-stagger. On a grid or stack, the direct children resolve in sequence
+   rather than snapping in together. Beyond the tenth child the delay is
+   capped — a long list shouldn't make the reader wait on a growing queue. */
+.rise-children > * {
+  animation: miq-rise 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rise-children > *:nth-child(1) {
+  animation-delay: 40ms;
+}
+.rise-children > *:nth-child(2) {
+  animation-delay: 85ms;
+}
+.rise-children > *:nth-child(3) {
+  animation-delay: 130ms;
+}
+.rise-children > *:nth-child(4) {
+  animation-delay: 175ms;
+}
+.rise-children > *:nth-child(5) {
+  animation-delay: 220ms;
+}
+.rise-children > *:nth-child(6) {
+  animation-delay: 265ms;
+}
+.rise-children > *:nth-child(7) {
+  animation-delay: 310ms;
+}
+.rise-children > *:nth-child(8) {
+  animation-delay: 355ms;
+}
+.rise-children > *:nth-child(n + 9) {
+  animation-delay: 400ms;
+}
+
+/* Live indicator: a dot with an expanding ring, for "streaming now" chrome. */
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--color-accent-2);
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-color: var(--color-accent-2);
+  animation: miq-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Loading skeleton block. */
+.skeleton {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 180% 100%;
+  animation: miq-shimmer 1.6s linear infinite;
+  border-radius: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   THE SPOTLIGHT — the card you are pointing at lights up, and nothing else does.
+
+   This reverts the proximity version, which ran an rAF loop over every card,
+   measured each one's distance to the pointer, and lit anything within
+   --lume-radius of it — including cards the cursor was merely passing near.
+   It demoed well and lived badly: with thirty cards on the dashboard, a third
+   of the page was glowing at any moment, and the light no longer answered the
+   only question it exists to answer, which is what am I about to click.
+
+   So the light is back inside the card. `useSpotlight()`
+   (src/lib/useSpotlight.ts) writes exactly two values, and only ever to the
+   card the pointer is inside:
+
+     --mx/--my  pointer position as a PERCENTAGE of the card's box, so the
+              gradient centre follows the cursor across the surface. The
+              fallbacks below keep both layers centred until the first
+              pointermove of the session.
+
+   Whether the light is ON is not the hook's business — that is `:hover`, five
+   rules down. Which means the card you leave goes dark because the browser
+   says so, with no cleanup pass and no chance of a card being stranded lit.
+
+   Two layers, both at z-index -1 so they paint under the card's own
+   (near-transparent) fill and can never sit over text:
+
+     ::before  THE EDGE CATCH. A 1px ring, lit only where the lamp faces it.
+               `inset: -1px` is required — `inset: 0` resolves to the PADDING
+               box, which would put the ring inside the border and read as a
+               stray inner line. mask-composite punches out the middle so only
+               the border band survives.
+     ::after   THE INTERIOR WASH. A wide tone-tinted pool plus a soft white
+               core. Deliberately multi-stop: a single `transparent 70%` ends
+               the gradient on a visible ring edge, so the ramp is stepped down
+               instead, and the tail runs well past where it's perceptible.
+
+   `--spot-tone` is the card's own status colour, set inline by the component
+   (see healthTone() / TONE_GLOW), so a critical tile catches magenta and a
+   healthy one barely lights at all. Cards that don't set it fall back to the
+   brand accent.
+
+   Nothing here animates per frame. Opacity flips once on enter and once on
+   leave; between those, the only thing moving is a gradient centre on an
+   already-composited layer.
    ------------------------------------------------------------------------- */
 .hover-glow {
-  transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
+  position: relative;
+  /* Contains the negative-z pseudo-elements so they can't slip behind the page
+     background. NOT `overflow: hidden` — that would clip the `inset: -1px`
+     ring off entirely. */
+  isolation: isolate;
+  transition:
+    box-shadow 220ms ease,
+    transform 220ms ease;
 }
+
+/* The edge catch. */
+.hover-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    var(--lume-radius) circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--spot-tone, var(--color-accent)) 78%, transparent),
+    color-mix(in srgb, var(--spot-tone, var(--color-accent)) 22%, transparent) 42%,
+    transparent 76%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+/* The interior wash. */
+.hover-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      calc(var(--lume-radius) * 1.62) circle at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, var(--spot-tone, var(--color-accent)) 21%, transparent) 0%,
+      color-mix(in srgb, var(--spot-tone, var(--color-accent)) 16%, transparent) 20%,
+      color-mix(in srgb, var(--spot-tone, var(--color-accent)) 10%, transparent) 42%,
+      color-mix(in srgb, var(--spot-tone, var(--color-accent)) 5%, transparent) 64%,
+      color-mix(in srgb, var(--spot-tone, var(--color-accent)) 2%, transparent) 83%,
+      transparent 100%
+    ),
+    radial-gradient(
+      182px circle at var(--mx, 50%) var(--my, 50%),
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.068) 24%,
+      rgba(255, 255, 255, 0.034) 50%,
+      rgba(255, 255, 255, 0.012) 74%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+/* The switch. Both layers come up together on enter and go down together on
+   leave — one gesture, one light. Pairing them in a single rule rather than
+   putting `opacity: 1` on each keeps it obvious that there is no state in
+   between; the ring never lingers after the wash, or the reverse. */
+.hover-glow:hover::before,
+.hover-glow:hover::after {
+  opacity: 1;
+}
+
+/* Landing on a card also lifts it. The bloom that used to live here is gone —
+   the ring and wash already carry the colour, and stacking a box-shadow on top
+   of them made the card look like it had two light sources. */
 .hover-glow:hover {
-  transform: translateY(-3px);
-  border-color: rgba(226, 58, 58, 0.5);
+  transform: translateY(-2px);
   box-shadow:
-    0 0 0 1px rgba(226, 58, 58, 0.35),
-    0 20px 48px -16px rgba(0, 0, 0, 0.75),
-    0 0 34px -6px rgba(212, 175, 55, 0.4),
+    0 22px 50px -24px rgba(0, 0, 0, 0.9),
     inset 0 1px 0 0 var(--glass-highlight);
 }
 
 /* ---------------------------------------------------------------------------
-   `.panel-notch` is retained (analytics tests key off it) — a thin red→gold
-   gradient hairline across the top edge that reads as the brand accent.
+   `.panel-notch` — a thin violet→azure gradient hairline across the top edge
+   that reads as the brand accent. (Analytics tests key off this class name.)
    ------------------------------------------------------------------------- */
 .panel-notch {
   position: relative;
@@ -212,17 +577,25 @@ body::after {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(226, 58, 58, 0.6) 20%,
-    rgba(255, 92, 82, 0.7) 50%,
-    rgba(212, 175, 55, 0.45) 85%,
+    rgba(124, 108, 255, 0.65) 20%,
+    rgba(77, 201, 255, 0.75) 50%,
+    rgba(196, 108, 255, 0.5) 85%,
     transparent
   );
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
-/* Utility: a soft red-glow for hero numerals / brand marks. */
+/* Utility: a soft violet glow for hero numerals / brand marks. */
 .text-glow {
-  text-shadow: 0 0 24px rgba(226, 58, 58, 0.45);
+  text-shadow: 0 0 24px rgba(124, 108, 255, 0.5);
+}
+
+/* Iridescent text fill for hero words — azure → violet → magenta. */
+.text-iridescent {
+  background-image: linear-gradient(120deg, #4dc9ff, #7c6cff 55%, #c46cff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* ---------------------------------------------------------------------------
@@ -241,29 +614,89 @@ select option {
 /* Custom slim scrollbar tuned to the dark surfaces. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(226, 58, 58, 0.25) transparent;
+  scrollbar-color: rgba(124, 108, 255, 0.28) transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background-color: rgba(226, 58, 58, 0.22);
+  background-color: rgba(124, 108, 255, 0.24);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(226, 58, 58, 0.4);
+  background-color: rgba(124, 108, 255, 0.42);
 }
 
 /* ---------------------------------------------------------------------------
-   Respect reduced-motion: freeze the drifting signal field (the grid + orbs
-   stay, they just stop moving). Component-level motion uses framer-motion's
-   own reduced-motion handling.
+   Respect reduced-motion: freeze every ambient and entrance animation. The
+   aurora, glows, and gradients all stay — they just stop moving, so the design
+   reads identically without vestibular cost.
    ------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-  body::before {
+  /* Both aurora ribbons park at their start pose. */
+  body::before,
+  body::after {
     animation: none;
+  }
+  .animate-rise,
+  .animate-settle,
+  .animate-pulse-dot,
+  .page-enter,
+  .rise-children > *,
+  .skeleton,
+  .live-dot::after {
+    animation: none;
+  }
+  /* The spotlight fades rather than animates, so it needs the TRANSITION cut,
+     not an animation. `useSpotlight()` bails out entirely under reduced motion
+     and never writes --mx/--my, so the ring and wash still light on hover —
+     they just appear instantly, centred, and nothing follows the cursor. */
+  .hover-glow,
+  .hover-glow::before,
+  .hover-glow::after {
+    transition: none;
+  }
+  .animate-rise,
+  .animate-settle,
+  .page-enter,
+  .rise-children > * {
+    opacity: 1;
+    transform: none;
+  }
+  /* No lift, but landing on a card must still register. A static ring in the
+     card's own tone does that without any movement at all. */
+  .hover-glow:hover {
+    transform: none;
+    border-color: color-mix(in srgb, var(--spot-tone, var(--color-accent)) 55%, transparent);
+  }
+}
+
+/* Mobile operator view (design/2026-10-07-mobile-operator-pwa-design.md).
+   Clears the home indicator / gesture bar on notched phones: the bottom tab
+   bar sits above it rather than under it. Needs viewport-fit=cover
+   (index.html). */
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Machine QR labels (MachineQrLabelDialog): printing the page prints only the
+   label, black on white at its own size, wherever it sits in the dialog. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-label,
+  .print-label * {
+    visibility: visible;
+  }
+  .print-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: #ffffff;
+    color: #000000;
   }
 }

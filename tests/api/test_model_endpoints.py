@@ -83,3 +83,44 @@ def test_telemetry_counts_and_rates(client, db_path):
 def test_telemetry_rejects_nonpositive_window(client, db_path):
     resp = client.get("/api/model/telemetry?window_minutes=0")
     assert resp.status_code == 422
+
+
+# --- Field accuracy + retraining export (design/2026-10-07-prediction-feedback-design.md)
+
+def test_feedback_accuracy_not_applicable_on_seed(client):
+    resp = client.get("/api/model/feedback-accuracy")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "not_applicable"
+    for key in ("precision", "false_alarm_rate", "lead_time", "rul_error", "root_cause",
+                "by_model_version", "offline", "exportable_episode_count", "missed_failures"):
+        assert key in body
+
+
+def test_feedback_accuracy_after_a_labelled_close(client, monkeypatch):
+    from src.realtime.manager import manager
+
+    async def _quiet(event):
+        return None
+
+    monkeypatch.setattr(manager, "broadcast", _quiet)
+    client.post("/api/alerts/2/close", json={"outcome": "confirmed_failure"})
+    body = client.get("/api/model/feedback-accuracy").json()
+    assert body["status"] == "available"
+    assert body["labelled_count"] == 1 and body["precision"] == 1.0
+
+
+def test_feedback_accuracy_rejects_a_bad_period(client):
+    resp = client.get("/api/model/feedback-accuracy?period_start=last%20tuesday")
+    assert resp.status_code == 400
+
+
+def test_feedback_export_rbac_and_format(auth_client):
+    assert auth_client("operator").get("/api/model/feedback/export").status_code == 403
+    resp = auth_client("supervisor").get("/api/model/feedback/export")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("text/csv")
+    assert 'filename="maintainiq-feedback-features-' in resp.headers["content-disposition"]
+    assert resp.headers["x-episode-count"] == "0"
+    assert resp.headers["x-row-count"] == "0"
+    assert resp.text.splitlines()[0].startswith("bearing_id,condition,cycle")
