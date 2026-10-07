@@ -28,7 +28,10 @@ describe('MaintenanceForm', () => {
 
     expect(onSubmit).toHaveBeenCalledWith({
       machine_id: 'm1',
-      performed_at: '2026-07-20T10:00:00',
+      // The local wall-clock time as UTC: the server reads naive timestamps
+      // as UTC (the reset date guard), so a local string would be off by the
+      // user's offset.
+      performed_at: new Date('2026-07-20T10:00').toISOString(),
       description: 'greased bearing',
       technician: 'tech1',
       alert_id: null,

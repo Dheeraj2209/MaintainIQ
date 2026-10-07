@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { Input, Label, Select } from './ui/input'
 import { Button } from './ui/button'
 import { RestartHealthCheckbox } from './RestartHealthCheckbox'
+import { localInputToIso } from '../lib/datetime'
 
 interface Props {
   machineId: string
@@ -47,11 +48,12 @@ export function MaintenanceForm({ machineId, onSubmit, linkedAlert = null }: Pro
     setBusy(true)
     setStatus({ kind: 'idle' })
     try {
-      // datetime-local yields "YYYY-MM-DDTHH:mm" (no seconds); append ':00'
-      // to match the backend's ISO expectation.
+      // datetime-local yields local wall-clock "YYYY-MM-DDTHH:mm"; send it as
+      // UTC ISO-8601, since the server reads a naive timestamp as UTC (the
+      // health-reset date guard compares it with now and the alert's time).
       await onSubmit({
         machine_id: machineId,
-        performed_at: when ? `${when}:00` : '',
+        performed_at: localInputToIso(when) ?? '',
         description: description || null,
         technician: technician || null,
         alert_id: linkedAlert?.id ?? null,
