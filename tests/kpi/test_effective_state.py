@@ -177,3 +177,28 @@ def test_machine_summary_serializes_the_health_fields(hconn):
     assert dumped["reset_pending_reading"] is False
     assert dumped["held_since"] is not None
     assert dumped["health_warnings"] == ["commissioning: 7/20 snapshots; learning the baseline"]
+
+
+def _demo_pred(conn, *, n, state):
+    # What /demo/simulate-fault writes (prediction.live.evaluate_new_reading).
+    conn.execute(
+        "INSERT INTO predictions (machine_id, timestamp, health_state, source, model_name) "
+        "VALUES ('m1', ?, ?, 'demo', 'demo_simulator')",
+        (f"2030-01-01T00:{n:02d}:00+00:00", state),
+    )
+    conn.commit()
+
+
+def test_a_demo_prediction_shows_its_own_state_on_a_machine_with_a_health_row(hconn):
+    _pred(hconn, n=1, state="healthy")
+    _level(hconn, "healthy")
+    _demo_pred(hconn, n=2, state="critical")
+
+    health = kpi.machine_health_kpis(hconn, "m1")[0]
+    assert health["health_state"] == "critical"
+    assert health["reset_pending_reading"] is False
+
+    report = generators.machine_prognostic(hconn, scope="m1")
+    assert report["current"]["health_state"] == "critical"
+    assert report["current"]["reset_pending_reading"] is False
+    assert generators.fleet_summary(hconn)["health_distribution"] == {"critical": 1}

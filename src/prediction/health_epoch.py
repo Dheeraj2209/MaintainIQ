@@ -205,7 +205,9 @@ def effective_state(conn, machine_id: str, latest_pred: dict | None) -> dict:
     After a reset or re-arm with no new reading, the latest prediction is
     from an older episode (or pre-ratchet, NULL, while the machine has a
     row): the current state is then the held level, flagged
-    reset_pending_reading. Otherwise it is the prediction's own state."""
+    reset_pending_reading. Otherwise it is the prediction's own state. A
+    demo prediction (/demo/simulate-fault) carries no episode and is never
+    pending: it shows its own state, so fault injection stays visible."""
     pred_state = latest_pred.get("health_state") if latest_pred else None
     pred_episode = latest_pred.get("health_episode") if latest_pred else None
     if not table_exists(conn, _TABLE):
@@ -213,7 +215,9 @@ def effective_state(conn, machine_id: str, latest_pred: dict | None) -> dict:
                 "health_episode": pred_episode}
     stored = _stored(conn, machine_id)
     row = stored or _DEFAULT
-    if pred_episode is None:  # no prediction yet, or a pre-ratchet one
+    if latest_pred and latest_pred.get("source") == live.DEMO_SOURCE:
+        pending = False
+    elif pred_episode is None:  # no prediction yet, or a pre-ratchet one
         pending = stored is not None
     else:
         pending = pred_episode < row.episode

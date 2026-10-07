@@ -61,7 +61,7 @@ def machine_prognostic(conn, *, scope, period_start=None, period_end=None) -> di
         f"""SELECT timestamp, health_state, predicted_rul_minutes, rul_estimate_kind,
                    prediction_interval_low, prediction_interval_high,
                    failure_within_horizon_probability, out_of_distribution,
-                   probable_cause, model_version, confidence, health_episode
+                   probable_cause, model_version, confidence, health_episode, source
             FROM predictions
             WHERE machine_id = :machine_id{where}
             ORDER BY id DESC LIMIT 1""",
@@ -225,7 +225,8 @@ def fleet_summary(conn, *, scope="fleet", period_start=None, period_end=None) ->
     machine_count = conn.execute("SELECT COUNT(*) AS n FROM machines").fetchone()["n"]
 
     latest_rows = conn.execute(
-        f"""SELECT p.machine_id, p.health_state, p.predicted_rul_minutes, p.health_episode
+        f"""SELECT p.machine_id, p.health_state, p.predicted_rul_minutes, p.health_episode,
+                   p.source
             FROM predictions p
             JOIN (SELECT machine_id, MAX(id) AS max_id FROM predictions
                   WHERE 1 = 1{pred_where} GROUP BY machine_id) l
