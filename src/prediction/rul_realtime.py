@@ -144,6 +144,39 @@ class RealTimeRULPredictor:
             self._episodes.pop(machine_id, None)
             self._gen[machine_id] += 1
 
+    def epoch_of(self, machine_id: str) -> int | None:
+        """The DB health epoch this machine's in-memory state belongs to."""
+        with self._locks[machine_id]:
+            return self._epochs.get(machine_id)
+
+    def episode_of(self, machine_id: str) -> int | None:
+        """The DB alert episode this machine's in-memory state belongs to."""
+        with self._locks[machine_id]:
+            return self._episodes.get(machine_id)
+
+    def restore_health(
+        self, machine_id: str, *, epoch: int, episode: int, max_state: str
+    ) -> None:
+        """Adopt the DB-authoritative epoch, episode and held level (plan D5).
+
+        Keeps the rolling history (rehydrate replays it first) and bumps the
+        generation so any in-flight prediction raises StaleEpoch. With the
+        ratchet off the in-memory held level stays healthy.
+        """
+        if max_state not in HEALTH_RANK:
+            raise ValueError(f"unknown max_state {max_state!r}")
+        with self._locks[machine_id]:
+            self._epochs[machine_id] = int(epoch)
+            self._episodes[machine_id] = int(episode)
+            self._max_state[machine_id] = max_state if self.ratchet else "healthy"
+            self._gen[machine_id] += 1
+
+    def _seek_cycle(self, machine_id: str, cycle: int) -> None:
+        """Set the next snapshot's cycle number. Used only by rul_store.rehydrate
+        to skip the middle of a long epoch (plan D5)."""
+        with self._locks[machine_id]:
+            self._cycles[machine_id] = int(cycle)
+
     def _health_state(self, rul_minutes: float) -> str:
         thresholds = self.artifact.get(
             "health_thresholds_minutes",

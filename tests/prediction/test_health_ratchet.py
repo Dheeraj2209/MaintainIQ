@@ -234,3 +234,78 @@ def test_reset_mid_prediction_raises_stale_epoch_and_leaves_state_alone(tmp_path
 
 def test_stale_epoch_is_a_runtime_error():
     assert issubclass(StaleEpoch, RuntimeError)
+
+
+# Task 4: predictor epoch API (D4, D5).
+
+def test_epoch_and_episode_are_none_when_fresh(tmp_path):
+    predictor = _predictor(tmp_path)
+    assert predictor.epoch_of(M) is None
+    assert predictor.episode_of(M) is None
+
+
+def test_restore_health_tags_results_and_sets_held_level(tmp_path):
+    predictor = _predictor(tmp_path)
+    predictor.restore_health(M, epoch=3, episode=5, max_state="faulty")
+    assert predictor.epoch_of(M) == 3
+    assert predictor.episode_of(M) == 5
+
+    # During commissioning the restored held level is reported, not healthy (F1).
+    first, second, third = _feed(predictor, ["healthy", "critical", "degrading"])
+    assert first["commissioning"] == {"seen": 1, "of": 2}
+    assert first["health_state"] == "faulty"
+    assert second["health_state"] == "faulty"
+    assert third["commissioning"] is None
+    assert third["health_state"] == "faulty"
+    assert third["instant_health_state"] == "degrading"
+    assert third["health_state_held"] is True
+    for result in (first, second, third):
+        assert result["health_epoch"] == 3
+        assert result["health_episode"] == 5
+
+
+def test_restore_health_bumps_generation(tmp_path):
+    predictor = _predictor(tmp_path)
+    before = predictor._gen[M]
+    predictor.restore_health(M, epoch=1, episode=1, max_state="healthy")
+    assert predictor._gen[M] == before + 1
+
+
+def test_restore_health_mid_prediction_raises_stale_epoch(tmp_path):
+    predictor = _predictor(tmp_path)
+    _feed(predictor, ["healthy", "healthy"])
+
+    class _RestoreDuringPredict:
+        def predict_proba(self, X):
+            predictor.restore_health(M, epoch=2, episode=2, max_state="degrading")
+            return np.tile([0.0, 1.0], (len(X), 1))
+
+    predictor.classifiers = [_RestoreDuringPredict()]
+    with pytest.raises(StaleEpoch):
+        _feed(predictor, ["critical"])
+    assert predictor._max_state[M] == "degrading"
+
+
+def test_restore_health_rejects_unknown_state(tmp_path):
+    predictor = _predictor(tmp_path)
+    with pytest.raises(ValueError, match="max_state"):
+        predictor.restore_health(M, epoch=1, episode=1, max_state="broken")
+    assert predictor.epoch_of(M) is None
+
+
+def test_restore_health_with_ratchet_off_keeps_held_healthy(tmp_path):
+    predictor = _predictor(tmp_path, ratchet=False)
+    predictor.restore_health(M, epoch=1, episode=2, max_state="critical")
+    assert predictor._max_state.get(M, "healthy") == "healthy"
+    (result,) = _feed(predictor, ["healthy"])
+    assert result["health_state"] == "healthy"
+    assert result["health_epoch"] == 1
+    assert result["health_episode"] == 2
+
+
+def test_seek_cycle_sets_next_cycle(tmp_path):
+    predictor = _predictor(tmp_path)
+    _feed(predictor, ["healthy"] * 3)
+    predictor._seek_cycle(M, 40)
+    (result,) = _feed(predictor, ["healthy"])
+    assert result["history_snapshots"] == 41
