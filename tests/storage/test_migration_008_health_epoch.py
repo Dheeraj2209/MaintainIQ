@@ -219,3 +219,19 @@ def test_legacy_rows_get_null_epoch_and_episode():
         "SELECT health_epoch, health_episode, instant_health_state FROM predictions").fetchone()
     assert tuple(pred) == (None, None, None)
     assert conn.execute("SELECT resets_health FROM maintenance_records").fetchone()[0] == 0
+
+
+def test_v7_upgrade_seeds_live_mqtt_alerts():
+    # Live telemetry alerts come from the same RUL model (source 'mqtt').
+    conn = _v7_db()
+    open_alert = _alert(conn, machine_id="m1", state="critical", source="mqtt")
+    closed = _alert(conn, machine_id="m2", state="faulty", source="mqtt", status="resolved",
+                    resolved_at="2026-10-02T00:00:00", closed_by=1)
+    conn.commit()
+
+    run_migrations(conn)
+
+    assert _seed(conn, "m1") == (0, 0, "critical", None)
+    assert _episode(conn, open_alert) == 0
+    assert _seed(conn, "m2") == (0, 0, "faulty", None)
+    assert _episode(conn, closed) == 0

@@ -238,9 +238,10 @@ CREATE TABLE IF NOT EXISTS machine_health_state (
 """
 
 # Literals mirror src/prediction/rul_store.PREDICTION_SOURCE and
-# src/alerts/live.DEMO_SOURCE; migrations do not import app modules. Only real
-# model alerts seed: demo and other detectors' alerts never do.
-_SEED_SOURCE = "xjtu_rul"
+# src/telemetry/ingest.MQTT_SOURCE (live telemetry runs the same RUL model);
+# migrations do not import app modules. Only real model alerts seed: demo and
+# other detectors' alerts never do.
+_SEED_SOURCE_SQL = "source IN ('xjtu_rul', 'mqtt')"
 _STATE_RANK_SQL = (
     "CASE health_state WHEN 'critical' THEN 3 WHEN 'faulty' THEN 2 "
     "WHEN 'degrading' THEN 1 ELSE 0 END"
@@ -256,17 +257,17 @@ def _seed_alert(conn: sqlite3.Connection, machine_id: str, has_feedback: bool):
     maintenance and was not judged a false alarm or a data-quality issue."""
     open_alert = conn.execute(
         f"SELECT id, health_state, opened_at FROM alerts "
-        f"WHERE machine_id = ? AND source = ? AND status = 'open' "
+        f"WHERE machine_id = ? AND {_SEED_SOURCE_SQL} AND status = 'open' "
         f"ORDER BY {_STATE_RANK_SQL} DESC, id DESC LIMIT 1",
-        (machine_id, _SEED_SOURCE),
+        (machine_id,),
     ).fetchone()
     if open_alert is not None:
         return open_alert
     newest = conn.execute(
         "SELECT id, health_state, opened_at, resolved_at, closed_by FROM alerts "
-        "WHERE machine_id = ? AND source = ? AND status = 'resolved' "
+        f"WHERE machine_id = ? AND {_SEED_SOURCE_SQL} AND status = 'resolved' "
         "ORDER BY resolved_at DESC, id DESC LIMIT 1",
-        (machine_id, _SEED_SOURCE),
+        (machine_id,),
     ).fetchone()
     if newest is None or newest[4] is None:
         return None
@@ -321,8 +322,7 @@ def _migration_008_health_epoch(conn: sqlite3.Connection) -> None:
     has_feedback = table_exists(conn, "alert_feedback")
     now = datetime.now(timezone.utc).isoformat()
     machines = [row[0] for row in conn.execute(
-        "SELECT DISTINCT machine_id FROM alerts WHERE source = ? ORDER BY machine_id",
-        (_SEED_SOURCE,),
+        f"SELECT DISTINCT machine_id FROM alerts WHERE {_SEED_SOURCE_SQL} ORDER BY machine_id",
     )]
     for machine_id in machines:
         seed = _seed_alert(conn, machine_id, has_feedback)
