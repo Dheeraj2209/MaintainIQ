@@ -37,6 +37,7 @@ erDiagram
     alerts ||--o{ alert_explanations : "explained by"
     readings |o--o{ alert_explanations : "triggered"
     users ||--o{ push_subscriptions : "receives push on"
+    machines ||--o| machine_health_state : "health tracked by"
 ```
 
 Notes on the diagram versus a naive reading of the schema: `predictions`
@@ -126,7 +127,7 @@ Model output per scored reading.
 | `machine_id` | TEXT NOT NULL REFERENCES `machines(machine_id)` | |
 | `reading_id` | INTEGER REFERENCES `readings(id)` | Nullable — not every scored prediction has a persisted reading. |
 | `timestamp` | TEXT NOT NULL | |
-| `health_state` | TEXT NOT NULL | |
+| `health_state` | TEXT NOT NULL | The **reported** state. With the health ratchet on this is the held level (see [Health state](#health-state-ratchet-epochs-and-resets)), which can be worse than the instant one. |
 | `confidence` | REAL | |
 | `source` | TEXT NOT NULL DEFAULT `'xjtu_rul'` | Which model/pipeline produced the row. |
 | `model_name` | TEXT | |
@@ -142,8 +143,36 @@ Model output per scored reading.
 | `out_of_distribution` | INTEGER NOT NULL DEFAULT 0 | Boolean flag stored as 0/1. |
 | `history_snapshots` | INTEGER | |
 | `warnings_json` | TEXT | |
+| `health_epoch` | INTEGER | The machine's health epoch (baseline life) the prediction was made in. NULL for pre-ratchet rows and for results without an epoch (demo, fakes). Rehydrate replays only rows of the current epoch. Added by migration 8. |
+| `health_episode` | INTEGER | The alert episode the prediction belongs to. A row is written only if this is still the machine's current episode (conditional `INSERT ... SELECT ... WHERE`); a result overtaken by a reset or re-arm is not persisted. NULL as for `health_epoch`. Added by migration 8. |
+| `instant_health_state` | TEXT | The model's own state for this snapshot, before the ratchet, the commissioning gate and the OOD rule. NULL on pre-ratchet rows (read `COALESCE(instant_health_state, health_state)`). Added by migration 8. |
 
-Index: `idx_predictions_machine_ts (machine_id, timestamp)`.
+Indexes: `idx_predictions_machine_ts (machine_id, timestamp)`,
+`idx_predictions_machine_epoch (machine_id, health_epoch, id)` (migration 8, for
+the bounded per-epoch rehydrate).
+
+### `machine_health_state`
+
+The DB authority for a machine's health tracking
+(`src/prediction/health_epoch.py`; plan
+[`docs/superpowers/plans/2026-10-07-ratchet-maintenance-reset.md`](superpowers/plans/2026-10-07-ratchet-maintenance-reset.md)).
+One row per machine; **no row means `(epoch 0, episode 0, 'healthy')`**. Every
+write is a single UPSERT statement, conditional where it must be, so racing
+connections never hit an `IntegrityError` and a stale write is a no-op inside
+SQLite. Resets and re-arms run under `live._TRANSITION_LOCK`, inside the
+caller's transaction. Added by migration 8.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `machine_id` | TEXT PRIMARY KEY REFERENCES `machines(machine_id)` | |
+| `epoch` | INTEGER NOT NULL DEFAULT 0 | **Baseline life.** Bumped only by a repair reset, which restarts commissioning and rehydrates nothing from the old component. |
+| `episode` | INTEGER NOT NULL DEFAULT 0 | **Alert episode.** Bumped by every repair reset and every false-alarm re-arm. Monotonic. |
+| `max_state` | TEXT NOT NULL DEFAULT `'healthy'` CHECK(max_state IN ('healthy','degrading','faulty','critical')) | The held (ratcheted) level of the current episode. Only raised, by `record_level`, for a persisted result of the current episode; reset to `healthy` by a reset or re-arm. |
+| `model_version` | TEXT | The artifact that derived `max_state`; NULL for a migration seed. A change triggers a re-derive (see below). |
+| `epoch_started_at` | TEXT | When the current epoch began (wall clock). NULL for epoch 0. Used by the maintenance date guard. |
+| `episode_started_at` | TEXT | When the current episode began. |
+| `reset_reason` | TEXT | Audit: `maintenance:{record id}`, `manual_reset:user:{id}`, `replay_restart` or `migration_008_seed`. |
+| `updated_at` | TEXT NOT NULL | |
 
 ### `model_inference_log`
 
@@ -225,6 +254,7 @@ Open/resolved machine alerts.
 | `reading_id` | INTEGER REFERENCES `readings(id)` | The stored reading behind that prediction (replay and live MQTT; NULL for `POST /api/predictions/rul`, which stores no reading). Same write-once rule. Added by migration 5. |
 | `model_version` | TEXT | The opening prediction's model version; groups real-world accuracy per model. Same write-once rule. Added by migration 5. |
 | `closed_by` | INTEGER | `users.id` of the person who closed the alert by hand (`POST /api/alerts/{id}/close`); NULL when it auto-resolved or is open. A close sets `status = 'resolved'` and `resolved_at` to the close time — there is no `closed` status. Added by migration 5. |
+| `health_episode` | INTEGER | The machine's alert episode when a real alert was inserted (written once, like `prediction_id`). An alert episode is (machine, real kind, `health_episode`). NULL for demo alerts, ratchet-off alerts and alerts opened before migration 8, except the one deploy-seed alert per machine, which migration 8 sets to 0. Added by migration 8. |
 
 Index: `idx_alerts_machine_status (machine_id, status)`. No index on the paging
 or link columns: the paging sweep scans open alerts only, and on a legacy database
@@ -244,6 +274,11 @@ Preventive/corrective maintenance history linked to alerts.
 | `created_at` | TEXT NOT NULL | |
 | `alert_id` | INTEGER REFERENCES `alerts(id)` | |
 | `type` | TEXT CHECK(type IN ('preventive','corrective')) | |
+| `resets_health` | INTEGER NOT NULL DEFAULT 0 | 1 if writing this record reset the machine's health epoch (a deliberate repair). A property of the record, not of its type; see [Reset rules](#reset-rules-d1-d2). Added by migration 8. |
+
+Every write goes through `src.maintenance.records` (`log_maintenance`, or
+`_log_maintenance_locked` inside a work-order completion), so the record and
+the health reset it may carry commit together.
 
 ### `users`
 
@@ -555,6 +590,187 @@ Each alert create or severity escalation is first snapshotted into
 `alert_explanations` (create/escalate → snapshot → page/broadcast), so
 "Why this alert?" keeps the evidence the model saw.
 
+## Health state: ratchet, epochs and resets
+
+Plan of record:
+[`docs/superpowers/plans/2026-10-07-ratchet-maintenance-reset.md`](superpowers/plans/2026-10-07-ratchet-maintenance-reset.md)
+(decision numbers D1–D14 below refer to it). Without it, the predictor could
+demote a machine (critical → healthy → critical); each demotion resolved the
+open alert and the next reading re-opened and re-paged it (offline: 31
+demotions on 10 of the 15 XJTU bearings).
+
+### Held vs instant state
+
+A bearing does not heal. With the ratchet on, the predictor
+(`src/prediction/rul_realtime.py`) holds the worst state it has latched:
+
+- `instant_health_state` is the model's own state for the snapshot;
+- `health_state` (reported, persisted, alerted on) is
+  `max(instant, held)`, and an in-distribution, post-commissioning snapshot
+  raises the held level to it;
+- `health_state_held` (result only) is true when the two differ; a
+  `condition_receded:` warning then says the instant state dropped and the
+  level is held until maintenance resets it.
+
+The held level is mirrored in `machine_health_state.max_state` by
+`record_level`, in the same transaction as the prediction row, so it survives
+restarts.
+
+### Epoch vs episode
+
+| | `epoch` (baseline life) | `episode` (alert episode) |
+| --- | --- | --- |
+| Bumped by | a repair reset only | every repair reset **and** every false-alarm re-arm |
+| Effect on the predictor | forgets all rolling context, restarts commissioning, rehydrates nothing older | restores the held level only; baseline and commissioning untouched |
+| Stamped on | `predictions.health_epoch` | `predictions.health_episode`, `alerts.health_episode` |
+
+### Commissioning (D3)
+
+The first `baseline_window` snapshots of an epoch (20 for the deployed
+artifact) learn the baseline. During them the reported state is the held
+level (`healthy` after a reset), nothing latches, the result carries
+`commissioning = {"seen": k, "of": 20}` and a `commissioning:` warning, and no
+alert opens. The UI shows "Commissioning k/20" with the instant state as a
+secondary badge when it is not healthy. A re-arm does not restart
+commissioning.
+
+### Out-of-distribution rows (D8)
+
+A snapshot with more than 10% of its features outside the artifact's
+`feature_bounds_99pct` (`out_of_distribution`) is reported as
+`max(instant, held)` and can alert as before, but it never raises the held
+level; an `ood_not_latched:` warning is added when it would have. A run of OOD
+rows therefore behaves like the legacy predictor above the held floor (it can
+fall back to the held level and re-page on OOD flapping), and an OOD blip never
+holds a machine red until maintenance. The ratchet evidence is XJTU-only. On
+the XJTU out-of-fold evaluation (Task 11, 2026-10-07) this rule leaves missed
+criticals (8), early pages (2), both bearing lists and C_w5 (6.747) unchanged,
+but brings back 3 one-level demotions between non-healthy states on 2
+bearings (1_5 faulty → degrading, 3_4 critical → faulty twice): an OOD row
+was shown one level above the next in-distribution row and not held (158 of
+9216 XJTU rows are OOD). A demotion to a non-healthy state does not resolve
+the open alert.
+
+### Alert episodes (D7)
+
+`pipeline.handle_prediction` passes the result's `health_episode` to
+`alerts.live.apply_reading` only when the ratchet is on. Then:
+
+1. a result whose episode is not the machine's current one is dropped;
+2. an abnormal reading with no open real alert does **not** open one if the
+   newest resolved real alert of this episode was closed by a person
+   (`closed_by` set) at the same or a higher severity — the held level is
+   already acknowledged; a rise in severity opens and pages a new alert;
+3. a healthy reading with an open alert resolves it as before (with the
+   ratchet this only happens at the start of a new episode).
+
+Independently of the ratchet, `rul_store.persist_prediction` writes a row only
+if its `health_episode` is still current (D6); a stale result returns `None`
+and every caller skips the alert fan-out (`POST /api/predictions/rul` answers
+409, replay and MQTT ingest log it at INFO and continue).
+
+### Reset rules (D1, D2)
+
+A repair reset (`health_epoch._reset_locked`) bumps the epoch and the episode,
+sets `max_state = 'healthy'` and system-resolves the machine's open real alert
+with `resolved_at` = wall-clock now (never the record's `performed_at`, so MTTR
+is never negative). The resolved alerts are broadcast after the commit. Resets
+happen only on a deliberate repair:
+
+| Path | Resets when | Who |
+| --- | --- | --- |
+| `POST /api/maintenance` | only with explicit `reset_health: true`; the default never resets | `reset_health: true` requires admin/supervisor (403 otherwise) |
+| Work-order completion (`work_orders.service.complete`) | by default when the order is `corrective`, linked to a real alert of the machine's **current** episode (open or human-closed), and the date guard passes; an explicit `reset_health` wins (the guard still applies). Free-standing, preventive and stale-alert orders do not reset | the assignee or a supervisor/admin |
+| `DELETE /api/predictions/rul/{machine_id}/state` | always | admin/supervisor |
+| `POST /api/ingestion/replay/start` | always (`replay_restart`): a replay begins a new baseline | admin/supervisor |
+
+**Date guard:** a `performed_at` more than 5 minutes in the future is refused.
+A record dated before the current epoch began or before its linked alert
+opened is history: with an explicit `reset_health: true` it is refused
+("cannot reset health tracking with a record dated before the current
+fault"); by default it simply does not reset.
+
+A work-order completion is one transaction (`_LOCK` → `_TRANSITION_LOCK`): the
+record, the reset, the default feedback and the status change commit together
+or not at all. A completion that resets records the order's alert as
+`maintenance_prevented` (D11) unless an outcome already exists; it stays
+editable. Supervisor resets through `POST /api/maintenance` invent no feedback.
+
+A replay whose machine is reset by someone else mid-run (for example a work
+order completed) stops with `stopped_reason = "health_reset"` (D9); a re-arm
+does not stop it.
+
+### False-alarm re-arm (D12)
+
+Closing an alert, or recording its feedback, with outcome `false_alarm` or
+actual cause `sensor_or_data_quality_issue` re-arms the machine
+(`health_epoch._rearm_locked`) when the alert is real, no longer open, and of
+the machine's current episode: the episode is bumped and `max_state` returns
+to `healthy`; the epoch, the baseline and commissioning are untouched. The tile
+turns green at once (`effective_state`), and the next in-distribution
+non-healthy reading latches into the new episode and pages once. Outcomes
+`confirmed_failure`, `maintenance_prevented` and `unknown` keep the held level
+and the suppression; the machine then needs a repair.
+
+### `effective_state` (D6)
+
+Readers of "the machine's current state" call
+`health_epoch.effective_state(conn, machine_id, latest_prediction)`. If the
+machine has a `machine_health_state` row and its latest prediction belongs to
+an older episode (or is pre-ratchet, `health_episode` NULL), the current state
+is `max_state`, flagged `reset_pending_reading`; otherwise it is the
+prediction's `health_state`. So after a reset or re-arm with no new reading the
+machine shows the post-reset state immediately, without inserting marker
+prediction rows.
+
+### Sync, restart and rehydrate (D4, D5)
+
+Every production predictor call goes through
+`health_epoch.predict_synced(predictor, conn, machine_id, call)`, which holds a
+per-machine lock across sync and predict. The sync compares the predictor
+with the DB row: another epoch (a restart or a reset) resets the machine in
+memory, rehydrates the current epoch and restores the held level; another
+episode only restores the held level. Rehydrate replays only readings joined
+to predictions of the current epoch, bounded to the first `baseline_window`
+and the last `max_history` rows, using the stored `readings.features_json`
+(rows that are empty, unparsable or missing a needed feature are skipped and
+logged). A predictor generation counter makes a prediction that was overtaken
+by an in-memory reset raise `StaleEpoch`; the caller skips persist and
+fan-out. Lock order: `_SYNC_LOCKS[machine]` → `_TRANSITION_LOCK`, and
+`work_orders._LOCK` → `_TRANSITION_LOCK`.
+
+### Model change (D10)
+
+When `machine_health_state.model_version` differs from the loaded artifact's,
+the first synced prediction replays the whole current epoch once with the new
+model, takes the level it latches over the current episode's rows, floors it
+at the state of the machine's open real alert (a model change never silently
+resolves an alert), and writes it with the new `model_version`, conditional on
+the episode. A NULL `model_version` (a migration seed) adopts the current model
+and keeps its level.
+
+### Deploy seed (D14)
+
+Migration 8 seeds at most one row per machine from its `xjtu_rul` alerts: the
+worst open one, else the newest resolved one later than the machine's latest
+maintenance, if a person closed it and its feedback is not `false_alarm` or
+`sensor_or_data_quality_issue`. The seed row is `(epoch 0, episode 0,
+max_state = alert.health_state, model_version NULL)` and the seed alert gets
+`health_episode = 0`, so a pre-deploy open alert is not resolved by the first
+cold reading and a pre-deploy closed one is not re-paged.
+
+### Kill switch (D13)
+
+The ratchet is **on** by default. Resolution order: the
+`RealTimeRULPredictor(ratchet=...)` argument, then env
+`MAINTAINIQ_HEALTH_RATCHET` (`0|false|off|no` or `1|true|on|yes`; anything else
+is an error), then the artifact's `health_ratchet` key (default true). Every
+result carries `health_ratchet`. Off gives the exact legacy `health_state` (no
+commissioning gate, no latch, no OOD rule), no `record_level`, and no episode
+suppression in the alert engine. Epoch stamping, resets, the stale-persist
+skip, re-arm bookkeeping and `effective_state` still run; they are neutral
+while `max_state` stays `healthy`.
+
 ## Ingestion modes
 
 - **Batch backfill** — bulk load of the XJTU-SY dataset into `readings`. Entry
@@ -624,7 +840,14 @@ purely additive, one `executescript`, like migration 2: it creates
 is additive with the mixed shape of migration 3: it creates
 `push_subscriptions` and its index, then adds `notifications.channel`
 (`DEFAULT 'email'`, so every existing row reads as an email) through a guarded
-`ALTER`. Migrations are still not run at
+`ALTER`. Migration 8 (health epoch) has the same mixed shape: it creates
+`machine_health_state`, adds `predictions.health_epoch`, `health_episode`,
+`instant_health_state`, `alerts.health_episode` and
+`maintenance_records.resets_health` through guarded `ALTER`s, creates
+`idx_predictions_machine_epoch`, and seeds held levels from pre-deploy
+`xjtu_rul` alerts with `INSERT OR IGNORE` (see
+[Deploy seed](#deploy-seed-d14)); legacy prediction rows keep NULL stamps
+("pre-ratchet"). Migrations are still not run at
 app start. Instead `migrations.ensure_current_schema` brings a versioned but
 stale file up to date lazily: the first request through `src/api/deps.get_db`
 (memoised per file afterwards), the paging job's first tick, and — via
