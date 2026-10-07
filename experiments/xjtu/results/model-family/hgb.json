@@ -1,0 +1,259 @@
+{
+  "sample_count": 9216,
+  "bearing_count": 15,
+  "prognostic_horizon_minutes": 120.0,
+  "failure_probability_threshold": 0.6,
+  "probability_smoothing_window": 3,
+  "warning_persistence_snapshots": 3,
+  "classifier_feature_count": 203,
+  "regressor_feature_count": 342,
+  "classifier_ensemble_size": 3,
+  "fit_seconds": 9488.763646999956,
+  "failure_detection": {
+    "precision": 0.5095057034220533,
+    "recall": 0.7265060240963855,
+    "false_alarm_count": 1161,
+    "missed_failure_window_count": 454,
+    "f1": 0.598957039980134,
+    "average_precision": 0.5959203871218515,
+    "roc_auc": 0.8161695484957299
+  },
+  "raw_failure_detection_without_temporal_smoothing": {
+    "precision": 0.4908874801901743,
+    "recall": 0.7463855421686747,
+    "false_alarm_count": 1285,
+    "missed_failure_window_count": 421,
+    "average_precision": 0.5967075068652872,
+    "roc_auc": 0.8178255371937724
+  },
+  "smoothed_failure_detection_without_persistence": {
+    "precision": 0.49457613499397346,
+    "recall": 0.7415662650602409,
+    "false_alarm_count": 1258,
+    "missed_failure_window_count": 429
+  },
+  "first_warning_events": {
+    "within_horizon_bearings": 8,
+    "early_warning_bearings": 7,
+    "no_warning_bearings": 0,
+    "per_bearing": [
+      {
+        "bearing_id": "Bearing1_1",
+        "actual_rul_minutes_at_first_warning": 120.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing1_2",
+        "actual_rul_minutes_at_first_warning": 125.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing1_3",
+        "actual_rul_minutes_at_first_warning": 152.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing1_4",
+        "actual_rul_minutes_at_first_warning": 71.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing1_5",
+        "actual_rul_minutes_at_first_warning": 14.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_1",
+        "actual_rul_minutes_at_first_warning": 33.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_2",
+        "actual_rul_minutes_at_first_warning": 117.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_3",
+        "actual_rul_minutes_at_first_warning": 516.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing2_4",
+        "actual_rul_minutes_at_first_warning": 8.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing2_5",
+        "actual_rul_minutes_at_first_warning": 336.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing3_1",
+        "actual_rul_minutes_at_first_warning": 146.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing3_2",
+        "actual_rul_minutes_at_first_warning": 2481.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing3_3",
+        "actual_rul_minutes_at_first_warning": 26.0,
+        "timing": "within_horizon"
+      },
+      {
+        "bearing_id": "Bearing3_4",
+        "actual_rul_minutes_at_first_warning": 1077.0,
+        "timing": "early"
+      },
+      {
+        "bearing_id": "Bearing3_5",
+        "actual_rul_minutes_at_first_warning": 104.0,
+        "timing": "within_horizon"
+      }
+    ]
+  },
+  "within_horizon_rul": {
+    "mae_minutes": 30.845007716580607,
+    "rmse_minutes": 37.75585028414267,
+    "error_90_minutes": 62.764619047619036
+  },
+  "per_bearing": [
+    {
+      "bearing_id": "Bearing1_1",
+      "samples": 123,
+      "failure_precision": 1.0,
+      "failure_recall": 1.0,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 25.646940574576934
+    },
+    {
+      "bearing_id": "Bearing1_2",
+      "samples": 161,
+      "failure_precision": 0.9603174603174603,
+      "failure_recall": 1.0,
+      "false_alarm_count": 5,
+      "within_horizon_rul_mae_minutes": 30.639012987012983
+    },
+    {
+      "bearing_id": "Bearing1_3",
+      "samples": 158,
+      "failure_precision": 0.8120805369127517,
+      "failure_recall": 1.0,
+      "false_alarm_count": 28,
+      "within_horizon_rul_mae_minutes": 27.71172884691067
+    },
+    {
+      "bearing_id": "Bearing1_4",
+      "samples": 122,
+      "failure_precision": 1.0,
+      "failure_recall": 0.4049586776859504,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 32.83136009445099
+    },
+    {
+      "bearing_id": "Bearing1_5",
+      "samples": 52,
+      "failure_precision": 1.0,
+      "failure_recall": 0.28846153846153844,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 55.606314102564134
+    },
+    {
+      "bearing_id": "Bearing2_1",
+      "samples": 491,
+      "failure_precision": 1.0,
+      "failure_recall": 0.2809917355371901,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 22.708584809130265
+    },
+    {
+      "bearing_id": "Bearing2_2",
+      "samples": 161,
+      "failure_precision": 1.0,
+      "failure_recall": 0.9338842975206612,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 29.125697363242825
+    },
+    {
+      "bearing_id": "Bearing2_3",
+      "samples": 533,
+      "failure_precision": 0.3055555555555556,
+      "failure_recall": 1.0,
+      "false_alarm_count": 275,
+      "within_horizon_rul_mae_minutes": 45.53103148366785
+    },
+    {
+      "bearing_id": "Bearing2_4",
+      "samples": 42,
+      "failure_precision": 1.0,
+      "failure_recall": 0.21428571428571427,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 63.605335600907026
+    },
+    {
+      "bearing_id": "Bearing2_5",
+      "samples": 339,
+      "failure_precision": 0.3590504451038576,
+      "failure_recall": 1.0,
+      "false_alarm_count": 216,
+      "within_horizon_rul_mae_minutes": 43.4769590712318
+    },
+    {
+      "bearing_id": "Bearing3_1",
+      "samples": 2538,
+      "failure_precision": 0.8231292517006803,
+      "failure_recall": 1.0,
+      "false_alarm_count": 26,
+      "within_horizon_rul_mae_minutes": 16.83153876426603
+    },
+    {
+      "bearing_id": "Bearing3_2",
+      "samples": 2496,
+      "failure_precision": 0.391304347826087,
+      "failure_recall": 0.2231404958677686,
+      "false_alarm_count": 42,
+      "within_horizon_rul_mae_minutes": 32.06915033451398
+    },
+    {
+      "bearing_id": "Bearing3_3",
+      "samples": 371,
+      "failure_precision": 1.0,
+      "failure_recall": 0.2231404958677686,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 26.553551357733166
+    },
+    {
+      "bearing_id": "Bearing3_4",
+      "samples": 1515,
+      "failure_precision": 0.17055393586005832,
+      "failure_recall": 0.9669421487603306,
+      "false_alarm_count": 569,
+      "within_horizon_rul_mae_minutes": 27.31278709169619
+    },
+    {
+      "bearing_id": "Bearing3_5",
+      "samples": 114,
+      "failure_precision": 1.0,
+      "failure_recall": 0.7807017543859649,
+      "false_alarm_count": 0,
+      "within_horizon_rul_mae_minutes": 17.778253550543024
+    }
+  ],
+  "summary": {
+    "roc_auc": 0.8161695484957299,
+    "average_precision": 0.5959203871218515,
+    "precision": 0.5095057034220533,
+    "recall": 0.7265060240963855,
+    "f1": 0.598957039980134,
+    "false_alarm_count": 1161,
+    "missed_failure_window_count": 454,
+    "within_horizon_bearings": 8,
+    "early_warning_bearings": 7,
+    "no_warning_bearings": 0,
+    "rul_mae": 30.845007716580607,
+    "rul_rmse": 37.75585028414267,
+    "rul_error_90": 62.764619047619036
+  }
+}

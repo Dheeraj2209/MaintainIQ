@@ -1,0 +1,54 @@
+[
+ {
+  "bearing": "Bearing2_3",
+  "n": 533,
+  "artifact_mb": 13.4,
+  "old_predictor": "old predictor rejected: ValueError: live feature vector is missing trained features: ['h_kurtosis_mean20_lr', 'h_kurtosis_mean5_lr', 'h_",
+  "raw_prob_maxdiff": 3.3306690738754696e-16,
+  "smooth_maxdiff": 3.3306690738754696e-16,
+  "warning_mismatches": 0,
+  "reg_maxdiff": 1.4210854715202004e-14,
+  "live_rul_maxdiff": 1.4210854715202004e-14,
+  "first_warning_index": 130,
+  "first_warning_true_rul": 402.0,
+  "latched_rows_beyond_current_rule": 0,
+  "latency_ms_median": {
+   "context": 72.5,
+   "classifier": 108.4,
+   "post+regressor": 74.0,
+   "total": 256.8
+  },
+  "latency_ms_p95": {
+   "context": 91.6,
+   "classifier": 130.1,
+   "post+regressor": 92.5,
+   "total": 300.7
+  }
+ },
+ {
+  "bearing": "Bearing3_1",
+  "n": 2538,
+  "artifact_mb": 14.7,
+  "old_predictor": "old predictor rejected: ValueError: live feature vector is missing trained features: ['h_kurtosis_mean20_lr', 'h_kurtosis_mean5_lr', 'h_",
+  "raw_prob_maxdiff": 3.3306690738754696e-16,
+  "smooth_maxdiff": 3.3306690738754696e-16,
+  "warning_mismatches": 0,
+  "reg_maxdiff": 2.842170943040401e-14,
+  "live_rul_maxdiff": 1.4210854715202004e-14,
+  "first_warning_index": 2398,
+  "first_warning_true_rul": 139.0,
+  "latched_rows_beyond_current_rule": 0,
+  "latency_ms_median": {
+   "context": 77.5,
+   "classifier": 113.0,
+   "post+regressor": 78.0,
+   "total": 268.6
+  },
+  "latency_ms_p95": {
+   "context": 99.1,
+   "classifier": 138.6,
+   "post+regressor": 98.8,
+   "total": 325.2
+  }
+ }
+]

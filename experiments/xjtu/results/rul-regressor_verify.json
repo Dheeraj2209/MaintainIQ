@@ -1,0 +1,20 @@
+{
+  "summary": {
+    "roc_auc": 0.8142943133040368,
+    "average_precision": 0.6225354240421872,
+    "precision": 0.7247075017205781,
+    "recall": 0.6343373493975903,
+    "f1": 0.6765178284612914,
+    "false_alarm_count": 400,
+    "missed_failure_window_count": 607,
+    "within_horizon_bearings": 10,
+    "early_warning_bearings": 5,
+    "no_warning_bearings": 0,
+    "rul_mae": 27.44447332169104,
+    "rul_rmse": 32.045149129576814,
+    "rul_error_90": 48.42301117143073
+  },
+  "fit_seconds": 2392.1032407000894,
+  "classifier_feature_count": 203,
+  "regressor_feature_count": 36
+}

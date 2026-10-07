@@ -1,0 +1,47 @@
+{
+ "xjtu_to_femto": {
+  "roc_auc": 0.4859511225549984,
+  "average_precision": 0.44963483493058204,
+  "precision": 0.0,
+  "recall": 0.0,
+  "f1": 0.0,
+  "false_alarm_count": 0,
+  "missed_failure_window_count": 1884,
+  "within_horizon_bearings": 0,
+  "early_warning_bearings": 0,
+  "no_warning_bearings": 17,
+  "rul_mae": 28.215427080173892,
+  "rul_rmse": 33.325641337787886,
+  "rul_error_90": 52.240190476190485
+ },
+ "femto_to_xjtu": {
+  "roc_auc": 0.6516048046075248,
+  "average_precision": 0.2630873905807834,
+  "precision": 0.26346153846153847,
+  "recall": 0.4951807228915663,
+  "f1": 0.34393305439330546,
+  "false_alarm_count": 2298,
+  "missed_failure_window_count": 838,
+  "within_horizon_bearings": 10,
+  "early_warning_bearings": 3,
+  "no_warning_bearings": 2,
+  "rul_mae": 28.781840676993692,
+  "rul_rmse": 35.985017674241135,
+  "rul_error_90": 58.12714285714285
+ },
+ "femto_lobo": {
+  "roc_auc": 0.7558495815828703,
+  "average_precision": 0.6173172142102379,
+  "precision": 0.6532258064516129,
+  "recall": 0.5589171974522293,
+  "f1": 0.6024027459954233,
+  "false_alarm_count": 559,
+  "missed_failure_window_count": 831,
+  "within_horizon_bearings": 8,
+  "early_warning_bearings": 7,
+  "no_warning_bearings": 2,
+  "rul_mae": 27.83662397634213,
+  "rul_rmse": 34.60357288874617,
+  "rul_error_90": 57.12380952380953
+ }
+}

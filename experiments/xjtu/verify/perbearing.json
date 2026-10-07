@@ -1,0 +1,1150 @@
+{
+ "s0/fixed/vs_baseline_s0": {
+  "ap_better/worse": [
+   6,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   1,
+   2,
+   12
+  ],
+  "miss_better/worse": [
+   8,
+   2
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   448
+  ],
+  "miss_total": [
+   607,
+   481
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": -1,
+   "Bearing3_2": 0,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.001,
+   "Bearing1_2": 0.265,
+   "Bearing1_3": -0.005,
+   "Bearing1_4": 0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.034,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.074,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.011,
+   "Bearing3_1": 0.025,
+   "Bearing3_2": -0.035,
+   "Bearing3_3": 0.164,
+   "Bearing3_4": 0.011,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.21,
+   "Bearing1_2": -2.43,
+   "Bearing1_3": -4.61,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.75,
+   "Bearing2_1": 1.33,
+   "Bearing2_2": -3.82,
+   "Bearing2_3": -8.41,
+   "Bearing2_4": -13.87,
+   "Bearing2_5": -13.34,
+   "Bearing3_1": 5.78,
+   "Bearing3_2": -4.67,
+   "Bearing3_3": -1.95,
+   "Bearing3_4": -7.02,
+   "Bearing3_5": 4.84
+  }
+ },
+ "s0/fixed/vs_baseline_same_seed": {
+  "ap_better/worse": [
+   6,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   1,
+   2,
+   12
+  ],
+  "miss_better/worse": [
+   8,
+   2
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   448
+  ],
+  "miss_total": [
+   607,
+   481
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": -1,
+   "Bearing3_2": 0,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.001,
+   "Bearing1_2": 0.265,
+   "Bearing1_3": -0.005,
+   "Bearing1_4": 0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.034,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.074,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.011,
+   "Bearing3_1": 0.025,
+   "Bearing3_2": -0.035,
+   "Bearing3_3": 0.164,
+   "Bearing3_4": 0.011,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.21,
+   "Bearing1_2": -2.43,
+   "Bearing1_3": -4.61,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.75,
+   "Bearing2_1": 1.33,
+   "Bearing2_2": -3.82,
+   "Bearing2_3": -8.41,
+   "Bearing2_4": -13.87,
+   "Bearing2_5": -13.34,
+   "Bearing3_1": 5.78,
+   "Bearing3_2": -4.67,
+   "Bearing3_3": -1.95,
+   "Bearing3_4": -7.02,
+   "Bearing3_5": 4.84
+  }
+ },
+ "s0/latch/vs_baseline_s0": {
+  "ap_better/worse": [
+   6,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   1,
+   3,
+   11
+  ],
+  "miss_better/worse": [
+   9,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   547
+  ],
+  "miss_total": [
+   607,
+   327
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": -1,
+   "Bearing3_2": 99,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.001,
+   "Bearing1_2": 0.265,
+   "Bearing1_3": -0.005,
+   "Bearing1_4": 0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.034,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.074,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.011,
+   "Bearing3_1": 0.025,
+   "Bearing3_2": -0.035,
+   "Bearing3_3": 0.164,
+   "Bearing3_4": 0.011,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.21,
+   "Bearing1_2": -2.43,
+   "Bearing1_3": -4.61,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.75,
+   "Bearing2_1": 1.33,
+   "Bearing2_2": -3.82,
+   "Bearing2_3": -8.41,
+   "Bearing2_4": -13.87,
+   "Bearing2_5": -13.34,
+   "Bearing3_1": 5.78,
+   "Bearing3_2": -4.67,
+   "Bearing3_3": -1.95,
+   "Bearing3_4": -7.02,
+   "Bearing3_5": 4.84
+  }
+ },
+ "s0/latch/vs_baseline_same_seed": {
+  "ap_better/worse": [
+   6,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   1,
+   3,
+   11
+  ],
+  "miss_better/worse": [
+   9,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   547
+  ],
+  "miss_total": [
+   607,
+   327
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": -1,
+   "Bearing3_2": 99,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.001,
+   "Bearing1_2": 0.265,
+   "Bearing1_3": -0.005,
+   "Bearing1_4": 0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.034,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.074,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.011,
+   "Bearing3_1": 0.025,
+   "Bearing3_2": -0.035,
+   "Bearing3_3": 0.164,
+   "Bearing3_4": 0.011,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.21,
+   "Bearing1_2": -2.43,
+   "Bearing1_3": -4.61,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.75,
+   "Bearing2_1": 1.33,
+   "Bearing2_2": -3.82,
+   "Bearing2_3": -8.41,
+   "Bearing2_4": -13.87,
+   "Bearing2_5": -13.34,
+   "Bearing3_1": 5.78,
+   "Bearing3_2": -4.67,
+   "Bearing3_3": -1.95,
+   "Bearing3_4": -7.02,
+   "Bearing3_5": 4.84
+  }
+ },
+ "s0/fully_nested/vs_baseline_s0": {
+  "ap_better/worse": [
+   6,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   4,
+   1,
+   10
+  ],
+  "miss_better/worse": [
+   8,
+   3
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   427
+  ],
+  "miss_total": [
+   607,
+   455
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": -1,
+   "Bearing2_4": 0,
+   "Bearing2_5": -2,
+   "Bearing3_1": -4,
+   "Bearing3_2": -1,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.001,
+   "Bearing1_2": 0.265,
+   "Bearing1_3": -0.005,
+   "Bearing1_4": 0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.034,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.074,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.011,
+   "Bearing3_1": 0.025,
+   "Bearing3_2": -0.035,
+   "Bearing3_3": 0.164,
+   "Bearing3_4": 0.011,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.21,
+   "Bearing1_2": -2.43,
+   "Bearing1_3": -4.61,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.75,
+   "Bearing2_1": 1.33,
+   "Bearing2_2": -3.82,
+   "Bearing2_3": -8.41,
+   "Bearing2_4": -13.87,
+   "Bearing2_5": -13.34,
+   "Bearing3_1": 5.78,
+   "Bearing3_2": -4.67,
+   "Bearing3_3": -1.95,
+   "Bearing3_4": -7.02,
+   "Bearing3_5": 4.84
+  }
+ },
+ "s0/fully_nested/vs_baseline_same_seed": {
+  "ap_better/worse": [
+   6,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   4,
+   1,
+   10
+  ],
+  "miss_better/worse": [
+   8,
+   3
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   427
+  ],
+  "miss_total": [
+   607,
+   455
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": -1,
+   "Bearing2_4": 0,
+   "Bearing2_5": -2,
+   "Bearing3_1": -4,
+   "Bearing3_2": -1,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.001,
+   "Bearing1_2": 0.265,
+   "Bearing1_3": -0.005,
+   "Bearing1_4": 0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.034,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.074,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.011,
+   "Bearing3_1": 0.025,
+   "Bearing3_2": -0.035,
+   "Bearing3_3": 0.164,
+   "Bearing3_4": 0.011,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.21,
+   "Bearing1_2": -2.43,
+   "Bearing1_3": -4.61,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.75,
+   "Bearing2_1": 1.33,
+   "Bearing2_2": -3.82,
+   "Bearing2_3": -8.41,
+   "Bearing2_4": -13.87,
+   "Bearing2_5": -13.34,
+   "Bearing3_1": 5.78,
+   "Bearing3_2": -4.67,
+   "Bearing3_3": -1.95,
+   "Bearing3_4": -7.02,
+   "Bearing3_5": 4.84
+  }
+ },
+ "s1/fixed/vs_baseline_s0": {
+  "ap_better/worse": [
+   6,
+   6
+  ],
+  "auc_better/worse": [
+   7,
+   4
+  ],
+  "fa_better/worse/tie": [
+   0,
+   3,
+   12
+  ],
+  "miss_better/worse": [
+   8,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   452
+  ],
+  "miss_total": [
+   607,
+   503
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": 0,
+   "Bearing3_2": 3,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": 0.001,
+   "Bearing1_2": 0.282,
+   "Bearing1_3": -0.008,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.035,
+   "Bearing2_2": 0.001,
+   "Bearing2_3": -0.086,
+   "Bearing2_4": NaN,
+   "Bearing2_5": -0.004,
+   "Bearing3_1": 0.022,
+   "Bearing3_2": -0.025,
+   "Bearing3_3": 0.15,
+   "Bearing3_4": 0.009,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.15,
+   "Bearing1_2": -2.38,
+   "Bearing1_3": -4.38,
+   "Bearing1_4": -0.91,
+   "Bearing1_5": -9.24,
+   "Bearing2_1": 1.38,
+   "Bearing2_2": -3.69,
+   "Bearing2_3": -8.62,
+   "Bearing2_4": -13.61,
+   "Bearing2_5": -13.69,
+   "Bearing3_1": 5.36,
+   "Bearing3_2": -5.06,
+   "Bearing3_3": -1.93,
+   "Bearing3_4": -7.0,
+   "Bearing3_5": 5.14
+  }
+ },
+ "s1/fixed/vs_baseline_same_seed": {
+  "ap_better/worse": [
+   7,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   0,
+   3,
+   12
+  ],
+  "miss_better/worse": [
+   8,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   402,
+   452
+  ],
+  "miss_total": [
+   616,
+   503
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": 0,
+   "Bearing3_2": 1,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": 0.003,
+   "Bearing1_2": 0.28,
+   "Bearing1_3": -0.007,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.014,
+   "Bearing2_2": 0.0,
+   "Bearing2_3": -0.084,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.006,
+   "Bearing3_1": 0.022,
+   "Bearing3_2": -0.019,
+   "Bearing3_3": 0.145,
+   "Bearing3_4": 0.003,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.15,
+   "Bearing1_2": -2.38,
+   "Bearing1_3": -4.38,
+   "Bearing1_4": -0.91,
+   "Bearing1_5": -9.24,
+   "Bearing2_1": 1.38,
+   "Bearing2_2": -3.69,
+   "Bearing2_3": -8.62,
+   "Bearing2_4": -13.61,
+   "Bearing2_5": -13.69,
+   "Bearing3_1": 5.36,
+   "Bearing3_2": -5.06,
+   "Bearing3_3": -1.93,
+   "Bearing3_4": -7.0,
+   "Bearing3_5": 5.14
+  }
+ },
+ "s1/latch/vs_baseline_s0": {
+  "ap_better/worse": [
+   6,
+   6
+  ],
+  "auc_better/worse": [
+   7,
+   4
+  ],
+  "fa_better/worse/tie": [
+   0,
+   3,
+   12
+  ],
+  "miss_better/worse": [
+   9,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   601
+  ],
+  "miss_total": [
+   607,
+   333
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": 0,
+   "Bearing3_2": 152,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": 0.001,
+   "Bearing1_2": 0.282,
+   "Bearing1_3": -0.008,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.035,
+   "Bearing2_2": 0.001,
+   "Bearing2_3": -0.086,
+   "Bearing2_4": NaN,
+   "Bearing2_5": -0.004,
+   "Bearing3_1": 0.022,
+   "Bearing3_2": -0.025,
+   "Bearing3_3": 0.15,
+   "Bearing3_4": 0.009,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.15,
+   "Bearing1_2": -2.38,
+   "Bearing1_3": -4.38,
+   "Bearing1_4": -0.91,
+   "Bearing1_5": -9.24,
+   "Bearing2_1": 1.38,
+   "Bearing2_2": -3.69,
+   "Bearing2_3": -8.62,
+   "Bearing2_4": -13.61,
+   "Bearing2_5": -13.69,
+   "Bearing3_1": 5.36,
+   "Bearing3_2": -5.06,
+   "Bearing3_3": -1.93,
+   "Bearing3_4": -7.0,
+   "Bearing3_5": 5.14
+  }
+ },
+ "s1/latch/vs_baseline_same_seed": {
+  "ap_better/worse": [
+   7,
+   5
+  ],
+  "auc_better/worse": [
+   6,
+   5
+  ],
+  "fa_better/worse/tie": [
+   0,
+   3,
+   12
+  ],
+  "miss_better/worse": [
+   9,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   402,
+   601
+  ],
+  "miss_total": [
+   616,
+   333
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": 0,
+   "Bearing3_2": 150,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": 0.003,
+   "Bearing1_2": 0.28,
+   "Bearing1_3": -0.007,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.014,
+   "Bearing2_2": 0.0,
+   "Bearing2_3": -0.084,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.006,
+   "Bearing3_1": 0.022,
+   "Bearing3_2": -0.019,
+   "Bearing3_3": 0.145,
+   "Bearing3_4": 0.003,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.15,
+   "Bearing1_2": -2.38,
+   "Bearing1_3": -4.38,
+   "Bearing1_4": -0.91,
+   "Bearing1_5": -9.24,
+   "Bearing2_1": 1.38,
+   "Bearing2_2": -3.69,
+   "Bearing2_3": -8.62,
+   "Bearing2_4": -13.61,
+   "Bearing2_5": -13.69,
+   "Bearing3_1": 5.36,
+   "Bearing3_2": -5.06,
+   "Bearing3_3": -1.93,
+   "Bearing3_4": -7.0,
+   "Bearing3_5": 5.14
+  }
+ },
+ "s2/fixed/vs_baseline_s0": {
+  "ap_better/worse": [
+   6,
+   6
+  ],
+  "auc_better/worse": [
+   7,
+   4
+  ],
+  "fa_better/worse/tie": [
+   1,
+   2,
+   12
+  ],
+  "miss_better/worse": [
+   8,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   448
+  ],
+  "miss_total": [
+   607,
+   488
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": -1,
+   "Bearing3_2": 0,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.002,
+   "Bearing1_2": 0.27,
+   "Bearing1_3": -0.001,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.104,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.086,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.019,
+   "Bearing3_1": 0.024,
+   "Bearing3_2": -0.021,
+   "Bearing3_3": 0.165,
+   "Bearing3_4": 0.013,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.1,
+   "Bearing1_2": -2.54,
+   "Bearing1_3": -4.68,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.35,
+   "Bearing2_1": 1.3,
+   "Bearing2_2": -3.52,
+   "Bearing2_3": -8.54,
+   "Bearing2_4": -13.84,
+   "Bearing2_5": -13.0,
+   "Bearing3_1": 5.46,
+   "Bearing3_2": -4.93,
+   "Bearing3_3": -1.8,
+   "Bearing3_4": -6.87,
+   "Bearing3_5": 4.88
+  }
+ },
+ "s2/fixed/vs_baseline_same_seed": {
+  "ap_better/worse": [
+   8,
+   4
+  ],
+  "auc_better/worse": [
+   8,
+   3
+  ],
+  "fa_better/worse/tie": [
+   0,
+   2,
+   13
+  ],
+  "miss_better/worse": [
+   9,
+   0
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   393,
+   448
+  ],
+  "miss_total": [
+   615,
+   488
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 20,
+   "Bearing3_1": 0,
+   "Bearing3_2": 0,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": 0.001,
+   "Bearing1_2": 0.273,
+   "Bearing1_3": 0.0,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.07,
+   "Bearing2_2": 0.002,
+   "Bearing2_3": -0.053,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.026,
+   "Bearing3_1": 0.017,
+   "Bearing3_2": -0.056,
+   "Bearing3_3": 0.251,
+   "Bearing3_4": 0.022,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.1,
+   "Bearing1_2": -2.54,
+   "Bearing1_3": -4.68,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.35,
+   "Bearing2_1": 1.3,
+   "Bearing2_2": -3.52,
+   "Bearing2_3": -8.54,
+   "Bearing2_4": -13.84,
+   "Bearing2_5": -13.0,
+   "Bearing3_1": 5.46,
+   "Bearing3_2": -4.93,
+   "Bearing3_3": -1.8,
+   "Bearing3_4": -6.87,
+   "Bearing3_5": 4.88
+  }
+ },
+ "s2/latch/vs_baseline_s0": {
+  "ap_better/worse": [
+   6,
+   6
+  ],
+  "auc_better/worse": [
+   7,
+   4
+  ],
+  "fa_better/worse/tie": [
+   1,
+   3,
+   11
+  ],
+  "miss_better/worse": [
+   9,
+   1
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   400,
+   547
+  ],
+  "miss_total": [
+   607,
+   331
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 14,
+   "Bearing3_1": -1,
+   "Bearing3_2": 99,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": -0.002,
+   "Bearing1_2": 0.27,
+   "Bearing1_3": -0.001,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.104,
+   "Bearing2_2": 0.003,
+   "Bearing2_3": -0.086,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.019,
+   "Bearing3_1": 0.024,
+   "Bearing3_2": -0.021,
+   "Bearing3_3": 0.165,
+   "Bearing3_4": 0.013,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.1,
+   "Bearing1_2": -2.54,
+   "Bearing1_3": -4.68,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.35,
+   "Bearing2_1": 1.3,
+   "Bearing2_2": -3.52,
+   "Bearing2_3": -8.54,
+   "Bearing2_4": -13.84,
+   "Bearing2_5": -13.0,
+   "Bearing3_1": 5.46,
+   "Bearing3_2": -4.93,
+   "Bearing3_3": -1.8,
+   "Bearing3_4": -6.87,
+   "Bearing3_5": 4.88
+  }
+ },
+ "s2/latch/vs_baseline_same_seed": {
+  "ap_better/worse": [
+   8,
+   4
+  ],
+  "auc_better/worse": [
+   8,
+   3
+  ],
+  "fa_better/worse/tie": [
+   0,
+   3,
+   12
+  ],
+  "miss_better/worse": [
+   10,
+   0
+  ],
+  "mae_better/worse": [
+   12,
+   3
+  ],
+  "fa_total": [
+   393,
+   547
+  ],
+  "miss_total": [
+   615,
+   331
+  ],
+  "fa_delta_per_bearing": {
+   "Bearing1_1": 0,
+   "Bearing1_2": 0,
+   "Bearing1_3": 35,
+   "Bearing1_4": 0,
+   "Bearing1_5": 0,
+   "Bearing2_1": 0,
+   "Bearing2_2": 0,
+   "Bearing2_3": 0,
+   "Bearing2_4": 0,
+   "Bearing2_5": 20,
+   "Bearing3_1": 0,
+   "Bearing3_2": 99,
+   "Bearing3_3": 0,
+   "Bearing3_4": 0,
+   "Bearing3_5": 0
+  },
+  "ap_delta_per_bearing": {
+   "Bearing1_1": 0.001,
+   "Bearing1_2": 0.273,
+   "Bearing1_3": 0.0,
+   "Bearing1_4": -0.0,
+   "Bearing1_5": NaN,
+   "Bearing2_1": -0.07,
+   "Bearing2_2": 0.002,
+   "Bearing2_3": -0.053,
+   "Bearing2_4": NaN,
+   "Bearing2_5": 0.026,
+   "Bearing3_1": 0.017,
+   "Bearing3_2": -0.056,
+   "Bearing3_3": 0.251,
+   "Bearing3_4": 0.022,
+   "Bearing3_5": NaN
+  },
+  "mae_delta_per_bearing": {
+   "Bearing1_1": -2.1,
+   "Bearing1_2": -2.54,
+   "Bearing1_3": -4.68,
+   "Bearing1_4": -0.85,
+   "Bearing1_5": -9.35,
+   "Bearing2_1": 1.3,
+   "Bearing2_2": -3.52,
+   "Bearing2_3": -8.54,
+   "Bearing2_4": -13.84,
+   "Bearing2_5": -13.0,
+   "Bearing3_1": 5.46,
+   "Bearing3_2": -4.93,
+   "Bearing3_3": -1.8,
+   "Bearing3_4": -6.87,
+   "Bearing3_5": 4.88
+  }
+ }
+}

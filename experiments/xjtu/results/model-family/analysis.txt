@@ -1,0 +1,40 @@
+
+== baseline  wbAUC=0.796 condAUC={1: 0.3912663246268657, 2: 0.7417739105001463, 3: 0.7677465126140377}
+  fixed_0.6                       roc_auc=0.814 average_=0.623 f1=0.677 false_al=400 missed_f=607 within_h=10 early_wa=5 no_warni=0
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.814 average_=0.623 f1=0.680 false_al=400 missed_f=598 within_h=10 early_wa=5 no_warni=0 thr=0.595
+  lobo_threshold_approx_nested    roc_auc=0.814 average_=0.623 f1=0.663 false_al=677 missed_f=502 within_h=8 early_wa=7 no_warni=0
+
+== et_reg  wbAUC=0.844 condAUC={1: 0.4142257462686567, 2: 0.7403050965194502, 3: 0.7762356809834314}
+  fixed_0.6                       roc_auc=0.840 average_=0.652 f1=0.717 false_al=448 missed_f=481 within_h=9 early_wa=6 no_warni=0
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.840 average_=0.652 f1=0.666 false_al=396 missed_f=633 within_h=9 early_wa=5 no_warni=1 thr=0.71
+  lobo_threshold_approx_nested    roc_auc=0.840 average_=0.652 f1=0.705 false_al=554 missed_f=455 within_h=9 early_wa=6 no_warni=0
+
+== et_reg_bw  wbAUC=0.875 condAUC={1: 0.39308535447761195, 2: 0.7153882714243931, 3: 0.7969331685689403}
+  fixed_0.6                       roc_auc=0.828 average_=0.643 f1=0.683 false_al=407 missed_f=589 within_h=10 early_wa=5 no_warni=0
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.828 average_=0.643 f1=0.672 false_al=399 missed_f=618 within_h=10 early_wa=5 no_warni=0 thr=0.615
+  lobo_threshold_approx_nested    roc_auc=0.828 average_=0.643 f1=0.690 false_al=594 missed_f=472 within_h=9 early_wa=6 no_warni=0
+
+== hgb  wbAUC=0.848 condAUC={1: 0.8357975746268655, 2: 0.713035609827435, 3: 0.7527585737417661}
+  fixed_0.6                       roc_auc=0.816 average_=0.596 f1=0.599 false_al=1161 missed_f=454 within_h=8 early_wa=7 no_warni=0
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.816 average_=0.596 f1=0.646 false_al=392 missed_f=680 within_h=11 early_wa=4 no_warni=0 thr=0.905
+  lobo_threshold_approx_nested    roc_auc=0.816 average_=0.596 f1=0.574 false_al=862 missed_f=645 within_h=11 early_wa=4 no_warni=0
+
+== hgb_bw  wbAUC=0.831 condAUC={1: 0.7074626865671642, 2: 0.6780354270254461, 3: 0.7027610161071398}
+  fixed_0.6                       roc_auc=0.765 average_=0.528 f1=0.429 false_al=2598 missed_f=498 within_h=8 early_wa=7 no_warni=0
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.765 average_=0.528 f1=0.649 false_al=393 missed_f=673 within_h=9 early_wa=5 no_warni=1 thr=0.88
+  lobo_threshold_approx_nested    roc_auc=0.765 average_=0.528 f1=0.623 false_al=491 missed_f=687 within_h=8 early_wa=6 no_warni=1
+
+== xgb_cw  wbAUC=0.822 condAUC={1: 0.7526352611940298, 2: 0.7158068879789412, 3: 0.7400517781459225}
+  fixed_0.6                       roc_auc=0.821 average_=0.578 f1=0.597 false_al=1276 missed_f=412 within_h=7 early_wa=8 no_warni=0
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.821 average_=0.578 f1=0.644 false_al=394 missed_f=684 within_h=10 early_wa=5 no_warni=0 thr=0.88
+  lobo_threshold_approx_nested    roc_auc=0.821 average_=0.578 f1=0.575 false_al=989 missed_f=592 within_h=8 early_wa=7 no_warni=0
+
+== xgb_bw  wbAUC=0.842 condAUC={1: 0.7365788246268657, 2: 0.6938468850541095, 3: 0.7407027724484556}
+  fixed_0.6                       roc_auc=0.799 average_=0.555 f1=0.555 false_al=1468 missed_f=458 within_h=8 early_wa=7 no_warni=0
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.799 average_=0.555 f1=0.653 false_al=397 missed_f=662 within_h=10 early_wa=5 no_warni=0 thr=0.865
+  lobo_threshold_approx_nested    roc_auc=0.799 average_=0.555 f1=0.617 false_al=617 missed_f=643 within_h=10 early_wa=5 no_warni=0
+
+== xgb_bw_iso  wbAUC=0.819 condAUC={1: 0.7883861940298508, 2: 0.7142695232524131, 3: 0.7039762227936087}
+  fixed_0.6                       roc_auc=0.731 average_=0.522 f1=0.409 false_al=158 missed_f=1193 within_h=10 early_wa=2 no_warni=3
+  fa_matched_pooled_DIAGNOSTIC    roc_auc=0.731 average_=0.522 f1=0.642 false_al=392 missed_f=689 within_h=10 early_wa=5 no_warni=0 thr=0.265
+  lobo_threshold_approx_nested    roc_auc=0.731 average_=0.522 f1=0.604 false_al=570 missed_f=695 within_h=10 early_wa=5 no_warni=0

@@ -1,0 +1,10 @@
+bearing,config,n,cuts_tested,prefix_mismatches,first_mismatch,garbage_rul_identical,first_nonhealthy,first_crit
+3_5,N_modal,114,94,0,[],True,22,65
+3_5,stress_calm_HGBq_mondrian_q10,114,94,0,[],True,38,38
+3_5,D,114,94,0,[],True,22,87
+1_2,N_modal,161,141,0,[],True,35,67
+1_2,stress_calm_HGBq_mondrian_q10,161,141,0,[],True,37,47
+1_2,D,161,141,0,[],True,35,98
+2_3,N_modal,533,129,0,[],True,131,343
+2_3,stress_calm_HGBq_mondrian_q10,533,129,0,[],True,133,133
+2_3,D,533,129,0,[],True,270,333

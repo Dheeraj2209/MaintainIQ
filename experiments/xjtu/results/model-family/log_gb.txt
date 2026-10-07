@@ -1,0 +1,94 @@
+fold  1 Bearing1_1 done  464.1s
+fold  2 Bearing1_2 done  808.5s
+fold  3 Bearing1_3 done 1051.2s
+fold  4 Bearing1_4 done 1432.3s
+fold  5 Bearing1_5 done 2126.9s
+fold  6 Bearing2_1 done 3958.6s
+fold  7 Bearing2_2 done 4913.8s
+fold  8 Bearing2_3 done 5681.3s
+fold  9 Bearing2_4 done 5990.9s
+fold 10 Bearing2_5 done 6792.3s
+fold 11 Bearing3_1 done 7223.8s
+fold 12 Bearing3_2 done 7914.1s
+fold 13 Bearing3_3 done 8621.4s
+fold 14 Bearing3_4 done 8953.5s
+fold 15 Bearing3_5 done 9488.8s
+hgb: 9492s
+metric                              baseline     candidate         delta
+roc_auc                               0.8143        0.8162       +0.0019
+average_precision                     0.6225        0.5959       -0.0266
+precision                             0.7247        0.5095       -0.2152
+recall                                0.6343        0.7265       +0.0922
+f1                                    0.6765        0.5990       -0.0776
+false_alarm_count                        400          1161     +761.0000
+missed_failure_window_count              607           454     -153.0000
+within_horizon_bearings                   10             8       -2.0000
+early_warning_bearings                     5             7       +2.0000
+no_warning_bearings                        0             0       +0.0000
+rul_mae                              30.8450       30.8450       +0.0000
+rul_rmse                             37.7559       37.7559       +0.0000
+rul_error_90                         62.7646       62.7646       +0.0000
+
+first warning (actual RUL at first warning, min):
+  Bearing1_1       120.0     120.0  within_horizon
+  Bearing1_2       158.0     125.0  early
+  Bearing1_3        95.0     152.0  early
+  Bearing1_4        58.0      71.0  within_horizon
+  Bearing1_5        13.0      14.0  within_horizon
+  Bearing2_1        33.0      33.0  within_horizon
+  Bearing2_2       104.0     117.0  within_horizon
+  Bearing2_3       402.0     516.0  early
+  Bearing2_4         7.0       8.0  within_horizon
+  Bearing2_5       179.0     336.0  early
+  Bearing3_1       140.0     146.0  early
+  Bearing3_2       220.0    2481.0  early
+  Bearing3_3        25.0      26.0  within_horizon
+  Bearing3_4        91.0    1077.0  early
+  Bearing3_5       103.0     104.0  within_horizon
+fold  1 Bearing1_1 done  386.4s
+fold  2 Bearing1_2 done  649.5s
+fold  3 Bearing1_3 done  801.7s
+fold  4 Bearing1_4 done  948.3s
+fold  5 Bearing1_5 done 1071.2s
+fold  6 Bearing2_1 done 1193.9s
+fold  7 Bearing2_2 done 1314.3s
+fold  8 Bearing2_3 done 1437.4s
+fold  9 Bearing2_4 done 1558.4s
+fold 10 Bearing2_5 done 1672.0s
+fold 11 Bearing3_1 done 1772.6s
+fold 12 Bearing3_2 done 1864.6s
+fold 13 Bearing3_3 done 1960.1s
+fold 14 Bearing3_4 done 2048.6s
+fold 15 Bearing3_5 done 2140.2s
+hgb_bw: 2141s
+metric                              baseline     candidate         delta
+roc_auc                               0.8143        0.7650       -0.0493
+average_precision                     0.6225        0.5277       -0.0948
+precision                             0.7247        0.3090       -0.4157
+recall                                0.6343        0.7000       +0.0657
+f1                                    0.6765        0.4288       -0.2477
+false_alarm_count                        400          2598    +2198.0000
+missed_failure_window_count              607           498     -109.0000
+within_horizon_bearings                   10             8       -2.0000
+early_warning_bearings                     5             7       +2.0000
+no_warning_bearings                        0             0       +0.0000
+rul_mae                              30.8450       30.8450       +0.0000
+rul_rmse                             37.7559       37.7559       +0.0000
+rul_error_90                         62.7646       62.7646       +0.0000
+
+first warning (actual RUL at first warning, min):
+  Bearing1_1       120.0     120.0  within_horizon
+  Bearing1_2       158.0     135.0  early
+  Bearing1_3        95.0     152.0  early
+  Bearing1_4        58.0      68.0  within_horizon
+  Bearing1_5        13.0      14.0  within_horizon
+  Bearing2_1        33.0      33.0  within_horizon
+  Bearing2_2       104.0     111.0  within_horizon
+  Bearing2_3       402.0     516.0  early
+  Bearing2_4         7.0       8.0  within_horizon
+  Bearing2_5       179.0     336.0  early
+  Bearing3_1       140.0    2413.0  early
+  Bearing3_2       220.0    2481.0  early
+  Bearing3_3        25.0      25.0  within_horizon
+  Bearing3_4        91.0    1063.0  early
+  Bearing3_5       103.0     104.0  within_horizon

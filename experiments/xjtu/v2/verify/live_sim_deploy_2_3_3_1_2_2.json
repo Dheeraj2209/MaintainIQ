@@ -1,0 +1,389 @@
+{
+ "2_3": {
+  "fold": 7,
+  "choice": "latch|ET(min_samples_leaf=20,max_features=0.3)|global|crit:q50|S1=3.0|S2=4.0",
+  "n": 533,
+  "p0": 0.4729061543025632,
+  "p0_timeline": 0.4729,
+  "offline_vs_timeline_state_mismatch": 0,
+  "offline_vs_timeline_q50_maxabs": 0.0004994121902370807,
+  "live_vs_offline_state_mismatch": 0,
+  "live_vs_offline_q50_maxabs": 1.9895196601282805e-13,
+  "live_vs_offline_lo_maxabs": 5.3290705182007514e-14,
+  "live_vs_offline_prob_maxabs": 8.881784197001252e-16,
+  "fallback_ref_changed": true,
+  "restart_t40_planstate_only": {
+   "mismatch": 0,
+   "error": null
+  },
+  "restart_t40_with_60row_history": {
+   "mismatch": 0,
+   "error": null
+  },
+  "restart_mid_planstate_only": {
+   "mismatch": 0,
+   "error": null
+  },
+  "story_live": [
+   [
+    0,
+    532,
+    0
+   ],
+   [
+    131,
+    401,
+    1
+   ],
+   [
+    329,
+    203,
+    2
+   ],
+   [
+    343,
+    189,
+    3
+   ]
+  ],
+  "story_offline_timeline": [
+   [
+    0,
+    532,
+    0
+   ],
+   [
+    131,
+    401,
+    1
+   ],
+   [
+    329,
+    203,
+    2
+   ],
+   [
+    343,
+    189,
+    3
+   ]
+  ],
+  "story_R0": [
+   [
+    0,
+    532,
+    0
+   ],
+   [
+    130,
+    402,
+    2
+   ],
+   [
+    285,
+    247,
+    1
+   ],
+   [
+    326,
+    206,
+    2
+   ],
+   [
+    336,
+    196,
+    1
+   ],
+   [
+    337,
+    195,
+    2
+   ],
+   [
+    340,
+    192,
+    1
+   ],
+   [
+    354,
+    178,
+    2
+   ],
+   [
+    381,
+    151,
+    3
+   ]
+  ],
+  "q50_at_entries": {
+   "0": null,
+   "131": 97.3,
+   "329": 36.3,
+   "343": 34.7
+  },
+  "prob_at_entries": {
+   "0": 0.473,
+   "131": 0.535,
+   "329": 0.845,
+   "343": 0.867
+  }
+ },
+ "3_1": {
+  "fold": 10,
+  "choice": "latch|ET(min_samples_leaf=10,max_features=0.3)|global|crit:q50|S1=3.0|S2=4.0",
+  "n": 2538,
+  "p0": 0.4729061543025633,
+  "p0_timeline": 0.4729,
+  "offline_vs_timeline_state_mismatch": 0,
+  "offline_vs_timeline_q50_maxabs": 0.000496865710758243,
+  "live_vs_offline_state_mismatch": 0,
+  "live_vs_offline_q50_maxabs": 1.4210854715202004e-13,
+  "live_vs_offline_lo_maxabs": 3.552713678800501e-14,
+  "live_vs_offline_prob_maxabs": 8.881784197001252e-16,
+  "fallback_ref_changed": false,
+  "restart_t40_planstate_only": {
+   "mismatch": 0,
+   "error": null
+  },
+  "restart_t40_with_60row_history": {
+   "mismatch": 0,
+   "error": null
+  },
+  "restart_mid_planstate_only": {
+   "mismatch": 0,
+   "error": null
+  },
+  "story_live": [
+   [
+    0,
+    2537,
+    0
+   ],
+   [
+    2392,
+    145,
+    1
+   ],
+   [
+    2454,
+    83,
+    2
+   ],
+   [
+    2469,
+    68,
+    3
+   ]
+  ],
+  "story_offline_timeline": [
+   [
+    0,
+    2537,
+    0
+   ],
+   [
+    2392,
+    145,
+    1
+   ],
+   [
+    2454,
+    83,
+    2
+   ],
+   [
+    2469,
+    68,
+    3
+   ]
+  ],
+  "story_R0": [
+   [
+    0,
+    2537,
+    0
+   ],
+   [
+    2397,
+    140,
+    1
+   ],
+   [
+    2464,
+    73,
+    2
+   ],
+   [
+    2482,
+    55,
+    1
+   ],
+   [
+    2483,
+    54,
+    2
+   ],
+   [
+    2523,
+    14,
+    3
+   ],
+   [
+    2536,
+    1,
+    0
+   ]
+  ],
+  "q50_at_entries": {
+   "0": null,
+   "2392": 155.1,
+   "2454": 62.4,
+   "2469": 35.6
+  },
+  "prob_at_entries": {
+   "0": 0.473,
+   "2392": 0.378,
+   "2454": 0.617,
+   "2469": 0.798
+  }
+ },
+ "2_2": {
+  "fold": 6,
+  "choice": "latch|ET(min_samples_leaf=10,max_features=0.3)|global|crit:q50|S1=3.0|S2=4.0",
+  "n": 161,
+  "p0": 0.4434943895966809,
+  "p0_timeline": 0.4435,
+  "offline_vs_timeline_state_mismatch": 0,
+  "offline_vs_timeline_q50_maxabs": 0.0004891913117148761,
+  "live_vs_offline_state_mismatch": 0,
+  "live_vs_offline_q50_maxabs": 5.684341886080802e-14,
+  "live_vs_offline_lo_maxabs": 1.4210854715202004e-14,
+  "live_vs_offline_prob_maxabs": 4.440892098500626e-16,
+  "fallback_ref_changed": false,
+  "restart_t40_planstate_only": {
+   "mismatch": 0,
+   "error": null
+  },
+  "restart_t40_with_60row_history": {
+   "mismatch": 0,
+   "error": null
+  },
+  "restart_mid_planstate_only": {
+   "mismatch": 0,
+   "error": null
+  },
+  "story_live": [
+   [
+    0,
+    160,
+    0
+   ],
+   [
+    54,
+    106,
+    1
+   ],
+   [
+    60,
+    100,
+    2
+   ],
+   [
+    79,
+    81,
+    3
+   ]
+  ],
+  "story_offline_timeline": [
+   [
+    0,
+    160,
+    0
+   ],
+   [
+    54,
+    106,
+    1
+   ],
+   [
+    60,
+    100,
+    2
+   ],
+   [
+    79,
+    81,
+    3
+   ]
+  ],
+  "story_R0": [
+   [
+    0,
+    160,
+    0
+   ],
+   [
+    56,
+    104,
+    1
+   ],
+   [
+    58,
+    102,
+    2
+   ],
+   [
+    82,
+    78,
+    0
+   ],
+   [
+    105,
+    55,
+    1
+   ],
+   [
+    124,
+    36,
+    2
+   ],
+   [
+    128,
+    32,
+    1
+   ],
+   [
+    129,
+    31,
+    2
+   ],
+   [
+    132,
+    28,
+    1
+   ],
+   [
+    133,
+    27,
+    2
+   ],
+   [
+    160,
+    0,
+    3
+   ]
+  ],
+  "q50_at_entries": {
+   "0": null,
+   "54": 78.5,
+   "60": 54.5,
+   "79": 39.5
+  },
+  "prob_at_entries": {
+   "0": 0.443,
+   "54": 0.567,
+   "60": 0.652,
+   "79": 0.755
+  }
+ }
+}

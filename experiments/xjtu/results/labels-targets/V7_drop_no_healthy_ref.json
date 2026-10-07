@@ -1,0 +1,37 @@
+{
+ "variant": "V7_drop_no_healthy_ref",
+ "fit_seconds": 1511.6810591999674,
+ "classifier_feature_count": 203,
+ "summary": {
+  "roc_auc": 0.7622045753155555,
+  "average_precision": 0.5941280320145875,
+  "precision": 0.8588098016336057,
+  "recall": 0.4433734939759036,
+  "f1": 0.5848232022248708,
+  "false_alarm_count": 121,
+  "missed_failure_window_count": 924,
+  "within_horizon_bearings": 11,
+  "early_warning_bearings": 2,
+  "no_warning_bearings": 2,
+  "rul_mae": 30.845007716580607,
+  "rul_rmse": 37.75585028414267,
+  "rul_error_90": 62.764619047619036
+ },
+ "first_warnings": {
+  "Bearing1_1": 41.0,
+  "Bearing1_2": null,
+  "Bearing1_3": 63.0,
+  "Bearing1_4": null,
+  "Bearing1_5": 12.0,
+  "Bearing2_1": 33.0,
+  "Bearing2_2": 104.0,
+  "Bearing2_3": 399.0,
+  "Bearing2_4": 7.0,
+  "Bearing2_5": 167.0,
+  "Bearing3_1": 119.0,
+  "Bearing3_2": 26.0,
+  "Bearing3_3": 25.0,
+  "Bearing3_4": 68.0,
+  "Bearing3_5": 103.0
+ }
+}

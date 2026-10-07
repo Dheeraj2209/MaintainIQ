@@ -1,0 +1,31 @@
+Deviations log for build_onset-learned.py (written 2026-10-06, BEFORE any onset-learned result was computed or seen).
+Protocol: experiments/xjtu/v2/PROTOCOL.frozen.md rev 2 (PROTOCOL.md itself is NOT edited: it is the frozen shared copy and
+other tracks run in parallel; deviations for this track are logged here and in results/onset-learned.json).
+
+DV1 (task vs protocol; scope). The task asks for "supervised/learned onset detector families in the protocol candidate space".
+    The frozen candidate space (section 5 item 1) contains NO supervised/learned onset family: ET-onset was removed (A.8,
+    "No exploratory version is pre-registered here"), and 1.4.3 forbids training anything on the onset GT. Because the task
+    also says "search ONLY the protocol's candidate space", no supervised onset classifier is trained. The only
+    label-driven stage-1 learning the protocol allows is the nested inner selection of the 24 rule configs (ratio/dual-gate
+    x self/fallback) by inner C1, which is computed against the offline onset GT of the 14 training bearings (4.3 step 1).
+    That is what "onset-learned" (N1) implements. Reported as a scope finding, not hidden.
+DV2 (stage 2 fixed, task-directed). Section 4.3 step 2 selects the downstream (672 combos) by nested LOBO. Per the task,
+    the downstream is fixed to the protocol's simplest reference = D's downstream {hard latch, TSO, global conformal,
+    model_crit q50<=30, S1 2.0, S2 off} so that the stage-1 effect is isolated. Consequently N1 is NOT the protocol's N;
+    decision rule 4.4.1 ("N ships") cannot be invoked for N1. All G/P gates are still computed for N1 and are labelled
+    EXPLORATORY (stage-1-only track). D and D' are computed exactly as pre-registered (D first, before any candidate).
+DV3 (ambiguity resolution, recorded before results). pre_onset semantics (harness2 caveat 2): primary = 'provisional'
+    (2.2 concurrent counters; stage-2 conditions evaluated at a provisional onset = current row, published q50 null while
+    O=0). Sensitivity 'none' is reported for N1, D, D'. With TSO, provisional q50 = L at tso=0, so this only matters
+    if a fold's L <= 60.
+DV4 (ambiguity resolution). Warm-up: the pipeline replay (causal.replay) never leaves healthy before row 20, so new
+    pipelines satisfy 2.1/3.1. R0/R1 keep the frozen ungated causal.states_r mapping (as in 4.5); harness2 already reports
+    the gated sensitivity.
+DV5 (ambiguity resolution). TSO L and conformal: L = median over training bearings (bearing-equal) of RUL at the chosen
+    stage-1's causal FPT; training bearings with no causal onset are excluded from L and from calibration. Inner OOF for
+    the conformal residuals: L_{-i} from the other 13 training bearings. Probability while O=1 = prob_within(120) from
+    levels (0.05, 0.1, 0.5, 0.9, 0.95) using alpha 0.1 and 0.05 conformal bounds; while O=0, p0 = bearing-equal fleet rate
+    P(RUL<=120 | O=0, row>=20) on the 14 training bearings under the chosen stage 1.
+DV6 (selection metric for stage 1, as pre-registered): stage-1 states for inner C1 are the hard-latch stage-1 replay; under
+    the fixed hard-latch downstream the non-healthy set equals the O=1 set, so C1 of the stage-1 replay equals C1 of the
+    full pipeline (checked at run time).

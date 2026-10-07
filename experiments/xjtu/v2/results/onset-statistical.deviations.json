@@ -1,0 +1,41 @@
+{
+  "written": "2026-10-06T23:44:07",
+  "note": "written before any D / candidate result is computed",
+  "deviations": [
+    {
+      "id": 1,
+      "kind": "ambiguity resolution (not a change)",
+      "text": "Pre-onset stage-2 semantics: pre_onset='provisional' (harness2 default). While O = 0 the faulty/critical conditions are evaluated with a provisional onset at the current row (tso = 0); no RUL is published while healthy. This follows the concurrent-counter rule of PROTOCOL 2.2 and the latency floors of 1.3. Same choice for D, D', N_TSO, N_S1."
+    },
+    {
+      "id": 2,
+      "kind": "ambiguity resolution (not a change)",
+      "text": "Warm-up: pipeline states come from causal.replay, which gates rows < 20 (healthy). R0/R1 use the frozen ungated causal.states_r mapping, exactly as the frozen 4.5 table."
+    },
+    {
+      "id": 3,
+      "kind": "DEVIATION: candidate space restricted (task scope)",
+      "text": "Stage-2 family fixed to TSO (the protocol's simplest reference RUL model) to isolate the stage-1 effect. ET and HGB-q (5 of the 7 stage-2 configs, 576 of 672 downstream combos) are NOT searched. N_TSO is therefore the protocol's nested procedure on a 96-combo subset of the 672 grid, not the protocol's N. Its gate outcomes are reported, but a ship decision for the protocol's N requires the full grid (run_nested.py). Results for N_TSO/N_S1 are labelled exploratory-for-N; D, D', R0 and R1 are unaffected."
+    },
+    {
+      "id": 4,
+      "kind": "DEVIATION: secondary pipeline not in the protocol",
+      "text": "N_S1 (stage 1 nested, downstream fixed at D's values) is an additional isolation analysis; it is not a protocol candidate selection and is reported as exploratory."
+    },
+    {
+      "id": 5,
+      "kind": "scope note (nothing added)",
+      "text": "The task text mentions CUSUM/EWMA detectors on fused health indicators. They are NOT in the frozen candidate space (section 5: ratio and dual-gate only) and were NOT searched or scored. Only the 24 protocol stage-1 configs are searched."
+    },
+    {
+      "id": 6,
+      "kind": "ambiguity resolution (not a change)",
+      "text": "Stage-1 scoring for C1 and the causal FPT used for TSO training/calibration use the hard latch (harness2.causal_fpt); the hysteresis option is a downstream item and is applied in the full replay only. Fallback when no downstream candidate is eligible = D's full configuration (stage 1 and downstream), as 4.2 says 'that fold uses D's configuration'. p0 = bearing-equal fleet rate of RUL <= 120 over rows >= 20 that are healthy in the chosen pipeline's inner-OOF replay on the training bearings. Published interval alpha = 0.1 for every model (P2 nominal 0.90), whatever model_crit alpha was selected."
+    },
+    {
+      "id": 7,
+      "kind": "ambiguity resolution (not a change)",
+      "text": "O1 delay for nested pipelines uses each bearing's own fold-selected k for the eligibility row (harness2.evaluate takes one k; the O1 column is recomputed per bearing)."
+    }
+  ]
+}

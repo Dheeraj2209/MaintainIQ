@@ -1,0 +1,888 @@
+{
+  "baseline": {
+    "summary": {
+      "roc_auc": 0.8142943133040368,
+      "average_precision": 0.6225354240421872,
+      "precision": 0.7247075017205781,
+      "recall": 0.6343373493975903,
+      "f1": 0.6765178284612914,
+      "false_alarm_count": 400,
+      "missed_failure_window_count": 607,
+      "within_horizon_bearings": 10,
+      "early_warning_bearings": 5,
+      "no_warning_bearings": 0,
+      "rul_mae": 30.845007716580607,
+      "rul_rmse": 37.75585028414267,
+      "rul_error_90": 62.764619047619036
+    },
+    "live_rul_mae": 36.40508571428571,
+    "loo_threshold": {
+      "summary": {
+        "roc_auc": 0.8142943133040368,
+        "average_precision": 0.6225354240421872,
+        "precision": 0.5422018348623853,
+        "recall": 0.7120481927710843,
+        "f1": 0.615625,
+        "false_alarm_count": 998,
+        "missed_failure_window_count": 478,
+        "within_horizon_bearings": 8,
+        "early_warning_bearings": 7,
+        "no_warning_bearings": 0,
+        "rul_mae": 30.845007716580607,
+        "rul_rmse": 37.75585028414267,
+        "rul_error_90": 62.764619047619036
+      },
+      "chosen": {
+        "Bearing1_1": 0.55,
+        "Bearing1_2": 0.5,
+        "Bearing1_3": 0.5,
+        "Bearing1_4": 0.5,
+        "Bearing1_5": 0.55,
+        "Bearing2_1": 0.5,
+        "Bearing2_2": 0.5,
+        "Bearing2_3": 0.5,
+        "Bearing2_4": 0.5,
+        "Bearing2_5": 0.5,
+        "Bearing3_1": 0.5,
+        "Bearing3_2": 0.45,
+        "Bearing3_3": 0.5,
+        "Bearing3_4": 0.5,
+        "Bearing3_5": 0.5
+      }
+    }
+  },
+  "variants": {
+    "V1_base_plus_rs": {
+      "variant": "V1_base_plus_rs",
+      "description": "production features + all rs features (both stages)",
+      "summary": {
+        "roc_auc": 0.774576176596274,
+        "average_precision": 0.6552031487533656,
+        "precision": 0.7203092059030218,
+        "recall": 0.6174698795180723,
+        "f1": 0.6649367499189102,
+        "false_alarm_count": 398,
+        "missed_failure_window_count": 635,
+        "within_horizon_bearings": 9,
+        "early_warning_bearings": 5,
+        "no_warning_bearings": 1,
+        "rul_mae": 30.083479862306366,
+        "rul_rmse": 36.87232846059739,
+        "rul_error_90": 60.100952380952435
+      },
+      "classifier_feature_count": 462,
+      "regressor_feature_count": 601,
+      "first_warning": [
+        {
+          "bearing_id": "Bearing1_1",
+          "actual_rul_minutes_at_first_warning": 41.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_2",
+          "actual_rul_minutes_at_first_warning": 157.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing1_3",
+          "actual_rul_minutes_at_first_warning": 155.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing1_4",
+          "actual_rul_minutes_at_first_warning": null,
+          "timing": "no_warning"
+        },
+        {
+          "bearing_id": "Bearing1_5",
+          "actual_rul_minutes_at_first_warning": 13.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_1",
+          "actual_rul_minutes_at_first_warning": 30.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_2",
+          "actual_rul_minutes_at_first_warning": 104.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_3",
+          "actual_rul_minutes_at_first_warning": 406.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing2_4",
+          "actual_rul_minutes_at_first_warning": 8.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_5",
+          "actual_rul_minutes_at_first_warning": 169.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_1",
+          "actual_rul_minutes_at_first_warning": 147.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_2",
+          "actual_rul_minutes_at_first_warning": 28.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_3",
+          "actual_rul_minutes_at_first_warning": 25.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_4",
+          "actual_rul_minutes_at_first_warning": 87.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_5",
+          "actual_rul_minutes_at_first_warning": 103.0,
+          "timing": "within_horizon"
+        }
+      ],
+      "wall_seconds": 4824.632114700042,
+      "live_rul_mae": 35.473913052208836,
+      "loo_threshold": {
+        "summary": {
+          "roc_auc": 0.774576176596274,
+          "average_precision": 0.6552031487533656,
+          "precision": 0.5102880658436214,
+          "recall": 0.5975903614457831,
+          "f1": 0.5504994450610433,
+          "false_alarm_count": 952,
+          "missed_failure_window_count": 668,
+          "within_horizon_bearings": 9,
+          "early_warning_bearings": 5,
+          "no_warning_bearings": 1,
+          "rul_mae": 30.083479862306366,
+          "rul_rmse": 36.87232846059739,
+          "rul_error_90": 60.100952380952435
+        },
+        "chosen": {
+          "Bearing1_1": 0.65,
+          "Bearing1_2": 0.65,
+          "Bearing1_3": 0.65,
+          "Bearing1_4": 0.65,
+          "Bearing1_5": 0.65,
+          "Bearing2_1": 0.65,
+          "Bearing2_2": 0.65,
+          "Bearing2_3": 0.55,
+          "Bearing2_4": 0.65,
+          "Bearing2_5": 0.65,
+          "Bearing3_1": 0.5,
+          "Bearing3_2": 0.65,
+          "Bearing3_3": 0.65,
+          "Bearing3_4": 0.65,
+          "Bearing3_5": 0.65
+        },
+        "live_rul_mae": 36.58953542742398
+      }
+    },
+    "V2_rel_ref": {
+      "variant": "V2_rel_ref",
+      "description": "reference: relative-only existing features, no speed/load, no rs (prod regressor)",
+      "summary": {
+        "roc_auc": 0.8378852758838424,
+        "average_precision": 0.6519274957885168,
+        "precision": 0.6294919454770755,
+        "recall": 0.6120481927710844,
+        "f1": 0.6206475259621258,
+        "false_alarm_count": 598,
+        "missed_failure_window_count": 644,
+        "within_horizon_bearings": 7,
+        "early_warning_bearings": 7,
+        "no_warning_bearings": 1,
+        "rul_mae": 30.845007716580607,
+        "rul_rmse": 37.75585028414267,
+        "rul_error_90": 62.764619047619036
+      },
+      "classifier_feature_count": 86,
+      "regressor_feature_count": 342,
+      "first_warning": [
+        {
+          "bearing_id": "Bearing1_1",
+          "actual_rul_minutes_at_first_warning": 108.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_2",
+          "actual_rul_minutes_at_first_warning": 101.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_3",
+          "actual_rul_minutes_at_first_warning": 63.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_4",
+          "actual_rul_minutes_at_first_warning": null,
+          "timing": "no_warning"
+        },
+        {
+          "bearing_id": "Bearing1_5",
+          "actual_rul_minutes_at_first_warning": 13.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_1",
+          "actual_rul_minutes_at_first_warning": 304.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing2_2",
+          "actual_rul_minutes_at_first_warning": 110.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_3",
+          "actual_rul_minutes_at_first_warning": 402.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing2_4",
+          "actual_rul_minutes_at_first_warning": 8.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_5",
+          "actual_rul_minutes_at_first_warning": 336.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_1",
+          "actual_rul_minutes_at_first_warning": 143.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_2",
+          "actual_rul_minutes_at_first_warning": 425.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_3",
+          "actual_rul_minutes_at_first_warning": 360.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_4",
+          "actual_rul_minutes_at_first_warning": 385.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_5",
+          "actual_rul_minutes_at_first_warning": 104.0,
+          "timing": "within_horizon"
+        }
+      ],
+      "wall_seconds": 1320.9613956999965,
+      "live_rul_mae": 35.969068588640276,
+      "loo_threshold": {
+        "summary": {
+          "roc_auc": 0.8378852758838424,
+          "average_precision": 0.6519274957885168,
+          "precision": 0.6054644808743169,
+          "recall": 0.6674698795180722,
+          "f1": 0.6349570200573066,
+          "false_alarm_count": 722,
+          "missed_failure_window_count": 552,
+          "within_horizon_bearings": 7,
+          "early_warning_bearings": 7,
+          "no_warning_bearings": 1,
+          "rul_mae": 30.845007716580607,
+          "rul_rmse": 37.75585028414267,
+          "rul_error_90": 62.764619047619036
+        },
+        "chosen": {
+          "Bearing1_1": 0.55,
+          "Bearing1_2": 0.55,
+          "Bearing1_3": 0.55,
+          "Bearing1_4": 0.55,
+          "Bearing1_5": 0.55,
+          "Bearing2_1": 0.55,
+          "Bearing2_2": 0.55,
+          "Bearing2_3": 0.55,
+          "Bearing2_4": 0.55,
+          "Bearing2_5": 0.55,
+          "Bearing3_1": 0.55,
+          "Bearing3_2": 0.55,
+          "Bearing3_3": 0.55,
+          "Bearing3_4": 0.55,
+          "Bearing3_5": 0.55
+        },
+        "live_rul_mae": 34.60995229489386
+      }
+    },
+    "V3_rel_plus_rs_rel": {
+      "variant": "V3_rel_plus_rs_rel",
+      "description": "relative existing + baseline-relative rs features; regressor + all rs",
+      "summary": {
+        "roc_auc": 0.7424518215795952,
+        "average_precision": 0.635364115086127,
+        "precision": 0.83446519524618,
+        "recall": 0.5921686746987952,
+        "f1": 0.6927413671599718,
+        "false_alarm_count": 195,
+        "missed_failure_window_count": 677,
+        "within_horizon_bearings": 9,
+        "early_warning_bearings": 5,
+        "no_warning_bearings": 1,
+        "rul_mae": 30.083479862306366,
+        "rul_rmse": 36.87232846059739,
+        "rul_error_90": 60.100952380952435
+      },
+      "classifier_feature_count": 234,
+      "regressor_feature_count": 601,
+      "first_warning": [
+        {
+          "bearing_id": "Bearing1_1",
+          "actual_rul_minutes_at_first_warning": 111.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_2",
+          "actual_rul_minutes_at_first_warning": 101.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_3",
+          "actual_rul_minutes_at_first_warning": 76.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_4",
+          "actual_rul_minutes_at_first_warning": null,
+          "timing": "no_warning"
+        },
+        {
+          "bearing_id": "Bearing1_5",
+          "actual_rul_minutes_at_first_warning": 13.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_1",
+          "actual_rul_minutes_at_first_warning": 33.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_2",
+          "actual_rul_minutes_at_first_warning": 110.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_3",
+          "actual_rul_minutes_at_first_warning": 282.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing2_4",
+          "actual_rul_minutes_at_first_warning": 8.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_5",
+          "actual_rul_minutes_at_first_warning": 158.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_1",
+          "actual_rul_minutes_at_first_warning": 2087.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_2",
+          "actual_rul_minutes_at_first_warning": 2462.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_3",
+          "actual_rul_minutes_at_first_warning": 360.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_4",
+          "actual_rul_minutes_at_first_warning": 92.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_5",
+          "actual_rul_minutes_at_first_warning": 104.0,
+          "timing": "within_horizon"
+        }
+      ],
+      "wall_seconds": 3052.6125443000346,
+      "live_rul_mae": 34.60886617900172,
+      "loo_threshold": {
+        "summary": {
+          "roc_auc": 0.7424518215795952,
+          "average_precision": 0.635364115086127,
+          "precision": 0.8325912733748887,
+          "recall": 0.5632530120481928,
+          "f1": 0.6719367588932806,
+          "false_alarm_count": 188,
+          "missed_failure_window_count": 725,
+          "within_horizon_bearings": 10,
+          "early_warning_bearings": 4,
+          "no_warning_bearings": 1,
+          "rul_mae": 30.083479862306366,
+          "rul_rmse": 36.87232846059739,
+          "rul_error_90": 60.100952380952435
+        },
+        "chosen": {
+          "Bearing1_1": 0.65,
+          "Bearing1_2": 0.65,
+          "Bearing1_3": 0.65,
+          "Bearing1_4": 0.65,
+          "Bearing1_5": 0.6,
+          "Bearing2_1": 0.65,
+          "Bearing2_2": 0.65,
+          "Bearing2_3": 0.6,
+          "Bearing2_4": 0.6,
+          "Bearing2_5": 0.6,
+          "Bearing3_1": 0.6,
+          "Bearing3_2": 0.65,
+          "Bearing3_3": 0.6,
+          "Bearing3_4": 0.6,
+          "Bearing3_5": 0.6
+        },
+        "live_rul_mae": 35.598482759609865
+      }
+    },
+    "V4_rel_plus_rs_all": {
+      "variant": "V4_rel_plus_rs_all",
+      "description": "relative existing + all rs (incl. absolute SNR/ratio levels); regressor + all rs",
+      "summary": {
+        "roc_auc": 0.7594157200533208,
+        "average_precision": 0.627603348668516,
+        "precision": 0.757527733755943,
+        "recall": 0.5759036144578313,
+        "f1": 0.6543463381245722,
+        "false_alarm_count": 306,
+        "missed_failure_window_count": 704,
+        "within_horizon_bearings": 11,
+        "early_warning_bearings": 3,
+        "no_warning_bearings": 1,
+        "rul_mae": 30.083479862306366,
+        "rul_rmse": 36.87232846059739,
+        "rul_error_90": 60.100952380952435
+      },
+      "classifier_feature_count": 345,
+      "regressor_feature_count": 601,
+      "first_warning": [
+        {
+          "bearing_id": "Bearing1_1",
+          "actual_rul_minutes_at_first_warning": 41.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_2",
+          "actual_rul_minutes_at_first_warning": 118.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_3",
+          "actual_rul_minutes_at_first_warning": 78.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_4",
+          "actual_rul_minutes_at_first_warning": null,
+          "timing": "no_warning"
+        },
+        {
+          "bearing_id": "Bearing1_5",
+          "actual_rul_minutes_at_first_warning": 13.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_1",
+          "actual_rul_minutes_at_first_warning": 16.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_2",
+          "actual_rul_minutes_at_first_warning": 106.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_3",
+          "actual_rul_minutes_at_first_warning": 383.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing2_4",
+          "actual_rul_minutes_at_first_warning": 8.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_5",
+          "actual_rul_minutes_at_first_warning": 167.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_1",
+          "actual_rul_minutes_at_first_warning": 154.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_2",
+          "actual_rul_minutes_at_first_warning": 46.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_3",
+          "actual_rul_minutes_at_first_warning": 25.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_4",
+          "actual_rul_minutes_at_first_warning": 88.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_5",
+          "actual_rul_minutes_at_first_warning": 104.0,
+          "timing": "within_horizon"
+        }
+      ],
+      "wall_seconds": 4009.5221130000427,
+      "live_rul_mae": 35.6202549340218,
+      "loo_threshold": {
+        "summary": {
+          "roc_auc": 0.7594157200533208,
+          "average_precision": 0.627603348668516,
+          "precision": 0.6798657718120805,
+          "recall": 0.6102409638554217,
+          "f1": 0.6431746031746032,
+          "false_alarm_count": 477,
+          "missed_failure_window_count": 647,
+          "within_horizon_bearings": 11,
+          "early_warning_bearings": 3,
+          "no_warning_bearings": 1,
+          "rul_mae": 30.083479862306366,
+          "rul_rmse": 36.87232846059739,
+          "rul_error_90": 60.100952380952435
+        },
+        "chosen": {
+          "Bearing1_1": 0.55,
+          "Bearing1_2": 0.6,
+          "Bearing1_3": 0.55,
+          "Bearing1_4": 0.55,
+          "Bearing1_5": 0.55,
+          "Bearing2_1": 0.55,
+          "Bearing2_2": 0.55,
+          "Bearing2_3": 0.55,
+          "Bearing2_4": 0.55,
+          "Bearing2_5": 0.55,
+          "Bearing3_1": 0.55,
+          "Bearing3_2": 0.6,
+          "Bearing3_3": 0.55,
+          "Bearing3_4": 0.55,
+          "Bearing3_5": 0.55
+        },
+        "live_rul_mae": 35.56906540447504
+      }
+    },
+    "V5_rel_plus_rs_energy": {
+      "variant": "V5_rel_plus_rs_energy",
+      "description": "relative existing + baseline-relative shaft-order/band-RMS rs only; regressor + all rs",
+      "summary": {
+        "roc_auc": 0.7335934659761332,
+        "average_precision": 0.6518815640709936,
+        "precision": 0.8680377035132819,
+        "recall": 0.6102409638554217,
+        "f1": 0.7166607711354793,
+        "false_alarm_count": 154,
+        "missed_failure_window_count": 647,
+        "within_horizon_bearings": 9,
+        "early_warning_bearings": 5,
+        "no_warning_bearings": 1,
+        "rul_mae": 30.083479862306366,
+        "rul_rmse": 36.87232846059739,
+        "rul_error_90": 60.100952380952435
+      },
+      "classifier_feature_count": 134,
+      "regressor_feature_count": 601,
+      "first_warning": [
+        {
+          "bearing_id": "Bearing1_1",
+          "actual_rul_minutes_at_first_warning": 110.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_2",
+          "actual_rul_minutes_at_first_warning": 120.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_3",
+          "actual_rul_minutes_at_first_warning": 76.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_4",
+          "actual_rul_minutes_at_first_warning": null,
+          "timing": "no_warning"
+        },
+        {
+          "bearing_id": "Bearing1_5",
+          "actual_rul_minutes_at_first_warning": 13.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_1",
+          "actual_rul_minutes_at_first_warning": 31.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_2",
+          "actual_rul_minutes_at_first_warning": 111.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_3",
+          "actual_rul_minutes_at_first_warning": 203.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing2_4",
+          "actual_rul_minutes_at_first_warning": 8.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_5",
+          "actual_rul_minutes_at_first_warning": 165.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_1",
+          "actual_rul_minutes_at_first_warning": 1677.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_2",
+          "actual_rul_minutes_at_first_warning": 2429.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_3",
+          "actual_rul_minutes_at_first_warning": 360.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_4",
+          "actual_rul_minutes_at_first_warning": 92.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_5",
+          "actual_rul_minutes_at_first_warning": 104.0,
+          "timing": "within_horizon"
+        }
+      ],
+      "wall_seconds": 2022.284417500021,
+      "live_rul_mae": 35.01214314400459,
+      "loo_threshold": {
+        "summary": {
+          "roc_auc": 0.7335934659761332,
+          "average_precision": 0.6518815640709936,
+          "precision": 0.8660869565217392,
+          "recall": 0.6,
+          "f1": 0.7088967971530249,
+          "false_alarm_count": 154,
+          "missed_failure_window_count": 664,
+          "within_horizon_bearings": 9,
+          "early_warning_bearings": 5,
+          "no_warning_bearings": 1,
+          "rul_mae": 30.083479862306366,
+          "rul_rmse": 36.87232846059739,
+          "rul_error_90": 60.100952380952435
+        },
+        "chosen": {
+          "Bearing1_1": 0.65,
+          "Bearing1_2": 0.6,
+          "Bearing1_3": 0.65,
+          "Bearing1_4": 0.65,
+          "Bearing1_5": 0.6,
+          "Bearing2_1": 0.65,
+          "Bearing2_2": 0.6,
+          "Bearing2_3": 0.6,
+          "Bearing2_4": 0.6,
+          "Bearing2_5": 0.6,
+          "Bearing3_1": 0.6,
+          "Bearing3_2": 0.6,
+          "Bearing3_3": 0.6,
+          "Bearing3_4": 0.6,
+          "Bearing3_5": 0.6
+        },
+        "live_rul_mae": 35.205375530694205
+      }
+    },
+    "V6_base_plus_rs_energy": {
+      "variant": "V6_base_plus_rs_energy",
+      "description": "production classifier features + baseline-relative shaft-order/band-RMS rs; regressor + all rs",
+      "summary": {
+        "roc_auc": 0.786496409141064,
+        "average_precision": 0.687901214324254,
+        "precision": 0.8344,
+        "recall": 0.6283132530120482,
+        "f1": 0.7168384879725086,
+        "false_alarm_count": 207,
+        "missed_failure_window_count": 617,
+        "within_horizon_bearings": 10,
+        "early_warning_bearings": 5,
+        "no_warning_bearings": 0,
+        "rul_mae": 30.083479862306366,
+        "rul_rmse": 36.87232846059739,
+        "rul_error_90": 60.100952380952435
+      },
+      "classifier_feature_count": 251,
+      "regressor_feature_count": 601,
+      "first_warning": [
+        {
+          "bearing_id": "Bearing1_1",
+          "actual_rul_minutes_at_first_warning": 120.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_2",
+          "actual_rul_minutes_at_first_warning": 158.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing1_3",
+          "actual_rul_minutes_at_first_warning": 125.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing1_4",
+          "actual_rul_minutes_at_first_warning": 34.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing1_5",
+          "actual_rul_minutes_at_first_warning": 13.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_1",
+          "actual_rul_minutes_at_first_warning": 31.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_2",
+          "actual_rul_minutes_at_first_warning": 106.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_3",
+          "actual_rul_minutes_at_first_warning": 402.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing2_4",
+          "actual_rul_minutes_at_first_warning": 8.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing2_5",
+          "actual_rul_minutes_at_first_warning": 152.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_1",
+          "actual_rul_minutes_at_first_warning": 141.0,
+          "timing": "early"
+        },
+        {
+          "bearing_id": "Bearing3_2",
+          "actual_rul_minutes_at_first_warning": 26.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_3",
+          "actual_rul_minutes_at_first_warning": 25.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_4",
+          "actual_rul_minutes_at_first_warning": 88.0,
+          "timing": "within_horizon"
+        },
+        {
+          "bearing_id": "Bearing3_5",
+          "actual_rul_minutes_at_first_warning": 103.0,
+          "timing": "within_horizon"
+        }
+      ],
+      "wall_seconds": 2478.3489890999626,
+      "live_rul_mae": 34.65543961560528,
+      "loo_threshold": {
+        "summary": {
+          "roc_auc": 0.786496409141064,
+          "average_precision": 0.687901214324254,
+          "precision": 0.7588014981273409,
+          "recall": 0.6102409638554217,
+          "f1": 0.6764607679465776,
+          "false_alarm_count": 322,
+          "missed_failure_window_count": 647,
+          "within_horizon_bearings": 9,
+          "early_warning_bearings": 5,
+          "no_warning_bearings": 1,
+          "rul_mae": 30.083479862306366,
+          "rul_rmse": 36.87232846059739,
+          "rul_error_90": 60.100952380952435
+        },
+        "chosen": {
+          "Bearing1_1": 0.6,
+          "Bearing1_2": 0.6,
+          "Bearing1_3": 0.6,
+          "Bearing1_4": 0.65,
+          "Bearing1_5": 0.6,
+          "Bearing2_1": 0.6,
+          "Bearing2_2": 0.6,
+          "Bearing2_3": 0.55,
+          "Bearing2_4": 0.6,
+          "Bearing2_5": 0.6,
+          "Bearing3_1": 0.6,
+          "Bearing3_2": 0.6,
+          "Bearing3_3": 0.6,
+          "Bearing3_4": 0.6,
+          "Bearing3_5": 0.6
+        },
+        "live_rul_mae": 35.35796589213999
+      }
+    }
+  },
+  "best_variant_by_ap": "V6_base_plus_rs_energy",
+  "notes": {
+    "extraction": "experiments/xjtu/rawsig_features.py extract_raw_signal_features(h, v, fs, speed_rpm); 113 per-snapshot features cached in experiments/xjtu/cache/raw_features.parquet (9216 rows, ~620s with 4 workers).",
+    "context": "rs_context(): per source, first-20 median baseline (same rule as add_past_context), log-ratio (or delta for kurtosis), rolling mean 5/20, trend over 20, raw mean5, std20. Windows <= 20 so it fits in max_history=60 + 20 baseline rows; no predictor state change.",
+    "best": "V6_base_plus_rs_energy: production classifier features + 48 baseline-relative shaft-order (1x,2x) and band-RMS (1-3/3-6/6-9/9-12 kHz) features; regressor = production features + all 259 rs context features.",
+    "selection_bias": "V5/V6 restricted rs features to energy-distribution sources AFTER seeing V3/V4 pooled OOF (SNR/kurtosis baseline-relative features inflated healthy probabilities on Bearing3_1 because their first-20 baseline is raised by run-in transients). Choice of best variant also by pooled OOF AP. Threshold kept at production 0.6 (not tuned). loo-thr rows: threshold per test bearing chosen from other bearings OOF only (not fully nested).",
+    "v6_first_warnings": "1_2@158, 1_3@125, 2_3@402, 2_5@152, 3_1@141 early; 3_2 now within horizon @26 (was early @220); 1_3 newly early (125, marginal); 0 no-warning.",
+    "v6_per_condition_auc": {
+      "cond1": [
+        0.391,
+        0.41
+      ],
+      "cond2": [
+        0.742,
+        0.756
+      ],
+      "cond3": [
+        0.768,
+        0.717
+      ]
+    }
+  }
+}

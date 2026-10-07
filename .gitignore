@@ -65,3 +65,25 @@ frontend/.env.local
 
 # Mosquitto password file for the hardened broker config (M6)
 deploy/mosquitto/secrets/
+
+# Model-research experiments: commit code, protocol/plan docs and result
+# summaries; keep regenerable caches, pickles and large per-row outputs local.
+experiments/**/cache/
+experiments/**/__pycache__/
+experiments/**/*.pkl
+experiments/**/*.parquet
+experiments/**/*.joblib
+experiments/**/*_oof.csv
+experiments/**/*.log
+experiments/xjtu/v2/results/final_timeline.csv
+experiments/xjtu/results/labels-targets/log*.txt
+experiments/xjtu/results/raw-signal-features_parts/
+experiments/xjtu/diag/fault_freq_features.csv
+
+# Claude Code hook logs written relative to the working directory.
+firmware/esp32-node/logs/
+
+# Session-scratch integration maps (line references go stale; not design docs).
+design/_integration_map.md
+design/_subsystem_maps.json
+experiments/**/*.npy

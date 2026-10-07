@@ -1,0 +1,31 @@
+{
+ "Bearing2_3": {
+  "fold": 8,
+  "n": 533,
+  "fit_seconds": 11.5,
+  "max_rel_feature_diff_clf_and_inputs": 2.5833885054050915e-11,
+  "worst_features": {
+   "h_envelope_kurtosis_std_5": 2.5833885054050915e-11,
+   "h_spectral_entropy_std_5": 2.0209500410940355e-11,
+   "v_envelope_kurtosis_std_5": 1.9858042094381063e-11,
+   "m_envelope_kurtosis_std_5": 1.4218940892798769e-11,
+   "m_spectral_entropy_std_5": 1.0781777414579574e-11
+  },
+  "max_rel_compact_diff": 1.7475367957363182e-13,
+  "max_abs_rawprob_live_vs_oof": 3.3306690738754696e-16,
+  "max_abs_rawprob_batch_live_feats_vs_oof": 3.3306690738754696e-16,
+  "max_abs_smoothed_live_vs_offline": 2.220446049250313e-16,
+  "warning_mask_mismatches": 0,
+  "latched_mask_mismatches": 0,
+  "first_warning_rul_live": 402.0,
+  "first_warning_rul_offline": 402.0,
+  "max_abs_rul_live_feats_vs_oof": 1.4210854715202004e-14,
+  "max_abs_rul_reported_vs_oof_on_warned_rows": 1.4210854715202004e-14,
+  "latency_ms": {
+   "p50": 325.4179999930784,
+   "p95": 692.9210799979044,
+   "max": 1501.1850000591949
+  },
+  "min_rul_pred_in_horizon_rows": 30.88270980314887
+ }
+}

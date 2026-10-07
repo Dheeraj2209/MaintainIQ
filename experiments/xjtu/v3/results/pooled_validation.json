@@ -1,0 +1,175 @@
+{
+ "schema": {
+  "n_columns": 127,
+  "rows_total": 13356,
+  "rows_xjtu": 9216,
+  "rows_femto": 4140,
+  "bearings": 32,
+  "conditions": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ]
+ },
+ "add_past_context": {
+  "n_columns": 347,
+  "all_finite": true,
+  "xjtu_rows_identical_to_xjtu_only": true,
+  "n_classifier_feature_columns": 203
+ },
+ "gt_xjtu_rows_equal_frozen": true,
+ "gt_frozen_files_unchanged": {
+  "causal.py": true,
+  "run_dummies.py": true,
+  "onset_gt.csv": true
+ },
+ "harness_dummies": {
+  "never": {
+   "C_all": 10.927604166666667,
+   "C_xjtu": 11.597777777777775,
+   "C_femto": 10.33627450980392,
+   "MC_xjtu": 15,
+   "MC_femto": 17,
+   "EP_femto": 0,
+   "O3_missed": 17,
+   "C_xjtu_frozen_loader": 11.597777777777775
+  },
+  "fire_at_eligibility": {
+   "C_all": 11.184114583333333,
+   "C_xjtu": 11.215555555555556,
+   "C_femto": 11.15637254901961,
+   "MC_xjtu": 15,
+   "MC_femto": 17,
+   "EP_femto": 0,
+   "O3_missed": 0,
+   "C_xjtu_frozen_loader": 11.215555555555556
+  },
+  "fire_at_eligibility_critical": {
+   "C_all": 7.419270833333333,
+   "C_xjtu": 7.40361111111111,
+   "C_femto": 7.433088235294116,
+   "MC_xjtu": 0,
+   "MC_femto": 0,
+   "EP_femto": 15,
+   "O3_missed": 0,
+   "C_xjtu_frozen_loader": 7.40361111111111
+  },
+  "onset_eq_critical": {
+   "C_all": 6.239583333333334,
+   "C_xjtu": 5.3708333333333345,
+   "C_femto": 7.006127450980393,
+   "MC_xjtu": 2,
+   "MC_femto": 6,
+   "EP_femto": 8,
+   "O3_missed": 1,
+   "C_xjtu_frozen_loader": 5.3708333333333345
+  },
+  "onset_only": {
+   "C_all": 10.233593749999999,
+   "C_xjtu": 10.098055555555556,
+   "C_femto": 10.353186274509804,
+   "MC_xjtu": 15,
+   "MC_femto": 17,
+   "EP_femto": 0,
+   "O3_missed": 1,
+   "C_xjtu_frozen_loader": 10.098055555555556
+  }
+ },
+ "p1_baselines_ok": true,
+ "femto_lifetimes_min": {
+  "FEMTO_Bearing1_1": 467,
+  "FEMTO_Bearing1_2": 145,
+  "FEMTO_Bearing1_3": 395,
+  "FEMTO_Bearing1_4": 238,
+  "FEMTO_Bearing1_5": 410,
+  "FEMTO_Bearing1_6": 408,
+  "FEMTO_Bearing1_7": 376,
+  "FEMTO_Bearing2_1": 151,
+  "FEMTO_Bearing2_2": 132,
+  "FEMTO_Bearing2_3": 325,
+  "FEMTO_Bearing2_4": 125,
+  "FEMTO_Bearing2_5": 385,
+  "FEMTO_Bearing2_6": 116,
+  "FEMTO_Bearing2_7": 38,
+  "FEMTO_Bearing3_1": 85,
+  "FEMTO_Bearing3_2": 272,
+  "FEMTO_Bearing3_3": 72
+ },
+ "counts": {
+  "FEMTO": {
+   "n": 17,
+   "life_min_median": 238.0,
+   "life_min_range": [
+    38,
+    467
+   ],
+   "baseline_contaminated": 14,
+   "short_healthy": 1,
+   "clean_baseline": 2,
+   "clean_bearings": [
+    "FEMTO_Bearing2_2",
+    "FEMTO_Bearing2_7"
+   ],
+   "abrupt": 12,
+   "no_onset": 0,
+   "life_ge_120": 13,
+   "gt_late_rul_ge_60": 2,
+   "r5_at_rul60_median": 1.0534136222132828,
+   "r5_at_rul30_median": 1.045542552988755,
+   "r5_at_life50_median": 1.0174570488415462,
+   "healthy_rcv_h_rms_median": 0.04090435454139542
+  },
+  "XJTU": {
+   "n": 15,
+   "life_min_median": 161.0,
+   "life_min_range": [
+    42,
+    2538
+   ],
+   "baseline_contaminated": 7,
+   "short_healthy": 2,
+   "clean_baseline": 7,
+   "clean_bearings": [
+    "Bearing1_1",
+    "Bearing1_2",
+    "Bearing1_3",
+    "Bearing1_4",
+    "Bearing2_2",
+    "Bearing2_3",
+    "Bearing3_1"
+   ],
+   "abrupt": 4,
+   "no_onset": 0,
+   "life_ge_120": 12,
+   "gt_late_rul_ge_60": 9,
+   "r5_at_rul60_median": 2.726033412428076,
+   "r5_at_rul30_median": 3.2991196559671483,
+   "r5_at_life50_median": 1.1986210186875654,
+   "healthy_rcv_h_rms_median": 0.03263539302168857
+  }
+ },
+ "aggregation_modes": {
+  "median6": {
+   "healthy_rcv_h_rms_median": 0.04791837756914351,
+   "log_ratio_step_noise_median": 0.020042422157679193,
+   "end_ratio_median": 6.259096316877134
+  },
+  "last1": {
+   "healthy_rcv_h_rms_median": 0.052027259670960016,
+   "log_ratio_step_noise_median": 0.030655046296147438,
+   "end_ratio_median": 7.004659965799635
+  },
+  "concat6": {
+   "healthy_rcv_h_rms_median": 0.04090435454139542,
+   "log_ratio_step_noise_median": 0.019578816851354666,
+   "end_ratio_median": 5.956266213039728
+  },
+  "xjtu_reference": {
+   "healthy_rcv_h_rms_median": 0.03263539302168857,
+   "log_ratio_step_noise_median": 0.01870568670111722
+  }
+ }
+}
