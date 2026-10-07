@@ -16,6 +16,90 @@
 > - the migration seeds the pre-deploy human closes;
 > - the commissioning and held states are visible in the UI (Task 12 is now required).
 
+## Drift corrections (2026-10-07)
+
+The plan was written against an uncommitted working tree. That tree is now committed
+(`f72c4d3`, plus research-only commits `ba41962`, `bdf5a65`). Every reference was
+re-checked against `bdf5a65`. What still holds, and what changed (the affected task text
+below has been fixed in place):
+
+**Still true (no change needed).**
+- Migration 008 is the next migration: `MIGRATIONS` ends at `(7, _migration_007_push)`.
+  `tests/storage/test_migrations.py` and `tests/api/test_get_db_schema.py` derive
+  `LATEST` from `MIGRATIONS[-1][0]`, so neither needs a version bump.
+- `maintenance_records.type` has `CHECK(type IN ('preventive','corrective'))`
+  (`src/storage/db.py:168`, re-added by the guarded ALTER in migration 001). D2 keeps it.
+- `work_orders.service.complete(conn, wo_id, actor, *, notes, performed_at,
+  maintenance_type, now)` holds `_LOCK`, calls `log_maintenance` (which commits on its
+  own), then `_transition`; its docstring has the "Not atomic" paragraph D1 replaces.
+  `_transition` commits and its conflict path already calls `conn.rollback()`.
+  `create_from_alert` takes only `live._TRANSITION_LOCK`, so the lock order of D1 holds.
+- `alerts/live.py`: `apply_reading` `:96-110`, `_apply_reading` `:113-177`,
+  `_ALERT_COLUMNS` `:47`, `_TRANSITION_LOCK` `:93`, `_resolve_locked` `:216` (the only
+  human-close writer, used by `feedback.service.close_alert`).
+- `feedback.service`: `close_alert`, `record_feedback`, `_upsert(conn, alert_id, actor,
+  values, work_order_id, now)`, `FUTURE_SKEW`, docstring `:13-14` all as described.
+- `rul_store.persist_prediction` `:28-65`, `rehydrate(predictor, conn, machine_id)`
+  `:147-173` (still has no `epoch` and is still never called in production),
+  `PREDICTION_SOURCE = "xjtu_rul"`, `live.DEMO_SOURCE = "demo"`.
+- `rul_realtime.py`: deques `:63-72`, two locked sections in `_predict_from_base`, the
+  OOD rule `outside_fraction > 0.10`. The deployed artifact has `baseline_window` 20,
+  smoothing 3, persistence 3, and no `health_ratchet` key (so the D13 default is on).
+- SQLite is 3.49.1, Python 3.12.
+
+**Drifted (fixed in the task text).**
+1. **Section 0 is historical.** Every file in its table is committed now; there is no
+   other session. Read its "State today" column as "was uncommitted when written".
+2. **Persist happens in the callers, not in `pipeline.handle_prediction`.** The route
+   (`predictions.py:67`), replay (`replay_service.py:163`) and ingest (`ingest.py:435`)
+   each call `persist_prediction` themselves and then call `handle_prediction` /
+   `_on_prediction` with the `prediction_id`. `handle_prediction` returns a dict
+   `{"event","alert","emails_sent"}`, not a tuple. So on a persist `None` **each caller**
+   skips the alert fan-out (`handle_prediction` / `_on_prediction`); `log_inference`
+   still runs (the inference happened). `handle_prediction` itself does not change for
+   this (D6, Task 6, Task 7 fixed).
+3. **Line numbers moved.** `ingest.py` `predictor.predict` is at `:410` (not `:409`);
+   the DELETE route `reset_rul_state` is at `predictions.py:105-109` (not `:90-94`);
+   `kpi._abnormal_event_count` is `:104-109` and `_machine_health` `:112-138` (not
+   `:101-106` / `:109-135`).
+4. **Ingest's `try` catches every exception** and records it as an ERROR message. A
+   `StaleEpoch` must be caught *before* that generic `except` and logged at INFO as a
+   skip, not reported as a prediction failure. The route's `try` catches only
+   `ValueError`, so it needs its own `except StaleEpoch` (409) (Task 6 fixed).
+5. **`get_current_user` / `require_role` live in `src.auth.deps`**, not `src.api.deps`
+   (Task 8, Task 10 fixed).
+6. **`records.py` has no `_get_record` helper** and `log_maintenance` takes no `now`; it
+   builds the returned dict inline. `_log_maintenance_locked` returns that inline dict
+   with `resets_health` added. `get_history` must also select `resets_health` so
+   `MaintenanceRecord.resets_health` serializes (Task 8 fixed).
+7. **`readings.features_json` holds raw snapshot features, not trained columns.** The
+   trained classifier/regressor columns are mostly derived by `add_past_context`
+   (`*_baseline_ratio`, `*_baseline_delta`, `*_mean_N`, `*_std_N`, `*_trend_N`) or are
+   snapshot meta (`speed_rpm`, `load_kn`, `elapsed_minutes`). Checking a stored row
+   against `classifier_feature_columns` would reject every row. The per-row rehydrate
+   check is against the **non-derived, non-meta** trained columns plus
+   `ROLLING_SOURCE_COLUMNS` (Task 5 fixed).
+8. **`tests/prediction/test_rul_store.py:203`** (`test_rehydrate_skips_readings_without_feature_vector`)
+   also calls `rehydrate` without `epoch` and without prediction rows; it changes with
+   the parity test (Task 5 fixed).
+9. **`experiments/` must not be edited** (execution rule for this run). Task 11 Step 2
+   runs its scratch checks from a temp copy outside the repo and commits nothing under
+   `experiments/` (Task 11 fixed).
+10. **`reports.generators.fleet_summary`** (`:214-232`) also reads "latest state per
+    machine"; it gets the same `effective_state` treatment as `machine_prognostic`, only
+    for open-ended reports (no `period_end`) (Task 11b fixed).
+11. **The close flow is a shared component.** Alert close lives in
+    `frontend/src/components/AlertCloseForm.tsx` / `AlertCloseDialog.tsx`, used by
+    `AlertsPage`, `MachineDetail`, `WorkOrderDrawer`, `MachineDetailPage` and the mobile
+    pages (`MobileAlertsPage`, `MobileAlertDetailPage`, `MobileMachineDetailPage`). The
+    Task 12 close-outcome messages go there, and held/commissioning badges also go on
+    `MobileMachineDetailPage` (Task 12 fixed).
+12. **`tests/maintenance/` does not exist**; sibling test dirs have `__init__.py`, so
+    create `tests/maintenance/__init__.py` with the new test file.
+13. **Test commands.** Backend: `python -m pytest -q -p no:cacheprovider <paths>` from the
+    repo root (full suite about 4 min, 1043 green at `bdf5a65`). Frontend, from
+    `frontend/` only: `npx vitest run <paths>`, `npx tsc -b`, `npm run build` (451 green).
+
 **Goal.** Stop the production predictor (`src/prediction/rul_realtime.py`) from demoting
 `health_state` (for example critical -> healthy -> critical). A demotion resolves the
 open alert, and the next reading re-opens and re-pages it. Offline this happens on
@@ -110,7 +194,10 @@ pytest, React/Vitest (Task 12).
 
 ---
 
-## 0. Coordination with the other live session (read first)
+## 0. Coordination with the other live session (historical)
+
+> **2026-10-07 drift note:** all of this work is now committed (`f72c4d3`). There is no
+> other session; the table below only maps files to tasks. See "Drift corrections".
 
 Almost every file this plan touches is **uncommitted work from the other session**
 (`git status` 2026-10-07). Land that work first (commit it, or at least stop editing
@@ -151,12 +238,13 @@ these files), then run this plan on top of it.
 - `tests/ingestion/test_replay_health_epoch.py`
 - `tests/telemetry/test_ingest_health_epoch.py`
 - `tests/kpi/test_effective_state.py` (or the existing KPI test dir)
-- `experiments/xjtu/v2/verify/ratchet_prod_check.py` (scratch, read-only on the DB)
+- ~~`experiments/xjtu/v2/verify/ratchet_prod_check.py`~~ (drift: scratch, kept outside the repo; `experiments/` is not edited, see Task 11)
+- `tests/maintenance/__init__.py`
 
 **Not touched:** `src/storage/db.py` (the DDL lives in `migrations.py`), `src/alerts/paging.py`, the demo routes, `src/training/xjtu_rul.py` and the other ML files.
 
 **Baseline before starting:**
-- [ ] `cd C:/projects/MaintainIQ && python -m pytest -q` and `cd frontend && npm test -- --run`. Record both pass counts. Every task must keep the rest of both suites green.
+- [ ] `cd C:/projects/MaintainIQ && python -m pytest -q -p no:cacheprovider` and `cd frontend && npx vitest run`. Record both pass counts (1043 / 451 at `bdf5a65`). Every task must keep the rest of both suites green.
 
 ---
 
@@ -318,10 +406,12 @@ work-order completion of the episode's alert.
   (fakes, the demo, an old DB) use the legacy INSERT.
 - In the same transaction, when the row was inserted and `result["health_ratchet"]` is
   true, it calls `record_level`.
-- Callers on `None`:
-  - `pipeline.handle_prediction` returns `(None, None)`, with no alert and no fan-out;
-  - the route returns **409** "machine health was reset during this prediction; retry";
-  - replay and MQTT log at INFO and continue.
+- Callers on `None` (drift fix: persist is done by the callers, which then call
+  `handle_prediction` / `_on_prediction`; none of them may call it on `None`):
+  - the route (`predictions.py:67`) returns **409** "machine health was reset during
+    this prediction; retry", with no `handle_prediction` call;
+  - replay (`replay_service.py:163`) and MQTT ingest (`ingest.py:435`) log at INFO,
+    skip `_on_prediction`, and continue (ingest still records the message as accepted).
 - **Current-state readers** use `health_epoch.effective_state(conn, machine_id, latest_pred)`:
   - If `machine_health_state` exists and the latest prediction's `health_episode` is
     older than the current episode, or is NULL while the machine has a row, the current
@@ -531,7 +621,7 @@ Effects:
     queries of D14, guard with `table_exists(conn, "alert_feedback")`, and
     `INSERT OR IGNORE`. Use the literals `'demo'` (`live.DEMO_SOURCE`) and `'xjtu_rul'`
     (`rul_store.PREDICTION_SOURCE`); do not import the modules into migrations.
-- [ ] **Step 4:** `python -m pytest tests/storage -q`, then the full suite. If `tests/storage/test_migrations.py` asserts `LATEST_VERSION == 7`, the one-line bump is the only edit to that file.
+- [ ] **Step 4:** `python -m pytest tests/storage -q -p no:cacheprovider`, then the full suite. (Drift check: `tests/storage/test_migrations.py` derives `LATEST` from `MIGRATIONS`, so it needs no edit.)
 - [ ] **Step 5:** commit "Add migration 008: health epoch/episode, ratchet level and deploy seed".
 
 ## Task 2: `src/prediction/health_epoch.py`, the DB authority
@@ -660,7 +750,7 @@ with self._locks[machine_id]:
   - `rehydrate(..., epoch=1)` replays only epoch-1 rows.
   - **Bounded:** with 300 epoch rows, `baseline_window=5` and `max_history=30`, it calls `_predict_from_base` 35 times (spy), and the next prediction's `history_snapshots` and `health_state` equal those of a warm predictor fed all 300.
   - **Corrupt row:** one row with `features_json='{'` and one missing a trained feature are skipped and logged, and the rest replay.
-  - Rewrite the parity test (`:163-200`) to persist with `reading_id` and episode 0 and to rehydrate with `epoch=0`, plus `restore_health`.
+  - Rewrite the parity test (`:163-200`) to persist with `reading_id` and episode 0 and to rehydrate with `epoch=0`, plus `restore_health`. Also update `test_rehydrate_skips_readings_without_feature_vector` (`:203`): pass `epoch=0` and give the `'{}'` reading a prediction row of epoch 0, so it still proves the skip.
 - [ ] **Step 2:** the tests fail.
 - [ ] **Step 3: implement.**
   - D6 conditional INSERT. Fall back to the legacy INSERT if the columns are missing:
@@ -677,13 +767,19 @@ with self._locks[machine_id]:
 
     Call `_seek_cycle` at the head/tail boundary. Add a `full: bool = False` keyword
     for D10.
-  - Per-row validation runs against `predictor.classifier_feature_columns` and
-    `regressor_feature_columns` before predicting.
+  - Per-row validation runs before predicting. Drift fix: `features_json` holds raw
+    snapshot features, so do **not** check it against the trained column lists as-is
+    (most trained columns are derived by `add_past_context`). Required keys =
+    `ROLLING_SOURCE_COLUMNS` plus every column of `classifier_feature_columns` and
+    `regressor_feature_columns` that is neither derived (suffix `_baseline_ratio`,
+    `_baseline_delta`, `_mean_<w>`, `_std_<w>`, `_trend_<w>` for `w` in
+    `ROLLING_WINDOWS`) nor snapshot meta (`speed_rpm`, `load_kn`, `elapsed_minutes`,
+    `cycle`, `bearing_id`). Compute this set once per predictor.
 - [ ] **Step 4:** run `python -m pytest tests/prediction -q`, then the full suite. Commit "Conditional, episode-guarded persist; bounded, epoch-scoped rehydrate".
 
 ## Task 6: `predict_synced` at every predictor call site
 
-**Files:** `src/prediction/health_epoch.py`; `src/api/routes/predictions.py` (`predict_rul`); `src/ingestion/replay_service.py` (`replay_once`; move `conn = self._connection_factory()` above the predict call, keeping the `finally: conn.close()`); `src/telemetry/ingest.py` (around `predictor.predict` `:409`, inside the existing `try`). Tests: `tests/prediction/test_health_epoch.py`, `tests/prediction/test_predict_synced_race.py`, `tests/ingestion/test_replay_health_epoch.py`, `tests/telemetry/test_ingest_health_epoch.py`, `tests/api/test_health_reset_routes.py`.
+**Files:** `src/prediction/health_epoch.py`; `src/api/routes/predictions.py` (`predict_rul`); `src/ingestion/replay_service.py` (`replay_once`; move `conn = self._connection_factory()` above the predict call, keeping the `finally: conn.close()`); `src/telemetry/ingest.py` (around `predictor.predict` `:410`, inside the existing `try`; add an `except StaleEpoch` **before** its generic `except Exception`, see drift item 4). Tests: `tests/prediction/test_health_epoch.py`, `tests/prediction/test_predict_synced_race.py`, `tests/ingestion/test_replay_health_epoch.py`, `tests/telemetry/test_ingest_health_epoch.py`, `tests/api/test_health_reset_routes.py`.
 
 ```python
 _SYNC_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -742,7 +838,7 @@ small write. Both are conditional on the episode.
 - [ ] **Step 2:** the tests fail.
 - [ ] **Step 3:** implement, and wire the three call sites.
   - Route: `result = health_epoch.predict_synced(predictor, db, m, lambda: predictor.predict(...))`.
-  - Each site catches `StaleEpoch` (route: 409; replay and ingest: log and skip) and handles a persist `None` (D6).
+  - Each site catches `StaleEpoch` (route: 409, in its own `except` because the existing one catches only `ValueError`; replay and ingest: log at INFO and skip, and ingest must catch it before its generic `except Exception` so it is not recorded as an ERROR) and handles a persist `None` (D6: the caller skips `handle_prediction` / `_on_prediction`).
 - [ ] **Step 4:** the full suite. The fakes in `tests/api/test_ingestion_control.py`, `tests/ingestion/test_replay_service.py` and `tests/telemetry/test_ingest.py` must pass unmodified.
 - [ ] **Step 5:** commit "Sync predictor to DB health state atomically with every prediction".
 
@@ -760,7 +856,7 @@ small write. Both are conditional on the episode.
   7. Epoch-less is legacy (`tests/feedback/test_service.py:93-99` unchanged).
   8. **Pipeline with ratchet off:** a result with `health_ratchet: False`, after a human close, re-opens and pages (legacy); `apply_reading` received `health_episode=None`.
   9. **Pipeline with ratchet on:** after a close, `event None` and no `send_email` call.
-  10. **Pipeline with a persist `None`:** no `apply_reading` call and no fan-out.
+  10. **Persist `None` (drift fix):** `handle_prediction` never sees it, because the callers persist. This case is tested at the call sites in Task 6 (route 409, replay/ingest skip `_on_prediction`), not here.
 - [ ] **Step 2:** the tests fail.
 - [ ] **Step 3: implement.**
 
@@ -784,8 +880,9 @@ if real and health_episode is not None:
 ```
 
   - `pipeline.handle_prediction`:
-    - `health_episode = result.get("health_episode") if result.get("health_ratchet") else None`;
-    - if `persist_prediction` returned `None`, return early.
+    - `health_episode = result.get("health_episode") if result.get("health_ratchet") else None`,
+      passed to `apply_reading`. (The persist-`None` early return lives in the callers,
+      Task 6; `handle_prediction` does not call `persist_prediction`.)
   - Add `health_episode` to the INSERT, the returned dict and `_ALERT_COLUMNS`. Grep
     `tests/` for exact-dict equality on alert payloads.
   - `_resolve_locked` docstring: "with the ratchet on, a later abnormal reading in the
@@ -810,7 +907,7 @@ if real and health_episode is not None:
 
 ## Task 8: maintenance and work-order reset (D1, D2, D11)
 
-**Files:** `src/maintenance/records.py`; `src/work_orders/service.py` (`complete`, `_transition` `commit=` parameter, docstrings); `src/api/schemas.py` (`MaintenanceCreate.reset_health: Optional[bool] = None`, `WorkOrderComplete.reset_health: Optional[bool] = None`, `MaintenanceRecord.resets_health: bool = False`); `src/api/routes/maintenance.py` (`user=Depends(get_current_user)`, 403); `src/api/routes/work_orders.py`. Test: `tests/maintenance/test_maintenance_reset.py`.
+**Files:** `src/maintenance/records.py`; `src/work_orders/service.py` (`complete`, `_transition` `commit=` parameter, docstrings); `src/api/schemas.py` (`MaintenanceCreate.reset_health: Optional[bool] = None`, `WorkOrderComplete.reset_health: Optional[bool] = None`, `MaintenanceRecord.resets_health: bool = False`); `src/api/routes/maintenance.py` (`user=Depends(get_current_user)` imported from `src.auth.deps`, 403); `src/api/routes/work_orders.py`. Test: `tests/maintenance/test_maintenance_reset.py` (create `tests/maintenance/__init__.py` too).
 
 - [ ] **Step 1: failing tests:**
   1. POST-style `log_maintenance(type="corrective")` without `reset_health` does not reset (D2: the API default is False).
@@ -849,8 +946,16 @@ def _log_maintenance_locked(conn, machine_id, performed_at, description, technic
     if resets:
         _, resolved = health_epoch._reset_locked(conn, machine_id,
                                                  reason=f"maintenance:{cur.lastrowid}", now=now)
-    return _get_record(conn, cur.lastrowid), resolved
+    return {..., "resets_health": bool(resets)}, resolved   # the inline dict log_maintenance builds today
 ```
+
+  - Drift fix: there is no `_get_record` helper; keep building the returned dict inline
+    as `log_maintenance` does today, plus `resets_health`. `log_maintenance` gains a
+    `now=None` keyword and a `reset_health=None` keyword. Add `resets_health` to the
+    `get_history` SELECT so history rows serialize it.
+  - D11 default feedback: call `feedback.service._upsert(conn, alert_id, actor,
+    {"outcome": "maintenance_prevented", "actual_cause": None, "actual_failure_at": None,
+    "notes": None}, order["id"], now)` only when `alert_feedback` has no row for the alert.
 
   - `work_orders.complete` computes `default_reset` per D2 (corrective, alert of the
     current episode via `alerts.health_episode`, real) **inside** the locks.
@@ -875,7 +980,7 @@ def _log_maintenance_locked(conn, machine_id, performed_at, description, technic
 
 ## Task 10: manual DELETE state route
 
-**Files:** `src/api/routes/predictions.py` `reset_rul_state` `:90-94`. Test: `tests/api/test_health_reset_routes.py`.
+**Files:** `src/api/routes/predictions.py` `reset_rul_state` `:105-109` (drift: was `:90-94`; `require_role` comes from `src.auth.deps`). Test: `tests/api/test_health_reset_routes.py`.
 
 - [ ] **Step 1: failing tests:**
   - As a supervisor, DELETE `/api/predictions/rul/m2/state` gives 200 `{"machine_id","status":"reset","health_epoch":1,"health_episode":1}` and resolves the open alert. The next POST `/rul` has `history_snapshots == 1`.
@@ -898,20 +1003,20 @@ def _log_maintenance_locked(conn, machine_id, performed_at, description, technic
   - OOD (D8);
   - the model-change rule (D10);
   - the kill switch (D13).
-- [ ] **Step 2: scratch** `experiments/xjtu/v2/verify/ratchet_prod_check.py` (read-only DB, `file:<db>?mode=ro`). For each XJTU machine, feed `readings.features_json` in cycle order through `_predict_from_base` with the ratchet on and off. Report per bearing:
+- [ ] **Step 2: scratch** `ratchet_prod_check.py` (drift fix: `experiments/` must not be edited in this run, so write it, and the D8-modified copy of `ratchet_warmup_check.py`, to a temp directory outside the repo, import from the repo by path, and commit nothing under `experiments/`; record the numbers in the Task 11 commit message) (read-only DB, `file:<db>?mode=ro`). For each XJTU machine, feed `readings.features_json` in cycle order through `_predict_from_base` with the ratchet on and off. Report per bearing:
   - demotions;
   - the first non-healthy index;
   - the count of OOD rows;
   - whether any latch was blocked by D8.
 
-  Also re-run `ratchet_warmup_check.py` with the D8 rule added to its ratchet function: OOD per row from the artifact's `feature_bounds_99pct`.
+  Also re-run a temp copy of `ratchet_warmup_check.py` (the original stays untouched) with the D8 rule added to its ratchet function: OOD per row from the artifact's `feature_bounds_99pct`.
 
   **Stop condition:** if D8 changes MC (8), EP (2) or the bearing lists on the OOF evaluation, stop and report to the user before Task 12. Do not tune.
 - [ ] **Step 3:** commit the docs only: "Document health epoch, episodes, ratchet and resets".
 
 ## Task 11b: current-state and KPI readers
 
-**Files:** `src/kpi/calculations.py` (`_machine_health` `:109-135`, `_abnormal_event_count` `:101-106`); `src/reports/generators.py` (latest state `:87`). Test: `tests/kpi/test_effective_state.py`.
+**Files:** `src/kpi/calculations.py` (`_machine_health` `:112-138`, `_abnormal_event_count` `:104-109`); `src/reports/generators.py` (latest state `:87` in `machine_prognostic`, and drift fix: `fleet_summary` latest rows `:214-232`; apply `effective_state` in both only when `period_end` is None, since a bounded report describes the past). Test: `tests/kpi/test_effective_state.py`.
 
 - [ ] **Step 1: failing tests:**
   - After a reset with no new reading, `_machine_health` reports `healthy` with `reset_pending_reading` True and `health_state_held` False.
@@ -922,7 +1027,7 @@ def _log_maintenance_locked(conn, machine_id, performed_at, description, technic
 
 ## Task 12 (required): operator-visible held, commissioning and reset
 
-Run this after the other session's frontend work lands. Without it, operators cannot
+(The other session's frontend work has landed in `f72c4d3`.) Without it, operators cannot
 tell held from current, or commissioning from healthy (review R2-5).
 
 **Backend:**
@@ -953,7 +1058,10 @@ tell held from current, or commissioning from healthy (review R2-5).
     is corrective (mirrors the D2 default);
   - the text explains the effect;
   - always sends an explicit `reset_health`.
-- `AlertsPage.tsx`:
+- `MobileMachineDetailPage.tsx`: the same held / commissioning badges (drift fix).
+- `AlertCloseForm.tsx` / `AlertCloseDialog.tsx` (drift fix: the close flow is this shared
+  component, used by `AlertsPage`, `MachineDetail`, `WorkOrderDrawer`,
+  `MachineDetailPage` and the mobile alert pages; put the messages here once):
   - when an operator closes as `confirmed_failure` or `maintenance_prevented`, show
     "The machine stays held at `{state}` until a repair is recorded" with a link to
     complete or create a work order;
@@ -961,14 +1069,14 @@ tell held from current, or commissioning from healthy (review R2-5).
 - Model warnings `commissioning:`, `condition_receded:` and `ood_not_latched:` appear in
   the detail view, not only in `AlertExplanationView`.
 
-**Tests:** the matching `*.test.tsx`. Run `cd frontend && npm test -- --run`. Also add
+**Tests:** the matching `*.test.tsx`. Run `cd frontend && npx vitest run <paths>`, then `npx vitest run`, `npx tsc -b` and `npm run build`. Also add
 backend schema tests that the new fields serialize.
 
 ---
 
 ## Verification checklist (before claiming done)
 
-- [ ] `python -m pytest -q` and `npm test -- --run` pass. The counts are the baselines plus the new tests.
+- [ ] `python -m pytest -q -p no:cacheprovider` and (from `frontend/`) `npx vitest run`, `npx tsc -b`, `npm run build` pass. The counts are the baselines plus the new tests.
 - [ ] `grep -n "_predict_from_base\|predictor.predict(" src/` shows every production call site inside `predict_synced`. The offline CLI `replay_xjtu.py` and `rul_store.rehydrate` are the intended exceptions.
 - [ ] `grep -n "reset_machine(" src/` finds no production caller.
 - [ ] `log_maintenance` / `_log_maintenance_locked` are the only writers of `maintenance_records`.
