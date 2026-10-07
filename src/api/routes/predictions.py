@@ -2,6 +2,7 @@
 import logging
 import os
 import time
+from datetime import datetime, timezone
 from functools import lru_cache
 
 import numpy as np
@@ -9,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.deps import get_db
 from src.api.schemas import RULPredictionRequest, RULPredictionResponse
+from src.auth.deps import require_role
 from src.prediction import health_epoch, pipeline, rul_store
 from src.prediction.rul_realtime import RealTimeRULPredictor, StaleEpoch
 from src.training.xjtu_rul import REPO_ROOT
@@ -102,7 +104,19 @@ def predict_rul(payload: RULPredictionRequest, db=Depends(get_db), predictor=Dep
 
 
 @router.delete("/rul/{machine_id}/state")
-def reset_rul_state(machine_id: str, predictor=Depends(get_predictor)):
-    """Reset rolling context after maintenance, sensor movement, or replacement."""
-    predictor.reset_machine(machine_id)
-    return {"machine_id": machine_id, "status": "reset"}
+def reset_rul_state(machine_id: str, db=Depends(get_db),
+                    user: dict = Depends(require_role("admin", "supervisor"))):
+    """Restart health tracking after maintenance, sensor movement, or
+    replacement: a new DB health epoch, which resolves the open alert. Only
+    the DB changes; the predictor drops its rolling context when it syncs on
+    the machine's next prediction (plan D4)."""
+    at = datetime.now(timezone.utc).isoformat()
+    row, resolved = health_epoch.reset_machine_health(
+        db, machine_id, reason=f"manual_reset:user:{user['id']}", now=at)
+    health_epoch.announce_resolved(db, resolved, at=at)
+    return {
+        "machine_id": machine_id,
+        "status": "reset",
+        "health_epoch": row.epoch if row is not None else None,
+        "health_episode": row.episode if row is not None else None,
+    }
