@@ -10,10 +10,21 @@ recorder, an admin or a supervisor.
 There is no 'closed' alert status. Closing an open alert is a human resolve
 (status='resolved', resolved_at, closed_by) that also acknowledges it, done
 in the same transaction as the feedback upsert. Paging stops because the
-ladder only looks at open alerts, and the next abnormal reading opens a
-fresh alert. Closing an alert that is already resolved (an auto-resolve or a
-racing close) is not an error: the feedback is still recorded and the
-caller learns closed=False.
+ladder only looks at open alerts. Closing an alert that is already resolved
+(an auto-resolve or a racing close) is not an error: the feedback is still
+recorded and the caller learns closed=False.
+
+Health episodes (docs/superpowers/plans/2026-10-07-ratchet-maintenance-reset.md,
+D7, D12): with the health ratchet on, a human close keeps the machine's held
+level, and later abnormal readings of the same episode open a fresh alert
+only if they are more severe. A repair reset starts a new episode. So does a
+false-alarm re-arm: closing (or recording feedback on a no-longer-open) real
+alert of the machine's current episode with outcome false_alarm or cause
+sensor_or_data_quality_issue bumps the episode and drops the held level to
+healthy, in the same transaction, keeping the epoch and baseline. The next
+abnormal reading then opens and pages one new alert. Other outcomes keep the
+held level and the suppression until a repair resets it. An open alert never
+re-arms: that would show the machine healthy while its alert is still open.
 
 `actor` is the get_current_user dict (id, role, name).
 
@@ -172,6 +183,26 @@ def _upsert(conn, alert_id: int, actor: dict, values: dict, work_order_id, now: 
         raise FeedbackError(f"invalid feedback: {exc}") from None
 
 
+def _maybe_rearm_locked(conn, alert: dict, values: dict, now: str) -> None:
+    """The false-alarm re-arm (plan D12), when the feedback says the held alert
+    was false and the alert is a real, no-longer-open alert of the machine's
+    current episode. The caller holds live._TRANSITION_LOCK and commits."""
+    from src.prediction import health_epoch  # lazy, to avoid an import cycle (plan Task 7b)
+
+    if (values["outcome"] not in health_epoch.REARM_OUTCOMES
+            and values["actual_cause"] not in health_epoch.REARM_CAUSES):
+        return
+    episode = alert.get("health_episode")
+    if alert.get("source") == live.DEMO_SOURCE or episode is None:
+        return
+    if live.get_alert(conn, alert["id"])["status"] == "open":
+        return
+    row = health_epoch.current(conn, alert["machine_id"])
+    if row is None or row.episode != episode:
+        return
+    health_epoch._rearm_locked(conn, alert["machine_id"], now=now)
+
+
 def record_feedback(conn, alert_id: int, actor: dict, *, outcome, actual_cause=None,
                     actual_failure_at=None, notes=None, work_order_id=None, now=None):
     """Create or replace alert_id's feedback without touching its status
@@ -185,6 +216,7 @@ def record_feedback(conn, alert_id: int, actor: dict, *, outcome, actual_cause=N
             alert = _locked_alert(conn, alert_id)
             _check_work_order(conn, work_order_id, alert)
             created = _upsert(conn, alert_id, actor, values, work_order_id, now)
+            _maybe_rearm_locked(conn, alert, values, now)
             conn.commit()
         except Exception:
             conn.rollback()
@@ -211,6 +243,7 @@ def close_alert(conn, alert_id: int, actor: dict, *, outcome, actual_cause=None,
                 # the paging ladder consistent (as work-order creation does).
                 live._acknowledge_locked(conn, alert_id, actor["id"], now)
             _upsert(conn, alert_id, actor, values, work_order_id, now)
+            _maybe_rearm_locked(conn, alert, values, now)
             conn.commit()
         except Exception:
             conn.rollback()
