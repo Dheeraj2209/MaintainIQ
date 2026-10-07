@@ -278,3 +278,124 @@ def test_concurrent_record_level_and_reset_stay_consistent(db_path):
     at_final = [s for e, s in written if e == final.episode]
     expected = max(at_final or ["healthy"], key=health_epoch.HEALTH_RANK.__getitem__)
     assert final.max_state == expected
+
+
+# --- rul_store.persist_prediction: episode-guarded (plan Task 5, D6) --------
+
+def _ratchet_result(**overrides):
+    result = {
+        "machine_id": "m2",
+        "predicted_rul_minutes": 20.0,
+        "rul_estimate_kind": "point_estimate",
+        "prognostic_horizon_minutes": 120.0,
+        "failure_within_horizon_probability": 0.9,
+        "prediction_interval_90_minutes": [10.0, 30.0],
+        "health_state": "critical",
+        "instant_health_state": "critical",
+        "health_ratchet": True,
+        "commissioning": None,
+        "health_epoch": 0,
+        "health_episode": 0,
+        "model_version": "v1",
+        "history_snapshots": 30,
+        "out_of_distribution": False,
+        "warnings": [],
+    }
+    result.update(overrides)
+    return result
+
+
+def _pred(conn, row_id):
+    return conn.execute("SELECT * FROM predictions WHERE id = ?", (row_id,)).fetchone()
+
+
+def test_persist_at_the_current_episode_stamps_and_raises_the_level(conn):
+    from src.prediction import rul_store
+
+    health_epoch.reset_machine_health(conn, "m2", reason="a", now=NOW)  # (1, 1)
+    row_id = rul_store.persist_prediction(
+        conn, _ratchet_result(health_epoch=1, health_episode=1, health_state="faulty",
+                              instant_health_state="degrading"), reading_id=3)
+    assert row_id is not None
+    row = _pred(conn, row_id)
+    assert (row["health_epoch"], row["health_episode"]) == (1, 1)
+    assert row["instant_health_state"] == "degrading"
+    assert row["health_state"] == "faulty"
+    assert row["reading_id"] == 3
+    assert row["source"] == "xjtu_rul"
+    stored = health_epoch.current(conn, "m2")
+    assert (stored.max_state, stored.model_version) == ("faulty", "v1")
+
+
+def test_persist_commits_row_and_level_together(db_path, conn):
+    from src.prediction import rul_store
+
+    rul_store.persist_prediction(conn, _ratchet_result())
+    other = sqlite3.connect(db_path)
+    try:
+        assert other.execute(
+            "SELECT max_state FROM machine_health_state WHERE machine_id = 'm2'").fetchone()[0] == "critical"
+        assert other.execute(
+            "SELECT COUNT(*) FROM predictions WHERE machine_id = 'm2' AND health_episode = 0"
+        ).fetchone()[0] == 1
+    finally:
+        other.close()
+
+
+def test_persist_of_a_stale_episode_returns_none_and_writes_nothing(conn):
+    from src.prediction import rul_store
+
+    health_epoch.reset_machine_health(conn, "m2", reason="a", now=NOW)  # (1, 1)
+    before = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+    assert rul_store.persist_prediction(conn, _ratchet_result(health_episode=0)) is None
+    assert conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0] == before
+    assert health_epoch.current(conn, "m2").max_state == "healthy"
+
+
+def test_persist_with_the_ratchet_off_inserts_without_recording_a_level(conn):
+    from src.prediction import rul_store
+
+    row_id = rul_store.persist_prediction(conn, _ratchet_result(health_ratchet=False))
+    assert _pred(conn, row_id)["health_episode"] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM machine_health_state WHERE machine_id = 'm2'").fetchone()[0] == 0
+
+
+def test_persist_of_an_ood_row_does_not_latch(conn):
+    """D8: an out-of-distribution row is shown above the held floor but never
+    raises the DB held level either."""
+    from src.prediction import rul_store
+
+    row_id = rul_store.persist_prediction(conn, _ratchet_result(out_of_distribution=True))
+    assert _pred(conn, row_id)["health_state"] == "critical"
+    assert health_epoch.current(conn, "m2").max_state == "healthy"
+
+
+def test_persist_of_a_commissioning_row_does_not_latch(conn):
+    from src.prediction import rul_store
+
+    rul_store.persist_prediction(
+        conn, _ratchet_result(commissioning={"seen": 3, "of": 20}))
+    assert health_epoch.current(conn, "m2").max_state == "healthy"
+
+
+def test_persist_without_an_episode_is_the_legacy_insert(conn):
+    from src.prediction import rul_store
+
+    result = _ratchet_result(health_episode=None, health_epoch=None)
+    for key in ("instant_health_state", "health_ratchet", "commissioning"):
+        result.pop(key)
+    row = _pred(conn, rul_store.persist_prediction(conn, result))
+    assert row["health_state"] == "critical"
+    assert (row["health_epoch"], row["health_episode"], row["instant_health_state"]) == (None, None, None)
+    assert health_epoch.current(conn, "m2").max_state == "healthy"
+
+
+def test_persist_falls_back_to_legacy_without_the_health_schema(conn):
+    from src.prediction import rul_store
+
+    conn.execute("DROP TABLE machine_health_state")
+    conn.commit()
+    row_id = rul_store.persist_prediction(conn, _ratchet_result())
+    assert row_id is not None
+    assert _pred(conn, row_id)["health_episode"] is None

@@ -123,10 +123,10 @@ class _ThirtyMin:
         return np.full(len(X), 30.0)
 
 
-def _fake_artifact(path):
+def _fake_artifact(path, **overrides):
     import joblib
 
-    joblib.dump({
+    artifact = {
         "classifiers": [_AlwaysLate(), _AlwaysLate()],
         "regressor": _ThirtyMin(),
         "classifier_feature_columns": ["speed_rpm", "h_kurtosis"],
@@ -141,7 +141,9 @@ def _fake_artifact(path):
         "warning_persistence_snapshots": 3,
         "baseline_window": 20,
         "sample_rate_hz": 25_600.0,
-    }, path)
+    }
+    artifact.update(overrides)
+    joblib.dump(artifact, path)
     return path
 
 
@@ -160,35 +162,65 @@ def _fresh_db(tmp_path):
     return conn
 
 
+def _persist_reading(conn, *, cycle, base, epoch, episode=None, speed=2100.0, load=12.0,
+                     sr=25_600.0, features_json=None, machine_id="b1", state="healthy",
+                     commit=True):
+    """One stored reading plus the prediction row (stamped with `epoch`) made
+    from it, the way the ingest/replay callers persist them."""
+    features = _json.dumps(base) if features_json is None else features_json
+    cur = conn.execute(
+        """INSERT INTO readings (machine_id, timestamp, cycle, elapsed_minutes, speed_rpm,
+               load_kn, sample_rate_hz, features_json, dataset,
+               vibration_h_rms, vibration_h_kurtosis, vibration_v_rms,
+               vibration_v_kurtosis, cross_axis_rms_ratio, cross_axis_correlation)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'xjtu_sy', 0, 0, 0, 0, 0, 0)""",
+        (machine_id, f"2020-01-01T00:00:{cycle:06d}", cycle, float(cycle), speed, load, sr, features),
+    )
+    conn.execute(
+        """INSERT INTO predictions (reading_id, machine_id, timestamp, health_state, source,
+               health_epoch, health_episode)
+           VALUES (?, ?, ?, ?, 'xjtu_rul', ?, ?)""",
+        (cur.lastrowid, machine_id, f"2020-01-01T00:00:{cycle:06d}", state, epoch,
+         epoch if episode is None else episode),
+    )
+    if commit:
+        conn.commit()
+
+
 def test_rehydrate_reproduces_next_prediction_health_state(tmp_path):
     art = _fake_artifact(tmp_path / "rul.joblib")
     n_history = 8
     sr, speed, load = 25_600.0, 2100.0, 12.0
 
-    # Warm predictor A: process n_history snapshots and persist each as a reading.
+    # Warm predictor A: process n_history snapshots; persist each reading and
+    # its episode-0 prediction row the way the callers do.
     conn = _fresh_db(tmp_path)
     warm = RealTimeRULPredictor(art)
-    rows = []
+    warm.restore_health("b1", epoch=0, episode=0, max_state="healthy")
     for cycle in range(n_history):
         h, v = _signal(cycle)
-        warm.predict("b1", h, v, sr, speed, load)
+        result = warm.predict("b1", h, v, sr, speed, load)
         base = extract_snapshot_features(h, v, sr)
-        rows.append({
-            "machine_id": "b1", "timestamp": f"2020-01-01T00:{cycle:02d}:00+00:00",
-            "cycle": cycle, "elapsed_minutes": float(cycle), "speed_rpm": speed, "load_kn": load,
-            "sample_rate_hz": sr,
-            "vibration_h_rms": base["h_rms"], "vibration_h_kurtosis": base["h_kurtosis"],
-            "vibration_v_rms": base["v_rms"], "vibration_v_kurtosis": base["v_kurtosis"],
-            "cross_axis_rms_ratio": base["cross_axis_rms_ratio"],
-            "cross_axis_correlation": base["cross_axis_correlation"],
-            "rul_minutes": None, "features_json": _json.dumps(base), "dataset": "xjtu_sy",
-        })
-    insert_readings(conn, rows)
+        cur = conn.execute(
+            """INSERT INTO readings (machine_id, timestamp, cycle, elapsed_minutes, speed_rpm,
+                   load_kn, sample_rate_hz, features_json, dataset,
+                   vibration_h_rms, vibration_h_kurtosis, vibration_v_rms,
+                   vibration_v_kurtosis, cross_axis_rms_ratio, cross_axis_correlation)
+               VALUES ('b1', ?, ?, ?, ?, ?, ?, ?, 'xjtu_sy', 0, 0, 0, 0, 0, 0)""",
+            (f"2020-01-01T00:{cycle:02d}:00+00:00", cycle, float(cycle), speed, load, sr,
+             _json.dumps(base)),
+        )
+        conn.commit()
+        assert rul_store.persist_prediction(conn, result, reading_id=cur.lastrowid) is not None
+    held = conn.execute(
+        "SELECT max_state FROM machine_health_state WHERE machine_id = 'b1'").fetchone()
+    held = held[0] if held else "healthy"
 
-    # Cold predictor B: rehydrate from the stored readings.
+    # Cold predictor B: rehydrate the epoch, then adopt the DB held level.
     cold = RealTimeRULPredictor(art)
-    replayed = rul_store.rehydrate(cold, conn, "b1")
+    replayed = rul_store.rehydrate(cold, conn, "b1", epoch=0)
     assert replayed == n_history
+    cold.restore_health("b1", epoch=0, episode=0, max_state=held)
 
     # Next snapshot fed to both must agree.
     h_next, v_next = _signal(n_history)
@@ -203,13 +235,124 @@ def test_rehydrate_reproduces_next_prediction_health_state(tmp_path):
 def test_rehydrate_skips_readings_without_feature_vector(tmp_path):
     art = _fake_artifact(tmp_path / "rul.joblib")
     conn = _fresh_db(tmp_path)
-    insert_readings(conn, [{
-        "machine_id": "b1", "timestamp": "2020-01-01T00:00:00+00:00", "cycle": 0,
-        "elapsed_minutes": 0.0, "speed_rpm": 2100.0, "load_kn": 12.0, "sample_rate_hz": 25_600.0,
-        "vibration_h_rms": 0.1, "vibration_h_kurtosis": 3.0, "vibration_v_rms": 0.1,
-        "vibration_v_kurtosis": 3.0, "cross_axis_rms_ratio": 1.0, "cross_axis_correlation": 0.0,
-        "rul_minutes": None, "features_json": "{}", "dataset": "xjtu_sy",
-    }])
+    _persist_reading(conn, cycle=0, base={}, epoch=0, features_json="{}")
     cold = RealTimeRULPredictor(art)
-    assert rul_store.rehydrate(cold, conn, "b1") == 0
+    assert rul_store.rehydrate(cold, conn, "b1", epoch=0) == 0
+    conn.close()
+
+
+# --- epoch-scoped, bounded rehydrate (plan Task 5, D5) ----------------------
+
+from src.training.xjtu_rul import ROLLING_SOURCE_COLUMNS
+
+
+class _KurtosisDriven:
+    """Failure probability follows h_kurtosis, so a prediction depends on the
+    smoothing/persistence deques and the rolling history, not a constant."""
+
+    def predict_proba(self, X):
+        p = np.clip(X["h_kurtosis"].to_numpy(dtype=float) - 3.0, 0.0, 1.0)
+        return np.column_stack([1.0 - p, p])
+
+
+def _base(i):
+    """A synthetic snapshot feature vector: every rolling source column, with
+    h_kurtosis stepping up and down so the failure probability flaps."""
+    base = {column: 1.0 + 0.001 * i + 0.01 * (n % 7)
+            for n, column in enumerate(ROLLING_SOURCE_COLUMNS)}
+    base["h_kurtosis"] = 3.0 + ((i // 7) % 3)
+    return base
+
+
+def test_rehydrate_replays_only_the_given_epoch(tmp_path):
+    art = _fake_artifact(tmp_path / "rul.joblib")
+    conn = _fresh_db(tmp_path)
+    for i in range(6):          # the old bearing
+        _persist_reading(conn, cycle=i, base=_base(i), epoch=0)
+    for i in range(4):          # the new bearing
+        _persist_reading(conn, cycle=100 + i, base=_base(i), epoch=1)
+    _persist_reading(conn, cycle=200, base=_base(0), epoch=None)  # pre-ratchet row
+
+    cold = RealTimeRULPredictor(art)
+    assert rul_store.rehydrate(cold, conn, "b1", epoch=1) == 4
+    nxt = cold._predict_from_base("b1", _base(4), sample_rate_hz=25_600.0,
+                                  speed_rpm=2100.0, load_kn=12.0)
+    assert nxt["history_snapshots"] == 5
+    conn.close()
+
+
+def test_rehydrate_is_bounded_and_matches_a_warm_predictor(tmp_path):
+    art = _fake_artifact(tmp_path / "rul.joblib", classifiers=[_KurtosisDriven()],
+                         baseline_window=5)
+    conn = _fresh_db(tmp_path)
+    kwargs = dict(sample_rate_hz=25_600.0, speed_rpm=2100.0, load_kn=12.0)
+    # max_history cannot go below max(ROLLING_WINDOWS) = 60 (the predictor
+    # rejects it), so the bound is baseline_window + 60 = 65 replays.
+    n_rows, max_history = 300, 60
+
+    warm = RealTimeRULPredictor(art, max_history=max_history)
+    warm.restore_health("b1", epoch=1, episode=1, max_state="healthy")
+    for i in range(n_rows):
+        warm._predict_from_base("b1", _base(i), **kwargs)
+        _persist_reading(conn, cycle=i, base=_base(i), epoch=1, commit=False)
+    conn.commit()
+
+    cold = RealTimeRULPredictor(art, max_history=max_history)
+    calls = []
+    real = cold._predict_from_base
+
+    def spy(*args, **kw):
+        calls.append(args[0])
+        return real(*args, **kw)
+
+    cold._predict_from_base = spy
+    assert rul_store.rehydrate(cold, conn, "b1", epoch=1) == 5 + max_history
+    assert len(calls) == 5 + max_history
+    held = warm._max_state.get("b1", "healthy")
+    cold.restore_health("b1", epoch=1, episode=1, max_state=held)
+    warm.restore_health("b1", epoch=1, episode=1, max_state=held)
+
+    states = set()
+    for i in range(n_rows, n_rows + 10):
+        w = warm._predict_from_base("b1", _base(i), **kwargs)
+        c = real("b1", _base(i), **kwargs)
+        states.add(w["instant_health_state"])
+        for key in ("history_snapshots", "health_state", "instant_health_state",
+                    "failure_within_horizon_probability", "predicted_rul_minutes",
+                    "warnings"):
+            assert c[key] == w[key], key
+    assert len(states) > 1  # the comparison covered a state change
+    conn.close()
+
+
+def test_rehydrate_full_replays_the_whole_epoch(tmp_path):
+    art = _fake_artifact(tmp_path / "rul.joblib", baseline_window=5)
+    conn = _fresh_db(tmp_path)
+    for i in range(80):
+        _persist_reading(conn, cycle=i, base=_base(i), epoch=1, commit=False)
+    conn.commit()
+    cold = RealTimeRULPredictor(art)
+    assert rul_store.rehydrate(cold, conn, "b1", epoch=1, full=True) == 80
+    conn.close()
+
+
+def test_rehydrate_skips_corrupt_rows_and_logs_them(tmp_path, caplog):
+    art = _fake_artifact(tmp_path / "rul.joblib")
+    conn = _fresh_db(tmp_path)
+    missing = _base(1)
+    del missing["h_rms"]
+    _persist_reading(conn, cycle=0, base=_base(0), epoch=0)
+    _persist_reading(conn, cycle=1, base=missing, epoch=0)
+    _persist_reading(conn, cycle=2, base={}, epoch=0, features_json="{")
+    _persist_reading(conn, cycle=3, base=_base(3), epoch=0)
+
+    cold = RealTimeRULPredictor(art)
+    with caplog.at_level("WARNING", logger="src.prediction.rul_store"):
+        assert rul_store.rehydrate(cold, conn, "b1", epoch=0) == 2
+    assert "h_rms" in caplog.text
+    assert "unparsable" in caplog.text
+    # The cycle count still follows the epoch's prediction rows.
+    nxt = cold._predict_from_base("b1", _base(4), sample_rate_hz=25_600.0,
+                                  speed_rpm=2100.0, load_kn=12.0)
+    assert nxt["history_snapshots"] == 5
     conn.close()
