@@ -212,12 +212,32 @@ def test_preventive_completion_does_not_reset(conn):
     assert _feedback(conn, alert["id"]) is None
 
 
-def test_order_for_an_alert_without_an_episode_does_not_reset(conn):
-    # The conftest's open alert 2 on m1 predates episodes (health_episode NULL).
+def test_order_for_a_resolved_alert_without_an_episode_does_not_reset(conn):
+    # The conftest's alert 2 on m1 predates episodes (health_episode NULL);
+    # once resolved by a person it is history, not the current fault.
+    conn.execute("UPDATE alerts SET status = 'resolved', resolved_at = ?, closed_by = 2 "
+                 "WHERE id = 2", (T,))
+    conn.commit()
     wo_id = _in_progress_order(conn, 2)
     service.complete(conn, wo_id, SUP, performed_at=PERFORMED, now=NOW)
     assert _epoch(conn, "m1") == (0, 0)
-    assert _alert(conn, 2)["status"] == "open"
+
+
+def test_an_open_alert_from_the_kill_switch_period_resets_once_the_ratchet_is_back(conn):
+    # Ratchet off: the pipeline stamps no episode. An open real alert is
+    # always the machine's current fault (a reset resolves open alerts and an
+    # open alert never re-arms), so its order resets by default once the
+    # ratchet is on again and the machine latches.
+    _, alert = live.apply_reading(conn, "m2", "critical", None, SRC, T)
+    assert alert["health_episode"] is None
+    wo_id = _in_progress_order(conn, alert["id"])
+    health_epoch.record_level(conn, "m2", 0, "critical", "v1")
+    conn.commit()
+
+    service.complete(conn, wo_id, SUP, performed_at=PERFORMED, now=NOW)
+
+    assert _epoch(conn) == (1, 1)
+    assert _alert(conn, alert["id"])["status"] == "resolved"
 
 
 def test_order_for_an_older_episode_alert_does_not_reset(conn):

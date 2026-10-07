@@ -384,6 +384,9 @@ def _resets_by_default(conn, order: dict, maintenance_type: str) -> bool:
     default only if the order's alert is a real alert of the machine's
     current episode that is open or was closed by a person. Free-standing
     orders, preventive work and orders for an older episode's alert do not.
+    An open real alert with no episode (opened while the ratchet kill switch
+    was on) counts as the current episode: a reset resolves every open real
+    alert and an open alert never re-arms, so it is the current fault.
     Called under live._TRANSITION_LOCK."""
     if maintenance_type != "corrective" or order["alert_id"] is None:
         return False
@@ -394,9 +397,11 @@ def _resets_by_default(conn, order: dict, maintenance_type: str) -> bool:
         "SELECT status, closed_by, source, health_episode FROM alerts WHERE id = ?",
         (order["alert_id"],),
     ).fetchone()
-    return (alert is not None and alert["source"] != live.DEMO_SOURCE
-            and alert["health_episode"] == row.episode
-            and (alert["status"] == "open" or alert["closed_by"] is not None))
+    if alert is None or alert["source"] == live.DEMO_SOURCE:
+        return False
+    if alert["status"] == "open":
+        return alert["health_episode"] in (None, row.episode)
+    return alert["health_episode"] == row.episode and alert["closed_by"] is not None
 
 
 def _default_feedback(conn, order: dict, actor: dict, now: str) -> None:
