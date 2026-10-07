@@ -273,6 +273,7 @@ class MaintenanceRecord(BaseModel):
     created_at: str
     alert_id: Optional[int] = None
     type: Optional[Literal["preventive", "corrective"]] = None
+    resets_health: bool = False
 
 
 class MaintenanceSummary(BaseModel):
@@ -297,6 +298,8 @@ class MaintenanceCreate(BaseModel):
     technician: Optional[str] = Field(None, max_length=200)
     alert_id: Optional[int] = None
     type: Optional[Literal["preventive", "corrective"]] = None
+    # Restart health tracking (a repair). Only True resets; admin/supervisor only.
+    reset_health: Optional[bool] = None
 
 
 class MachineDetail(BaseModel):
@@ -521,6 +524,8 @@ class WorkOrderComplete(BaseModel):
     notes: Optional[str] = Field(None, max_length=2000)
     performed_at: Optional[str] = None
     maintenance_type: Literal["preventive", "corrective"] = "corrective"
+    # None: reset only when completing the machine's current alert (plan D2).
+    reset_health: Optional[bool] = None
 
 
 class WorkOrderCancel(BaseModel):

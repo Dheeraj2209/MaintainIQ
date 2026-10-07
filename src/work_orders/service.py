@@ -28,7 +28,10 @@ import threading
 from datetime import datetime, timezone
 
 from src.alerts import live
-from src.maintenance.records import MaintenanceError, log_maintenance
+from src.feedback import service as feedback
+from src.maintenance.records import MaintenanceError, _log_maintenance_locked
+from src.prediction import health_epoch
+from src.storage.db import table_exists
 
 ACTIVE_STATUSES = ("open", "assigned", "in_progress")
 TERMINAL_STATUSES = ("done", "cancelled")
@@ -297,9 +300,10 @@ def create(conn, actor: dict, *, machine_id: str, title: str, description=None,
 
 
 def _transition(conn, order: dict, *, to_status: str, event: str, actor: dict, now: str,
-                sets: dict, assigned_to=None, note=None) -> None:
-    """Conditional UPDATE from order's current status, plus one event; commits.
-    Raises WorkOrderConflict if the status changed under us."""
+                sets: dict, assigned_to=None, note=None, commit: bool = True) -> None:
+    """Conditional UPDATE from order's current status, plus one event; commits
+    unless commit=False. Raises WorkOrderConflict (after a rollback of the
+    whole transaction) if the status changed under us."""
     columns = {**sets, "status": to_status, "updated_at": now}
     assignments = ", ".join(f"{name} = ?" for name in columns)
     cur = conn.execute(
@@ -311,7 +315,8 @@ def _transition(conn, order: dict, *, to_status: str, event: str, actor: dict, n
         raise WorkOrderConflict(f"work order {order['id']} changed concurrently; reload and retry")
     _event(conn, order["id"], event, from_status=order["status"], to_status=to_status,
            user_id=actor["id"], assigned_to=assigned_to, note=note, now=now)
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 _UNSET = object()
@@ -374,14 +379,52 @@ def start(conn, wo_id: int, actor: dict, *, now=None) -> dict:
     return get_work_order(conn, wo_id)
 
 
-def complete(conn, wo_id: int, actor: dict, *, notes=None, performed_at=None,
-             maintenance_type: str = "corrective", now=None) -> dict:
-    """in_progress -> done, writing a maintenance_records row through
-    log_maintenance and linking it (decision 6).
+def _resets_by_default(conn, order: dict, maintenance_type: str) -> bool:
+    """Plan D2: completing a corrective order resets the machine's health by
+    default only if the order's alert is a real alert of the machine's
+    current episode that is open or was closed by a person. Free-standing
+    orders, preventive work and orders for an older episode's alert do not.
+    Called under live._TRANSITION_LOCK."""
+    if maintenance_type != "corrective" or order["alert_id"] is None:
+        return False
+    row = health_epoch.current(conn, order["machine_id"])
+    if row is None:
+        return False
+    alert = conn.execute(
+        "SELECT status, closed_by, source, health_episode FROM alerts WHERE id = ?",
+        (order["alert_id"],),
+    ).fetchone()
+    return (alert is not None and alert["source"] != live.DEMO_SOURCE
+            and alert["health_episode"] == row.episode
+            and (alert["status"] == "open" or alert["closed_by"] is not None))
 
-    Not atomic: log_maintenance commits on its own. _LOCK means no concurrent
-    completion can slip between the two writes; if the second one fails the
-    order stays in_progress with an orphan record (design, Risks)."""
+
+def _default_feedback(conn, order: dict, actor: dict, now: str) -> None:
+    """Plan D11: a completion that reset the machine records the order's
+    alert as 'maintenance_prevented' (editable later), unless someone already
+    recorded an outcome. Does not commit."""
+    if not table_exists(conn, "alert_feedback"):
+        return
+    if conn.execute("SELECT 1 FROM alert_feedback WHERE alert_id = ?",
+                    (order["alert_id"],)).fetchone() is not None:
+        return
+    feedback._upsert(conn, order["alert_id"], actor,
+                     {"outcome": "maintenance_prevented", "actual_cause": None,
+                      "actual_failure_at": None, "notes": None},
+                     order["id"], now)
+
+
+def complete(conn, wo_id: int, actor: dict, *, notes=None, performed_at=None,
+             maintenance_type: str = "corrective", reset_health=None, now=None) -> dict:
+    """in_progress -> done, writing a maintenance_records row and linking it
+    (decision 6).
+
+    One transaction under _LOCK -> live._TRANSITION_LOCK: the record, the
+    health reset it may carry (reset_health None means the plan-D2 default,
+    see _resets_by_default), the default feedback (D11) and the transition
+    commit together. If any of them fails nothing is written, the order stays
+    in_progress and a retry is clean. The alerts the reset resolved are
+    announced after the commit, outside both locks."""
     now = now or _now()
     if maintenance_type not in MAINTENANCE_TYPES:
         raise WorkOrderError(f"invalid maintenance_type: {maintenance_type}")
@@ -394,19 +437,30 @@ def complete(conn, wo_id: int, actor: dict, *, notes=None, performed_at=None,
         description = f"Work order #{order['id']}: {order['title']}"
         if notes:
             description += f" — {notes}"
-        try:
-            record = log_maintenance(
-                conn, order["machine_id"], performed_at, description,
-                order["assigned_to_name"] or actor.get("name"),
-                alert_id=order["alert_id"], type=maintenance_type,
-            )
-        except MaintenanceError as exc:
-            raise WorkOrderError(str(exc)) from None
-        sets = {"completed_at": now, "maintenance_record_id": record["id"]}
-        if notes is not None:
-            sets["notes"] = notes
-        _transition(conn, order, to_status="done", event="completed", actor=actor, now=now,
-                    sets=sets, note=notes)
+        with live._TRANSITION_LOCK:
+            try:
+                record, resolved = _log_maintenance_locked(
+                    conn, order["machine_id"], performed_at, description,
+                    order["assigned_to_name"] or actor.get("name"),
+                    alert_id=order["alert_id"], type=maintenance_type,
+                    reset_health=reset_health, now=now,
+                    default_reset=_resets_by_default(conn, order, maintenance_type),
+                )
+                if record["resets_health"] and order["alert_id"] is not None:
+                    _default_feedback(conn, order, actor, now)
+                sets = {"completed_at": now, "maintenance_record_id": record["id"]}
+                if notes is not None:
+                    sets["notes"] = notes
+                _transition(conn, order, to_status="done", event="completed", actor=actor,
+                            now=now, sets=sets, note=notes, commit=False)
+                conn.commit()
+            except MaintenanceError as exc:
+                conn.rollback()
+                raise WorkOrderError(str(exc)) from None
+            except Exception:
+                conn.rollback()
+                raise
+    health_epoch.announce_resolved(conn, resolved, at=now)
     return get_work_order(conn, wo_id)
 
 

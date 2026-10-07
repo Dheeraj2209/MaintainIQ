@@ -171,7 +171,8 @@ async def complete_work_order(wo_id: int, payload: Optional[WorkOrderComplete] =
     try:
         order = await asyncio.to_thread(service.complete, db, wo_id, user, notes=payload.notes,
                                         performed_at=payload.performed_at,
-                                        maintenance_type=payload.maintenance_type)
+                                        maintenance_type=payload.maintenance_type,
+                                        reset_health=payload.reset_health)
     except WorkOrderError as exc:
         raise http_error(exc)
     await broadcast_order(order, "completed")

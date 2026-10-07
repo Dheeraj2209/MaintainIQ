@@ -376,7 +376,7 @@ def test_failed_maintenance_write_keeps_order_in_progress(conn, monkeypatch):
     def boom(*args, **kwargs):
         raise MaintenanceError("bad")
 
-    monkeypatch.setattr(service, "log_maintenance", boom)
+    monkeypatch.setattr(service, "_log_maintenance_locked", boom)
     with pytest.raises(WorkOrderError, match="bad"):
         service.complete(conn, wo["id"], sup, now=LATER)
     assert service.get_work_order(conn, wo["id"])["status"] == "in_progress"
