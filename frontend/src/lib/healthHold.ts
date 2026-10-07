@@ -5,7 +5,10 @@
 // alert again. Kept out of component files so those only export components.
 import type { MachineSummary } from '../api/types'
 
-type HealthView = Pick<MachineSummary, 'health_state' | 'health_state_held' | 'instant_health_state' | 'commissioning'>
+type HealthView = Pick<
+  MachineSummary,
+  'health_state' | 'health_state_held' | 'instant_health_state' | 'commissioning' | 'reset_pending_reading'
+>
 
 function label(state: string | null | undefined): string {
   if (!state) return 'Unknown'
@@ -29,6 +32,18 @@ export function heldText(health: HealthView): string | null {
 export function commissioningText(health: HealthView): string | null {
   const c = health.commissioning
   return c ? `Commissioning ${c.seen}/${c.of}` : null
+}
+
+// "Reset, awaiting reading" after a reset with no reading since (the held
+// level is healthy but nothing has been measured yet), or null.
+export function resetPendingText(health: HealthView): string | null {
+  return health.reset_pending_reading && !health.commissioning ? 'Reset, awaiting reading' : null
+}
+
+// The state to colour a machine by: neutral ('unknown') while it relearns its
+// baseline after a reset, not the forced-healthy green.
+export function toneState(health: HealthView): string {
+  return health.commissioning || health.reset_pending_reading ? 'unknown' : health.health_state
 }
 
 // The current reading's state while commissioning, when it is not healthy.

@@ -4,7 +4,7 @@ import type { Alert, MachineDetail as Detail, MaintenanceRecord, TelemetryDevice
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { FEEDBACK_MODE_TITLE, canEditFeedback, feedbackMode } from '../lib/feedback'
-import { heldText } from '../lib/healthHold'
+import { heldText, toneState } from '../lib/healthHold'
 import { HealthStateBadges } from './HealthStateBadges'
 import { deviceStateLabel, deviceStateTone, healthClasses } from './healthStyles'
 import { TrendChart } from './TrendChart'
@@ -121,8 +121,9 @@ export function MachineDetail({ machineId, onCreateWorkOrder, onRecordOutcome, o
   }
 
   const { health, maintenance, alerts } = detail
-  // Commissioning is neutral, not the forced-healthy green.
-  const hc = healthClasses(health.commissioning ? 'unknown' : health.health_state)
+  // Commissioning (or a reset awaiting a reading) is neutral, not the
+  // forced-healthy green.
+  const hc = healthClasses(toneState(health))
 
   async function handleLog(payload: Parameters<typeof api.logMaintenance>[0]) {
     const result = await api.logMaintenance(payload)

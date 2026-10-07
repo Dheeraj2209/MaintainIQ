@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react'
 import type { MachineSummary } from '../../api/types'
-import { healthClasses, healthLabel, healthTone } from '../healthStyles'
+import { healthTone } from '../healthStyles'
+import { HealthStateBadges } from '../HealthStateBadges'
+import { toneState } from '../../lib/healthHold'
 import { formatRul, URGENT_RISK } from './risk'
 
 /**
@@ -58,24 +60,25 @@ export function MachinesAtRisk({ machines, onSelect }: Props) {
           </li>
 
           {ranked.map((m) => {
-            const cls = healthClasses(m.health_state)
+            // Neutral while the machine relearns its baseline after a reset.
+            const tone = healthTone(toneState(m))
             const confidence = m.confidence === null ? null : Math.round(m.confidence * 100)
             return (
               <li key={m.machine_id}>
                 <button
                   type="button"
                   onClick={() => onSelect(m.machine_id)}
-                  style={{ '--spot-tone': healthTone(m.health_state) } as CSSProperties}
+                  style={{ '--spot-tone': tone } as CSSProperties}
                   className="hover-glow flex w-full flex-col gap-2 rounded-xl border border-border/70 bg-white/2 px-3 py-2.5 text-left sm:flex-row sm:items-center sm:gap-4"
                 >
                   <span className="flex min-w-0 flex-[1.4] items-center gap-2">
                     <span className="truncate font-mono text-sm text-text">{m.machine_id}</span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${cls.badge}`}>
-                      {healthLabel(m.health_state)}
+                    <span className="shrink-0 text-[10px]">
+                      <HealthStateBadges health={m} />
                     </span>
                   </span>
 
-                  <Meter value={m.risk_score} label={`${Math.round(m.risk_score)}`} fill={healthTone(m.health_state)} />
+                  <Meter value={m.risk_score} label={`${Math.round(m.risk_score)}`} fill={tone} />
 
                   <Meter
                     value={confidence ?? 0}

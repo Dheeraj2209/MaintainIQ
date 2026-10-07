@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import type { MachineSummary } from '../api/types'
 import { HealthStateBadges } from './HealthStateBadges'
 import { healthClasses, healthTone } from './healthStyles'
+import { toneState } from '../lib/healthHold'
 
 interface Props {
   machines: MachineSummary[]
@@ -18,8 +19,9 @@ export function MachineGrid({ machines, selectedId, onSelect }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {machines.map((m, i) => {
-        // Commissioning is neutral, not the forced-healthy green.
-        const tone = m.commissioning ? 'unknown' : m.health_state
+        // Commissioning (or a reset awaiting its first reading) is neutral,
+        // not the forced-healthy green.
+        const tone = toneState(m)
         const cls = healthClasses(tone)
         const selected = m.machine_id === selectedId
         return (

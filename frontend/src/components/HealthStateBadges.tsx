@@ -1,15 +1,21 @@
 // The machine's health badge with the ratchet made visible (plan Task 12):
 // "Commissioning k/20" in a neutral colour (not green) while the baseline is
-// relearned, with the current signal beside it if it is not healthy; otherwise
-// the state, plus "Held since …" when that state is a held level.
+// relearned, with the current signal beside it if it is not healthy; "Reset,
+// awaiting reading" (also neutral) after a reset with no reading since;
+// otherwise the state, plus "Held since …" when that state is a held level.
 import type { MachineSummary } from '../api/types'
-import { commissioningSignal, commissioningText, isHeld } from '../lib/healthHold'
+import { commissioningSignal, commissioningText, isHeld, resetPendingText } from '../lib/healthHold'
 import { healthLabel } from './healthStyles'
 import { Badge } from './ui/badge'
 
 type Health = Pick<
   MachineSummary,
-  'health_state' | 'health_state_held' | 'instant_health_state' | 'commissioning' | 'held_since'
+  | 'health_state'
+  | 'health_state_held'
+  | 'instant_health_state'
+  | 'commissioning'
+  | 'held_since'
+  | 'reset_pending_reading'
 >
 
 export function HealthStateBadges({ health }: { health: Health }) {
@@ -25,6 +31,14 @@ export function HealthStateBadges({ health }: { health: Health }) {
           <Badge variant={health.instant_health_state as 'degrading' | 'faulty' | 'critical'}>{signal}</Badge>
         )}
       </span>
+    )
+  }
+  const pending = resetPendingText(health)
+  if (pending) {
+    return (
+      <Badge variant="neutral" title="Health tracking was reset; the baseline is relearned from the next readings">
+        {pending}
+      </Badge>
     )
   }
   const state = (health.health_state || 'unknown') as 'healthy' | 'degrading' | 'faulty' | 'critical' | 'unknown'

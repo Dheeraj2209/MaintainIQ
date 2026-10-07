@@ -4,7 +4,8 @@ import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recha
 import type { HealthState, KpiSummary, MachineSummary } from '../api/types'
 import { api } from '../api/client'
 import { healthClasses, healthLabel } from '../components/healthStyles'
-import { Badge } from '../components/ui/badge'
+import { HealthStateBadges } from '../components/HealthStateBadges'
+import { toneState } from '../lib/healthHold'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { MetricCard } from '../components/ui/metric-card'
 import { useChartColors } from '../lib/chartColors'
@@ -162,7 +163,7 @@ export function AnalyticsPage() {
           ) : (
             <ol className="space-y-2">
               {topRisk.map((m, i) => {
-                const cls = healthClasses(m.health_state)
+                const cls = healthClasses(toneState(m))
                 return (
                   <li key={m.machine_id}>
                     <Link
@@ -172,7 +173,7 @@ export function AnalyticsPage() {
                       <span className="flex items-center gap-2">
                         <span className="font-mono text-text-muted">#{i + 1}</span>
                         <span className="font-medium text-text">{m.machine_id}</span>
-                        <Badge variant={m.health_state}>{healthLabel(m.health_state)}</Badge>
+                        <HealthStateBadges health={m} />
                       </span>
                       <span className={`font-mono ${cls.text}`}>Risk {m.risk_score}</span>
                     </Link>

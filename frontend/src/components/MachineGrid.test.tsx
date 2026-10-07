@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MachineGrid } from './MachineGrid'
-import { commissioningMachine, heldMachine, machineSummaries } from '../test/fixtures'
+import { commissioningMachine, heldMachine, machineSummaries, resetPendingMachine } from '../test/fixtures'
 
 describe('MachineGrid', () => {
   it('renders one card per machine with its state and risk', () => {
@@ -45,5 +45,11 @@ describe('MachineGrid health ratchet', () => {
     expect(screen.queryByText('Healthy')).not.toBeInTheDocument()
     expect(screen.getByText('Signal: Faulty')).toBeInTheDocument()
     expect(screen.queryByText(/held since/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a reset awaiting its first reading as neutral, not healthy', () => {
+    render(<MachineGrid machines={[resetPendingMachine]} selectedId={null} onSelect={() => {}} />)
+    expect(screen.getByText('Reset, awaiting reading')).toBeInTheDocument()
+    expect(screen.queryByText('Healthy')).not.toBeInTheDocument()
   })
 })

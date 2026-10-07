@@ -5,7 +5,7 @@ import { AuthProvider } from '../auth/AuthContext'
 import { LiveEventsProvider } from '../realtime/LiveEventsProvider'
 import { AnalyticsPage } from './AnalyticsPage'
 import { server } from '../test/server'
-import { kpiSummary } from '../test/fixtures'
+import { commissioningMachine, heldMachine, kpiSummary } from '../test/fixtures'
 
 function harness() {
   return (
@@ -37,6 +37,16 @@ describe('AnalyticsPage', () => {
     const links = riskSection.getAllByRole('link')
     expect(links[0]).toHaveTextContent('m1')
     expect(links[1]).toHaveTextContent('m2')
+  })
+
+  it('shows held and commissioning machines in the ranking, not plain states', async () => {
+    server.use(http.get('/api/machines', () => HttpResponse.json([heldMachine, commissioningMachine])))
+    render(harness())
+
+    const riskSection = within((await screen.findByText(/top at-risk machines/i)).closest('.panel-notch')!)
+    expect(await riskSection.findByText(/held since/i)).toBeInTheDocument()
+    expect(riskSection.getByText('Commissioning 7/20')).toBeInTheDocument()
+    expect(riskSection.queryByText('Healthy')).not.toBeInTheDocument()
   })
 
   it('shows placeholders when there is no model or machine data', async () => {

@@ -223,7 +223,8 @@ describe('AlertCloseDialog', () => {
       const dialog = await openDialog(openAlert())
 
       await userEvent.click(within(dialog).getByRole('radio', { name: /confirmed failure/i }))
-      expect(within(dialog).getByText(/the machine stays held at critical until a repair is recorded/i)).toBeInTheDocument()
+      // Worded without the alert's opening state: the held level may since have escalated.
+      expect(within(dialog).getByText(/the machine stays held until a repair is recorded/i)).toBeInTheDocument()
       expect(within(dialog).getByRole('link', { name: /create a work order/i })).toHaveAttribute('href', '/machines/m1')
       expect(within(dialog).queryByText(/health tracking re-armed/i)).not.toBeInTheDocument()
     })
@@ -232,7 +233,7 @@ describe('AlertCloseDialog', () => {
       const dialog = await openDialog(openAlert({ active_work_order_id: 7 }))
 
       await userEvent.click(within(dialog).getByRole('radio', { name: /prevented by maintenance/i }))
-      expect(within(dialog).getByText(/stays held at critical/i)).toBeInTheDocument()
+      expect(within(dialog).getByText(/stays held until a repair is recorded/i)).toBeInTheDocument()
       expect(within(dialog).getByRole('link', { name: /complete work order #7/i })).toHaveAttribute('href', '/work-orders/7')
     })
 
@@ -242,6 +243,13 @@ describe('AlertCloseDialog', () => {
       await userEvent.click(within(dialog).getByRole('radio', { name: /false alarm/i }))
       expect(within(dialog).getByText(/health tracking re-armed/i)).toBeInTheDocument()
       expect(within(dialog).queryByText(/stays held/i)).not.toBeInTheDocument()
+    })
+
+    it('says a false alarm recorded on a resolved alert can re-arm health tracking', async () => {
+      const dialog = await openDialog(resolvedAlert())
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: /false alarm/i }))
+      expect(within(dialog).getByText(/re-arms health tracking/i)).toBeInTheDocument()
     })
 
     it('says nothing about holding when recording on an already-resolved alert', async () => {
