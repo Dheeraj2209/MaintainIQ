@@ -38,10 +38,14 @@ def _row_conn(db_path):
 
 
 @pytest.fixture
-def replay_svc(db_path):
+def replay_svc(db_path, monkeypatch):
     """Override get_replay_service with a service bound to the temp DB and a
-    fake predictor; always stop threads on teardown (no leaked loops)."""
+    fake predictor; always stop threads on teardown (no leaked loops).
+    A start resolves the seed's open alert (a new health epoch, plan D9), so
+    the replay pages: email is stubbed rather than dialled at localhost."""
     from src.api.app import app
+
+    monkeypatch.setattr("src.notifications.dispatch.send_email", lambda to, subject, body: None)
     from src.api.routes.ingestion import get_replay_service
 
     pred = _FakePredictor()

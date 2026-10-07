@@ -112,6 +112,9 @@ class ReplayService:
         self._state: dict[str, dict] = {}
         self._threads: dict[str, threading.Thread] = {}
         self._stops: dict[str, threading.Event] = {}
+        # The DB health epoch each run began (plan D9); a replay_once that
+        # finds another epoch stops: someone else reset the machine.
+        self._start_epoch: dict[str, int | None] = {}
         self._lock = threading.RLock()
 
     def _load_worklist(self, machine_id: str) -> list[dict]:
@@ -147,11 +150,23 @@ class ReplayService:
                 return False
             row = worklist[cursor]
             self._cursors[machine_id] = cursor + 1
+            start_epoch = self._start_epoch.get(machine_id)
 
         base = json.loads(row["features_json"] or "{}")
         predictor = self._predictor_provider()
         conn = self._connection_factory()
         try:
+            if start_epoch is not None:
+                health = health_epoch.current(conn, machine_id)
+                if health is not None and health.epoch != start_epoch:
+                    # Reset by someone else mid-run (e.g. a completed work
+                    # order): feeding the rest of a failing trajectory into
+                    # the fresh baseline would be wrong, so the run ends (D9).
+                    # A re-arm moves only the episode and does not stop it.
+                    logger.info("Stopping the replay of %s: its health epoch was reset", machine_id)
+                    with self._lock:
+                        self._state[machine_id]["stopped_reason"] = "health_reset"
+                    return False
             start = time.perf_counter()
             try:
                 # Synced to the machine's DB health epoch first, atomically
@@ -201,22 +216,33 @@ class ReplayService:
         return True
 
     def start(self, machine_id: str, speed_multiplier: float = 1.0) -> None:
+        """Replay machine_id from its first stored reading as a new health
+        epoch (plan D9): the restart is a fresh component, so the previous
+        run's held level and alert are reset.
+
+        The live guard, worklist load and DB reset run outside self._lock, so
+        a reset waiting on live._TRANSITION_LOCK or SQLite never stalls
+        status() or another machine's replay. Two racing starts may both
+        bump the epoch, which is harmless; only one thread is spawned."""
         if speed_multiplier <= 0:
             raise ValueError("speed_multiplier must be positive")
+        if self._is_running(machine_id):
+            return  # already running; idempotent
+        last_live = self._last_live_reading(machine_id)
+        if last_live is not None and datetime.now(timezone.utc) - last_live < LIVE_GUARD:
+            raise LiveMachineError(
+                f"machine {machine_id} is receiving live telemetry (last reading "
+                f"{last_live.isoformat()}); replay would corrupt its live predictions and alerts"
+            )
+        # Fresh worklist each start so a re-start replays from the beginning.
+        worklist = self._load_worklist(machine_id)
+        if not worklist:
+            raise ValueError(f"no replayable readings for machine {machine_id}")
+        new_epoch = self._reset_health(machine_id)
         with self._lock:
-            existing = self._threads.get(machine_id)
-            if existing is not None and existing.is_alive():
-                return  # already running; idempotent
-            last_live = self._last_live_reading(machine_id)
-            if last_live is not None and datetime.now(timezone.utc) - last_live < LIVE_GUARD:
-                raise LiveMachineError(
-                    f"machine {machine_id} is receiving live telemetry (last reading "
-                    f"{last_live.isoformat()}); replay would corrupt its live predictions and alerts"
-                )
-            # Fresh worklist each start so a re-start replays from the beginning.
-            worklist = self._load_worklist(machine_id)
-            if not worklist:
-                raise ValueError(f"no replayable readings for machine {machine_id}")
+            if self._is_running(machine_id):
+                return  # a racing start won; its run continues
+            self._start_epoch[machine_id] = new_epoch
             self._worklists[machine_id] = worklist
             self._cursors[machine_id] = 0
             state = self._fresh_state()
@@ -231,6 +257,24 @@ class ReplayService:
             )
             self._threads[machine_id] = thread
             thread.start()
+
+    def _is_running(self, machine_id: str) -> bool:
+        with self._lock:
+            existing = self._threads.get(machine_id)
+            return existing is not None and existing.is_alive()
+
+    def _reset_health(self, machine_id: str) -> int | None:
+        """Begin a new DB health epoch for the run and announce the alert it
+        resolved. Returns the new epoch (None without the health table)."""
+        conn = self._connection_factory()
+        try:
+            at = _now_iso()
+            row, resolved = health_epoch.reset_machine_health(
+                conn, machine_id, reason="replay_restart", now=at)
+            health_epoch.announce_resolved(conn, resolved, at=at)
+        finally:
+            conn.close()
+        return row.epoch if row is not None else None
 
     def _run(self, machine_id: str, interval: float, stop_event: threading.Event) -> None:
         try:

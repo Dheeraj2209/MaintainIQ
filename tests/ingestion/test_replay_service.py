@@ -102,7 +102,10 @@ def test_start_sets_running_then_stop_halts(db_path):
     assert svc._threads.get("m1") is None   # thread cleaned up — no leaked loop
 
 
-def test_start_replays_all_then_marks_not_running(db_path):
+def test_start_replays_all_then_marks_not_running(db_path, monkeypatch):
+    # A start resolves the seed's open alert (a new health epoch, plan D9),
+    # so the replay pages: stub email rather than dial localhost.
+    monkeypatch.setattr("src.notifications.dispatch.send_email", lambda to, subject, body: None)
     pred = _FakePredictor()
     svc = _service(db_path, pred, base_interval_seconds=0.001)
     svc.start("m1")

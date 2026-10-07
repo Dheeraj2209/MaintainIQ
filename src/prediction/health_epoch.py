@@ -169,9 +169,13 @@ def _rearm_locked(conn, machine_id: str, *, now: str) -> HealthRow:
 
 
 def reset_machine_health(conn, machine_id: str, *, reason: str,
-                         now: str | None = None) -> tuple[HealthRow, list[dict]]:
+                         now: str | None = None) -> tuple[HealthRow | None, list[dict]]:
     """_reset_locked under live._TRANSITION_LOCK, committed (or rolled back
-    on failure). Call announce_resolved with the returned alerts afterwards."""
+    on failure). Call announce_resolved with the returned alerts afterwards.
+    Without the table (an old DB opened outside get_db) it is a no-op
+    returning (None, [])."""
+    if not table_exists(conn, _TABLE):
+        return None, []
     now = now or _now()
     with live._TRANSITION_LOCK:
         try:

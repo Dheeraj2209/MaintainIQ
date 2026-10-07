@@ -1,10 +1,19 @@
 """ReplayService.replay_once predicts through health_epoch.predict_synced and
-never fans out a stale result (plan Task 6, D4, D6)."""
+never fans out a stale result (plan Task 6, D4, D6); a replay start begins a
+new health epoch and an external reset stops the run (plan Task 9, D9)."""
+import json
 import logging
+import threading
+import time
+from datetime import datetime, timezone
 
+import pytest
+
+from src.ingestion.replay_service import LiveMachineError, ReplayService
 from src.prediction import health_epoch, rul_store
-from src.prediction.rul_realtime import StaleEpoch
+from src.prediction.rul_realtime import RealTimeRULPredictor, StaleEpoch
 from tests.ingestion.test_replay_service import _FakePredictor, _row_conn, _service
+from tests.prediction.test_health_epoch import _artifact, _sbase
 
 
 def _fan_out_recorder():
@@ -73,3 +82,180 @@ def test_replay_still_persists_and_fans_out_normally(db_path):
     assert svc.replay_once("m1") is True
     assert len(fanned) == 1
     assert _count(db_path, "SELECT COUNT(*) FROM predictions WHERE source='xjtu_rul'") == 1
+
+
+# --- Task 9: replay restart and external reset (D9) -------------------------
+
+def _wait(predicate, timeout=5.0):
+    deadline = time.time() + timeout
+    while not predicate() and time.time() < deadline:
+        time.sleep(0.01)
+    assert predicate()
+
+
+def _epoch(db_path, machine_id="m1"):
+    conn = _row_conn(db_path)
+    try:
+        return health_epoch.current(conn, machine_id)
+    finally:
+        conn.close()
+
+
+def _insert_replay_alert(db_path, machine_id="m1") -> int:
+    conn = _row_conn(db_path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO alerts (machine_id, opened_at, severity, health_state, message, "
+            "status, source, created_at) VALUES (?, ?, 'high', 'critical', 'x', 'open', "
+            "'xjtu_rul', ?)",
+            (machine_id, "2026-10-07T10:00:00+00:00", "2026-10-07T10:00:00+00:00"),
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def _alert_status(db_path, alert_id):
+    conn = _row_conn(db_path)
+    try:
+        return conn.execute("SELECT status FROM alerts WHERE id = ?", (alert_id,)).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def test_restart_bumps_the_epoch_and_resolves_the_first_runs_alert(db_path):
+    _, on_prediction = _fan_out_recorder()
+    svc = _service(db_path, _FakePredictor(), base_interval_seconds=10.0,
+                   on_prediction=on_prediction)
+    svc.start("m1")
+    _wait(lambda: svc.status()["m1"]["replayed"] >= 1)
+    alert_id = _insert_replay_alert(db_path)  # raised by the first run
+    svc.stop("m1")
+    svc.start("m1")
+    svc.stop("m1")
+    assert _epoch(db_path).epoch == 2
+    assert _alert_status(db_path, alert_id) == "resolved"
+
+
+def test_after_a_restart_the_first_result_starts_a_fresh_history(db_path, tmp_path):
+    conn = _row_conn(db_path)
+    conn.execute("UPDATE readings SET features_json = ? WHERE machine_id = 'm1'",
+                 (json.dumps(_sbase("healthy")),))
+    conn.commit()
+    conn.close()
+    predictor = RealTimeRULPredictor(_artifact(tmp_path / "a.joblib"))
+    results, on_prediction = _fan_out_recorder()
+    svc = ReplayService(predictor_provider=lambda: predictor,
+                        connection_factory=lambda: _row_conn(db_path),
+                        base_interval_seconds=0.001, on_prediction=on_prediction)
+    svc.start("m1")
+    _wait(lambda: not svc.status()["m1"]["running"])
+    assert [r["history_snapshots"] for r in results] == [1, 2]
+    svc.start("m1")
+    _wait(lambda: not svc.status()["m1"]["running"])
+    svc.stop_all()
+    assert results[2]["history_snapshots"] == 1
+
+
+def test_a_live_machine_or_an_empty_worklist_does_not_bump(db_path):
+    conn = _row_conn(db_path)
+    conn.execute(
+        """INSERT INTO readings (machine_id, timestamp, cycle, elapsed_minutes, speed_rpm,
+               load_kn, sample_rate_hz, features_json, dataset, vibration_h_rms,
+               vibration_h_kurtosis, vibration_v_rms, vibration_v_kurtosis,
+               cross_axis_rms_ratio, cross_axis_correlation)
+           VALUES ('m1', ?, 9, 0, 2100.0, 12.0, 25600.0, '{}', 'live_mqtt', 0, 0, 0, 0, 0, 0)""",
+        (datetime.now(timezone.utc).isoformat(),),
+    )
+    conn.execute("UPDATE readings SET features_json = '{}' WHERE machine_id = 'm2'")
+    conn.commit()
+    conn.close()
+    svc = _service(db_path, _FakePredictor(), base_interval_seconds=10.0)
+    with pytest.raises(LiveMachineError):
+        svc.start("m1")
+    with pytest.raises(ValueError):
+        svc.start("m2")
+    assert _epoch(db_path, "m1").epoch == 0
+    assert _epoch(db_path, "m2").epoch == 0
+
+
+def test_start_while_running_does_not_bump(db_path):
+    svc = _service(db_path, _FakePredictor(), base_interval_seconds=10.0)
+    svc.start("m1")
+    svc.start("m1")
+    svc.stop("m1")
+    assert _epoch(db_path).epoch == 1
+
+
+def test_the_reset_does_not_hold_the_service_lock(db_path, monkeypatch):
+    entered, release = threading.Event(), threading.Event()
+    real = health_epoch.reset_machine_health
+
+    def blocking(conn, machine_id, **kw):
+        entered.set()
+        release.wait(5.0)
+        return real(conn, machine_id, **kw)
+
+    monkeypatch.setattr(health_epoch, "reset_machine_health", blocking)
+    _, on_prediction = _fan_out_recorder()
+    svc = _service(db_path, _FakePredictor(), base_interval_seconds=10.0,
+                   on_prediction=on_prediction)
+    starter = threading.Thread(target=svc.start, args=("m1",))
+    starter.start()
+    try:
+        assert entered.wait(5.0)
+        done = []
+        probe = threading.Thread(target=lambda: done.append((svc.status(), svc.replay_once("m2"))))
+        probe.start()
+        probe.join(2.0)
+        assert not probe.is_alive(), "status()/replay_once waited on the reset"
+        assert done[0][1] is True
+    finally:
+        release.set()
+        starter.join(5.0)
+        svc.stop_all()
+
+
+def _started(db_path):
+    """A running replay of m1 parked after its first snapshot."""
+    _, on_prediction = _fan_out_recorder()
+    svc = _service(db_path, _FakePredictor(), base_interval_seconds=10.0,
+                   on_prediction=on_prediction)
+    svc.start("m1")
+    _wait(lambda: svc.status()["m1"]["replayed"] >= 1)
+    return svc
+
+
+def test_an_external_reset_stops_the_replay(db_path):
+    svc = _started(db_path)
+    try:
+        conn2 = _row_conn(db_path)
+        health_epoch.reset_machine_health(conn2, "m1", reason="work_order")
+        conn2.close()
+        assert svc.replay_once("m1") is False
+        assert svc.status()["m1"]["stopped_reason"] == "health_reset"
+        assert _count(db_path, "SELECT COUNT(*) FROM predictions "
+                               "WHERE machine_id='m1' AND source='xjtu_rul'") == 1
+    finally:
+        svc.stop_all()
+
+
+def test_a_rearm_does_not_stop_the_replay(db_path):
+    svc = _started(db_path)
+    try:
+        conn2 = _row_conn(db_path)
+        with health_epoch.live._TRANSITION_LOCK:
+            health_epoch._rearm_locked(conn2, "m1", now="2026-10-07T12:00:00+00:00")
+            conn2.commit()
+        conn2.close()
+        assert svc.replay_once("m1") is True
+        assert svc.status()["m1"].get("stopped_reason") is None
+    finally:
+        svc.stop_all()
+
+
+def test_reset_machine_health_without_the_table_is_a_noop(conn):
+    conn.execute("DROP TABLE machine_health_state")
+    conn.commit()
+    assert health_epoch.reset_machine_health(conn, "m1", reason="replay_restart") == (None, [])
