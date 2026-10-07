@@ -37,7 +37,7 @@ def _make_predictor(tmp_path):
         "failure_probability_threshold": 0.6,
         "probability_smoothing_window": 3,
         "warning_persistence_snapshots": 3,
-        "baseline_window": 20,
+        "baseline_window": 2,  # ratchet commissioning gate: snapshot 3 is the first that may latch (plan D13)
         "sample_rate_hz": 25_600.0,
     }, path)
     return RealTimeRULPredictor(path)

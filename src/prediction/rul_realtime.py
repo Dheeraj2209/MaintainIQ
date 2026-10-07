@@ -1,6 +1,7 @@
 """Stateful real-time RUL inference from dual-axis vibration snapshots."""
 from __future__ import annotations
 
+import os
 from collections import defaultdict, deque
 from pathlib import Path
 from threading import Lock
@@ -10,12 +11,46 @@ import numpy as np
 import pandas as pd
 
 from src.ingestion.xjtu_sy import extract_snapshot_features
+from src.prediction.health_epoch import HEALTH_RANK
 from src.training.xjtu_rul import (
     BASELINE_WINDOW,
     DEFAULT_ARTIFACT,
     ROLLING_WINDOWS,
     add_past_context,
 )
+
+RATCHET_ENV = "MAINTAINIQ_HEALTH_RATCHET"
+_ENV_TRUE = {"1", "true", "on", "yes"}
+_ENV_FALSE = {"0", "false", "off", "no"}
+
+
+class StaleEpoch(RuntimeError):
+    """The machine was reset or restored while this prediction was in flight.
+
+    The prediction is discarded without touching the machine's fresh state;
+    callers log it and skip persist and fan-out (plan D4).
+    """
+
+    def __init__(self, machine_id: str):
+        super().__init__(f"health state of {machine_id!r} changed during prediction")
+        self.machine_id = machine_id
+
+
+def _resolve_ratchet(ratchet: bool | None, artifact: dict) -> bool:
+    """Constructor kwarg, then env MAINTAINIQ_HEALTH_RATCHET, then the
+    artifact's ``health_ratchet`` key; on by default (plan D13)."""
+    if ratchet is not None:
+        return bool(ratchet)
+    raw = os.environ.get(RATCHET_ENV, "").strip().lower()
+    if raw in _ENV_TRUE:
+        return True
+    if raw in _ENV_FALSE:
+        return False
+    if raw:
+        raise ValueError(
+            f"{RATCHET_ENV} must be one of {sorted(_ENV_TRUE | _ENV_FALSE)}, got {raw!r}"
+        )
+    return bool(artifact.get("health_ratchet", True))
 
 
 class RealTimeRULPredictor:
@@ -26,7 +61,13 @@ class RealTimeRULPredictor:
     database so process restarts do not discard context.
     """
 
-    def __init__(self, artifact_path: Path = DEFAULT_ARTIFACT, max_history: int | None = None):
+    def __init__(
+        self,
+        artifact_path: Path = DEFAULT_ARTIFACT,
+        max_history: int | None = None,
+        *,
+        ratchet: bool | None = None,
+    ):
         if not artifact_path.exists():
             raise FileNotFoundError(
                 f"RUL model not found at {artifact_path}; run "
@@ -72,14 +113,36 @@ class RealTimeRULPredictor:
             lambda: deque(maxlen=persistence)
         )
         self._locks: dict[str, Lock] = defaultdict(Lock)
+        # Health ratchet (plan D3/D8/D13): the worst in-distribution,
+        # post-commissioning state is held until a reset or restore.
+        self.ratchet = _resolve_ratchet(ratchet, artifact)
+        self._max_state: dict[str, str] = {}
+        self._epochs: dict[str, int] = {}
+        self._episodes: dict[str, int] = {}
+        # Generation counter: bumped by every reset/restore so an in-flight
+        # prediction can tell its machine state was replaced (StaleEpoch).
+        self._gen: dict[str, int] = defaultdict(int)
 
     def reset_machine(self, machine_id: str) -> None:
+        """Forget all state of one machine and restart commissioning.
+
+        Epoch-unaware: production callers must reset through
+        src.prediction.health_epoch; a bare reset here is undone by the next
+        health_epoch.predict_synced.
+        """
+        self._reset_state(machine_id)
+
+    def _reset_state(self, machine_id: str) -> None:
         with self._locks[machine_id]:
             self._history.pop(machine_id, None)
             self._baseline_history.pop(machine_id, None)
             self._cycles.pop(machine_id, None)
             self._probability_history.pop(machine_id, None)
             self._warning_history.pop(machine_id, None)
+            self._max_state.pop(machine_id, None)
+            self._epochs.pop(machine_id, None)
+            self._episodes.pop(machine_id, None)
+            self._gen[machine_id] += 1
 
     def _health_state(self, rul_minutes: float) -> str:
         thresholds = self.artifact.get(
@@ -122,6 +185,9 @@ class RealTimeRULPredictor:
         load_kn: float,
     ) -> dict:
         with self._locks[machine_id]:
+            gen = self._gen[machine_id]
+            epoch = self._epochs.get(machine_id)
+            episode = self._episodes.get(machine_id)
             history = self._history[machine_id]
             cycle = self._cycles[machine_id]
             self._cycles[machine_id] += 1
@@ -159,6 +225,8 @@ class RealTimeRULPredictor:
             for classifier in self.classifiers
         ]))
         with self._locks[machine_id]:
+            if self._gen[machine_id] != gen:
+                raise StaleEpoch(machine_id)
             probability_history = self._probability_history[machine_id]
             probability_history.append(raw_failure_probability)
             failure_probability = float(np.median(probability_history))
@@ -225,6 +293,41 @@ class RealTimeRULPredictor:
             if within_horizon else [horizon, None]
         )
 
+        instant = self._health_state(predicted) if within_horizon else "healthy"
+        commissioning = self.ratchet and snapshots_seen <= baseline_window
+        ood = outside_fraction > 0.10
+        with self._locks[machine_id]:
+            if self._gen[machine_id] != gen:
+                raise StaleEpoch(machine_id)
+            held = self._max_state.get(machine_id, "healthy")
+            if not self.ratchet:
+                state = instant
+            elif commissioning:
+                # The baseline is still being learned: report the held level
+                # and never latch (D3).
+                state = held
+            elif ood:
+                # Shown and able to alert above the held floor, never latched (D8).
+                state = instant if HEALTH_RANK[instant] > HEALTH_RANK[held] else held
+            else:
+                state = instant if HEALTH_RANK[instant] > HEALTH_RANK[held] else held
+                self._max_state[machine_id] = state
+        if commissioning:
+            warnings.append(
+                f"commissioning: {snapshots_seen}/{baseline_window} snapshots; "
+                f"learning the baseline, instant state {instant} is not held"
+            )
+        if self.ratchet and ood and not commissioning and HEALTH_RANK[instant] > HEALTH_RANK[held]:
+            warnings.append(
+                f"ood_not_latched: instant state {instant} is out of distribution "
+                f"and is not held above {held}"
+            )
+        if HEALTH_RANK[instant] < HEALTH_RANK[state]:
+            warnings.append(
+                f"condition_receded: instant state {instant}; holding {state} "
+                "until maintenance resets health tracking"
+            )
+
         return {
             "machine_id": machine_id,
             "predicted_rul_minutes": predicted,
@@ -235,7 +338,15 @@ class RealTimeRULPredictor:
             "raw_failure_within_horizon_probability": raw_failure_probability,
             "warning_persistence_snapshots": required_persistence,
             "prediction_interval_90_minutes": interval,
-            "health_state": self._health_state(predicted) if within_horizon else "healthy",
+            "health_state": state,
+            "instant_health_state": instant,
+            "health_state_held": state != instant,
+            "health_ratchet": self.ratchet,
+            "commissioning": (
+                {"seen": snapshots_seen, "of": baseline_window} if commissioning else None
+            ),
+            "health_epoch": epoch,
+            "health_episode": episode,
             "model_version": self.artifact["model_version"],
             "history_snapshots": snapshots_seen,
             "out_of_distribution": outside_fraction > 0.10,
