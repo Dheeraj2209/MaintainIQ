@@ -54,3 +54,30 @@ def test_live_predictor_requires_persistence_and_retains_commissioning_baseline(
     predictor.reset_machine("fan-1")
     assert "fan-1" not in predictor._baseline_history
     assert "fan-1" not in predictor._history
+
+
+def test_loaded_estimators_predict_single_threaded(tmp_path):
+    # Training saves the forests with n_jobs=-1. Live inference scores one
+    # snapshot at a time, where dispatching every tree across all cores costs
+    # more than it saves (~460 ms vs ~270 ms per prediction on the real model),
+    # so the predictor must run them with n_jobs=1.
+    from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
+    from sklearn.pipeline import Pipeline
+
+    X = np.random.default_rng(0).normal(size=(40, 2))
+    y = (X[:, 0] > 0).astype(int)
+    classifiers = [
+        Pipeline([("classifier", ExtraTreesClassifier(n_estimators=5, n_jobs=-1, random_state=s))]).fit(X, y)
+        for s in (1, 2)
+    ]
+    regressor = Pipeline([("regressor", ExtraTreesRegressor(n_estimators=5, n_jobs=-1, random_state=0))]).fit(X, X[:, 0])
+    path = tmp_path / "rul.joblib"
+    _artifact(path)
+    artifact = joblib.load(path)
+    artifact.update(classifiers=classifiers, regressor=regressor)
+    joblib.dump(artifact, path)
+
+    predictor = RealTimeRULPredictor(path)
+
+    assert [c.steps[-1][1].n_jobs for c in predictor.classifiers] == [1, 1]
+    assert predictor.regressor.steps[-1][1].n_jobs == 1

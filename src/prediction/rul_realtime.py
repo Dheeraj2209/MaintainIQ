@@ -53,6 +53,14 @@ def _resolve_ratchet(ratchet: bool | None, artifact: dict) -> bool:
     return bool(artifact.get("health_ratchet", True))
 
 
+def _predict_single_threaded(estimator) -> None:
+    """Set n_jobs=1 on a loaded estimator (or a Pipeline's final step) that
+    has the parameter; anything else, e.g. a test fake, is left alone."""
+    final = estimator.steps[-1][1] if hasattr(estimator, "steps") else estimator
+    if hasattr(final, "n_jobs"):
+        final.n_jobs = 1
+
+
 class RealTimeRULPredictor:
     """Keep causal feature history per machine and predict one snapshot at a time.
 
@@ -87,6 +95,11 @@ class RealTimeRULPredictor:
         self.artifact = artifact
         self.classifiers = artifact.get("classifiers", [artifact.get("classifier")])
         self.regressor = artifact["regressor"]
+        # Training saves the forests with n_jobs=-1; scoring one snapshot at a
+        # time, spreading each tree across every core costs more than it saves
+        # (~460 ms vs ~270 ms per prediction on the real model).
+        for estimator in [*self.classifiers, self.regressor]:
+            _predict_single_threaded(estimator)
         legacy_features = artifact.get("feature_columns")
         self.classifier_feature_columns = artifact.get(
             "classifier_feature_columns", legacy_features
