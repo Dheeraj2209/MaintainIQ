@@ -176,6 +176,9 @@ def _machine_health(conn, machine_id: str) -> dict:
     health_state = effective["health_state"] or "unknown"
     instant = None if pending or not latest_pred else latest_pred.get("instant_health_state")
     held = instant is not None and instant != health_state
+    # While a reset is pending the latest prediction scored the replaced
+    # component, so none of its prediction-derived fields describe the machine.
+    current_pred = None if pending else latest_pred
 
     # Combined risk: driven by the current health state, nudged up when an
     # alert is still open for the machine (unresolved issue = higher risk).
@@ -187,17 +190,17 @@ def _machine_health(conn, machine_id: str) -> dict:
     return {
         "machine_id": machine_id,
         "health_state": health_state,
-        "confidence": latest_pred.get("confidence") if latest_pred else None,
+        "confidence": current_pred.get("confidence") if current_pred else None,
         "prediction_source": latest_pred.get("source") if latest_pred else None,
-        "probable_cause": latest_pred.get("probable_cause") if latest_pred else None,
+        "probable_cause": current_pred.get("probable_cause") if current_pred else None,
         "last_reading_at": latest_reading.get("timestamp") if latest_reading else None,
         "vibration_severity": _vibration_severity(latest_reading),
         "risk_score": round(risk, 1),
         "abnormal_event_count": _abnormal_event_count(conn, machine_id),
         "open_alert_count": open_alerts,
-        "predicted_rul_minutes": latest_pred.get("predicted_rul_minutes") if latest_pred else None,
-        "rul_estimate_kind": latest_pred.get("rul_estimate_kind") if latest_pred else None,
-        "out_of_distribution": bool(latest_pred["out_of_distribution"]) if latest_pred and latest_pred.get("out_of_distribution") is not None else None,
+        "predicted_rul_minutes": current_pred.get("predicted_rul_minutes") if current_pred else None,
+        "rul_estimate_kind": current_pred.get("rul_estimate_kind") if current_pred else None,
+        "out_of_distribution": bool(current_pred["out_of_distribution"]) if current_pred and current_pred.get("out_of_distribution") is not None else None,
         "instant_health_state": instant,
         "health_state_held": held,
         "held_since": _held_since(conn, machine_id, latest_pred) if held else None,

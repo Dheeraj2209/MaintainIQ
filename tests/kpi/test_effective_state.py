@@ -54,6 +54,14 @@ def test_machine_health_after_reset_without_a_new_reading_is_healthy(hconn):
     assert health["health_state_held"] is False
     assert health["instant_health_state"] is None
     assert health["risk_score"] == 0.0
+    # The last prediction scored the replaced component: none of its
+    # prediction-derived fields describe the machine now (it showed the old
+    # bearing's "1.6 min left" on a freshly repaired machine).
+    assert health["predicted_rul_minutes"] is None
+    assert health["rul_estimate_kind"] is None
+    assert health["confidence"] is None
+    assert health["probable_cause"] is None
+    assert health["out_of_distribution"] is None
 
 
 def test_machine_health_flags_a_held_row(hconn):
@@ -109,6 +117,11 @@ def test_open_ended_prognostic_report_uses_the_effective_state(hconn):
     report = generators.machine_prognostic(hconn, scope="m1")
     assert report["current"]["health_state"] == "healthy"
     assert report["current"]["reset_pending_reading"] is True
+    # The replaced component's RUL must not drive a "service within N
+    # minutes" recommendation for the repaired machine.
+    assert report["current"]["predicted_rul_minutes"] is None
+    assert report["current"]["rul_estimate_kind"] is None
+    assert report["recommended_maintenance"] == {"within_minutes": None, "by_timestamp": None}
 
 
 def test_bounded_prognostic_report_describes_the_past(hconn):
@@ -129,9 +142,11 @@ def test_open_ended_fleet_summary_uses_the_effective_state(hconn):
     summary = generators.fleet_summary(hconn)
     assert summary["health_distribution"] == {"healthy": 1}
     assert summary["top_at_risk"][0]["health_state"] == "healthy"
+    assert summary["top_at_risk"][0]["predicted_rul_minutes"] is None
 
     bounded = generators.fleet_summary(hconn, period_end="2030-12-31T00:00:00+00:00")
     assert bounded["health_distribution"] == {"critical": 1}
+    assert bounded["top_at_risk"][0]["predicted_rul_minutes"] == 30.0
 
 
 def test_held_since_is_when_the_held_level_was_first_reached(hconn):

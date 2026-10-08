@@ -95,21 +95,26 @@ def machine_prognostic(conn, *, scope, period_start=None, period_end=None) -> di
     recommended = {"within_minutes": None, "by_timestamp": None}
     if latest is not None:
         state = _current_state(conn, scope, dict(latest), period_end)
+        # While a reset is pending, the latest prediction scored the replaced
+        # component: report the state, but none of its prediction-derived
+        # fields, and recommend nothing from them.
+        scored = None if state["reset_pending_reading"] else latest
         current = {
             "timestamp": latest["timestamp"],
             "health_state": state["health_state"],
             "reset_pending_reading": state["reset_pending_reading"],
-            "predicted_rul_minutes": latest["predicted_rul_minutes"],
-            "rul_estimate_kind": latest["rul_estimate_kind"],
-            "prediction_interval_low": latest["prediction_interval_low"],
-            "prediction_interval_high": latest["prediction_interval_high"],
-            "failure_within_horizon_probability": latest["failure_within_horizon_probability"],
-            "out_of_distribution": bool(latest["out_of_distribution"]),
-            "probable_cause": latest["probable_cause"],
+            "predicted_rul_minutes": scored["predicted_rul_minutes"] if scored else None,
+            "rul_estimate_kind": scored["rul_estimate_kind"] if scored else None,
+            "prediction_interval_low": scored["prediction_interval_low"] if scored else None,
+            "prediction_interval_high": scored["prediction_interval_high"] if scored else None,
+            "failure_within_horizon_probability": (
+                scored["failure_within_horizon_probability"] if scored else None),
+            "out_of_distribution": bool(scored["out_of_distribution"]) if scored else None,
+            "probable_cause": scored["probable_cause"] if scored else None,
             "model_version": latest["model_version"],
-            "confidence": latest["confidence"],
+            "confidence": scored["confidence"] if scored else None,
         }
-        rul = latest["predicted_rul_minutes"]
+        rul = scored["predicted_rul_minutes"] if scored else None
         if rul is not None:
             recommended = {
                 "within_minutes": rul,
@@ -235,11 +240,14 @@ def fleet_summary(conn, *, scope="fleet", period_start=None, period_end=None) ->
     health_distribution: dict = {}
     at_risk = []
     for r in latest_rows:
-        state = _current_state(conn, r["machine_id"], dict(r), period_end)["health_state"]
+        current = _current_state(conn, r["machine_id"], dict(r), period_end)
+        state = current["health_state"]
         health_distribution[state] = health_distribution.get(state, 0) + 1
         at_risk.append({
             "machine_id": r["machine_id"],
-            "predicted_rul_minutes": r["predicted_rul_minutes"],
+            # A pending reset means this RUL belongs to the replaced component.
+            "predicted_rul_minutes": (None if current["reset_pending_reading"]
+                                      else r["predicted_rul_minutes"]),
             "health_state": state,
         })
 
