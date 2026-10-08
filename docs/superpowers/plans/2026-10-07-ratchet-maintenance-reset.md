@@ -458,6 +458,13 @@ holds a machine red until maintenance. In-distribution rows latch as designed.
 Task 11 verifies on XJTU that this rule leaves MC 8 / EP 2 / demotions 0 (the stop
 condition is in Task 11).
 
+**Outcome (accepted 2026-10-08).** On the R0 out-of-fold set, MC 8 / EP 2 and both
+bearing lists are unchanged, so the stop condition did not trigger. Demotions are 3,
+not 0: on 1_5 and 3_4 an OOD row is shown one level above the held floor and the next
+in-distribution row drops back to it. That is this rule working as written (OOD rows
+are reported but never latch). The user accepted it over hiding OOD rows, because
+suppressing a real sensor anomaly is worse than a one-reading step down.
+
 ### D9. Replay (blocker 6, review R1-11)
 
 - `ReplayService.start`:
