@@ -107,7 +107,11 @@ services:
   simulator:
     build: .
     profiles: ["sim"]
-    command: ["python", "-m", "src.telemetry.simulator", "--broker", "mosquitto", "--port", "1883", "--devices", "3"]
+    # --interval 5: the app predicts snapshots on one serial ingest worker at
+    # ~0.5 s each (~1.8 snapshots/s). 3 devices at the simulator's default
+    # 2 s interval sit right at that limit and the dashboard falls minutes
+    # behind; at 5 s they use about a third of it.
+    command: ["python", "-m", "src.telemetry.simulator", "--broker", "mosquitto", "--port", "1883", "--devices", "3", "--interval", "5"]
     volumes:
       # Read-only dataset for `--source xjtu` (its default --data-dir is the
       # relative path local_data/xjtu_full/..., resolved from /app). Absent
