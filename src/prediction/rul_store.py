@@ -298,14 +298,31 @@ def rehydrate(predictor, conn, machine_id: str, *, epoch: int, full: bool = Fals
          "tail": predictor.max_history},
     ).fetchall()
     required = _required_base_keys(predictor)
+    usable = [(row, base) for row in rows
+              if (base := _stored_base(row, required)) is not None]
+    # The model's output only feeds the probability-smoothing and
+    # warning-persistence deques (the held level is restored from the DB
+    # afterwards), so only the rows that can still reach them need inference:
+    # the last smoothing + persistence - 1. Earlier rows just rebuild the
+    # feature history. A full replay or an on_result caller (the D10
+    # re-derive) needs every row's result, so it predicts them all.
+    if full or on_result is not None:
+        first_predicted = 0
+    else:
+        smoothing = int(predictor.artifact.get("probability_smoothing_window", 1))
+        persistence = int(predictor.artifact.get("warning_persistence_snapshots", 1))
+        first_predicted = max(0, len(usable) - (smoothing + persistence - 1))
     replayed = 0
-    for row in rows:
-        base = _stored_base(row, required)
-        if base is None:
-            continue
+    for index, (row, base) in enumerate(usable):
         # Across the skipped middle of a long epoch (and any skipped row)
         # each row keeps the cycle number a warm predictor gave it.
         predictor._seek_cycle(machine_id, row["n"] - 1)
+        if index < first_predicted:
+            predictor._observe_base(
+                machine_id, base, speed_rpm=row["speed_rpm"], load_kn=row["load_kn"]
+            )
+            replayed += 1
+            continue
         result = predictor._predict_from_base(
             machine_id,
             base,

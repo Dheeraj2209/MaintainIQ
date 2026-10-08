@@ -306,8 +306,13 @@ def test_rehydrate_is_bounded_and_matches_a_warm_predictor(tmp_path):
         return real(*args, **kw)
 
     cold._predict_from_base = spy
+    # All 65 bounded rows rebuild the feature history, but only the last
+    # smoothing + persistence - 1 = 5 run the model: the probability and
+    # warning deques are the only model-derived state, and the held level is
+    # restored from the DB afterwards. Running the model on every row made
+    # each machine's first prediction after a restart take 30-45 s.
     assert rul_store.rehydrate(cold, conn, "b1", epoch=1) == 5 + max_history
-    assert len(calls) == 5 + max_history
+    assert len(calls) == 3 + 3 - 1
     held = warm._max_state.get("b1", "healthy")
     cold.restore_health("b1", epoch=1, episode=1, max_state=held)
     warm.restore_health("b1", epoch=1, episode=1, max_state=held)

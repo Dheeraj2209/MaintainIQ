@@ -177,6 +177,39 @@ class RealTimeRULPredictor:
         with self._locks[machine_id]:
             self._cycles[machine_id] = int(cycle)
 
+    def _append_snapshot_locked(
+        self, machine_id: str, base: dict, *, speed_rpm: float, load_kn: float
+    ) -> int:
+        """Record one snapshot in the rolling and commissioning histories and
+        advance the cycle. Caller holds the machine lock. Returns the cycle."""
+        cycle = self._cycles[machine_id]
+        self._cycles[machine_id] += 1
+        snapshot = {
+            "bearing_id": machine_id,
+            "cycle": cycle,
+            "elapsed_minutes": float(cycle),
+            "speed_rpm": float(speed_rpm),
+            "load_kn": float(load_kn),
+            **base,
+        }
+        self._history[machine_id].append(snapshot)
+        baseline_history = self._baseline_history[machine_id]
+        baseline_window = int(self.artifact.get("baseline_window", BASELINE_WINDOW))
+        if len(baseline_history) < baseline_window:
+            baseline_history.append(snapshot)
+        return cycle
+
+    def _observe_base(
+        self, machine_id: str, base: dict, *, speed_rpm: float, load_kn: float
+    ) -> None:
+        """Feed one stored snapshot into the feature history without running
+        the model. Used only by rul_store.rehydrate for rows whose model output
+        no longer affects any state (see rul_store.rehydrate)."""
+        with self._locks[machine_id]:
+            self._append_snapshot_locked(
+                machine_id, base, speed_rpm=speed_rpm, load_kn=load_kn
+            )
+
     def _health_state(self, rul_minutes: float) -> str:
         thresholds = self.artifact.get(
             "health_thresholds_minutes",
@@ -222,21 +255,11 @@ class RealTimeRULPredictor:
             epoch = self._epochs.get(machine_id)
             episode = self._episodes.get(machine_id)
             history = self._history[machine_id]
-            cycle = self._cycles[machine_id]
-            self._cycles[machine_id] += 1
-            snapshot = {
-                "bearing_id": machine_id,
-                "cycle": cycle,
-                "elapsed_minutes": float(cycle),
-                "speed_rpm": float(speed_rpm),
-                "load_kn": float(load_kn),
-                **base,
-            }
-            history.append(snapshot)
             baseline_history = self._baseline_history[machine_id]
             baseline_window = int(self.artifact.get("baseline_window", BASELINE_WINDOW))
-            if len(baseline_history) < baseline_window:
-                baseline_history.append(snapshot)
+            cycle = self._append_snapshot_locked(
+                machine_id, base, speed_rpm=speed_rpm, load_kn=load_kn
+            )
             # Retain the commissioning baseline even after it falls out of the
             # recent rolling window. De-duplicate cycles while the two overlap.
             context_rows = {
