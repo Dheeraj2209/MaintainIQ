@@ -194,6 +194,9 @@ label printed from `localhost` points nowhere on the shop floor.
 
 ### Demo script: live fault cascade
 
+For the full walkthrough (every container, every page, and the repair and
+health-reset workflow), see [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md).
+
 Shows realtime dashboard updates and realtime email alerts end-to-end,
 without any hardware — the admin-only **Demo Control** page (`/demo`) injects
 a synthetic sensor reading through the exact same prediction → alert →
