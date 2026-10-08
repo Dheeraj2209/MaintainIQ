@@ -215,14 +215,19 @@ def effective_state(conn, machine_id: str, latest_pred: dict | None) -> dict:
                 "health_episode": pred_episode}
     stored = _stored(conn, machine_id)
     row = stored or _DEFAULT
-    if latest_pred and latest_pred.get("source") == live.DEMO_SOURCE:
+    is_demo = bool(latest_pred) and latest_pred.get("source") == live.DEMO_SOURCE
+    if is_demo:
         pending = False
     elif pred_episode is None:  # no prediction yet, or a pre-ratchet one
-        pending = stored is not None
+        # Every reset or re-arm bumps the episode above 0, so episode 0 means
+        # nothing was reset (e.g. a migration 008 seed): the held level is the
+        # state, but no reading is awaited.
+        pending = stored is not None and row.episode > 0
     else:
         pending = pred_episode < row.episode
+    held_without_episode = not is_demo and pred_episode is None and stored is not None
     return {
-        "health_state": row.max_state if pending else pred_state,
+        "health_state": row.max_state if pending or held_without_episode else pred_state,
         "reset_pending_reading": pending,
         "health_episode": row.episode,
     }

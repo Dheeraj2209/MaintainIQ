@@ -197,6 +197,15 @@ def test_effective_state_null_episode_with_a_row_uses_the_held_level(conn):
     assert got == {"health_state": "healthy", "reset_pending_reading": True, "health_episode": 1}
 
 
+def test_effective_state_null_episode_on_a_never_reset_seed_is_held_not_pending(conn):
+    # Migration 008 seeds a held level at episode 0 without any reset; the
+    # machine's latest prediction predates the ratchet (no episode). Nothing
+    # was reset, so this is the held level, not "reset, awaiting reading".
+    health_epoch.record_level(conn, "m2", 0, "critical", None)
+    got = health_epoch.effective_state(conn, "m2", {"health_state": "faulty", "health_episode": None})
+    assert got == {"health_state": "critical", "reset_pending_reading": False, "health_episode": 0}
+
+
 def test_effective_state_null_episode_without_a_row_is_legacy(conn):
     got = health_epoch.effective_state(conn, "m2", {"health_state": "faulty"})
     assert got == {"health_state": "faulty", "reset_pending_reading": False, "health_episode": 0}
@@ -214,7 +223,10 @@ def test_effective_state_without_a_prediction(conn):
         "health_state": None, "reset_pending_reading": False, "health_episode": 0}
     health_epoch.record_level(conn, "m2", 0, "faulty", "v1")
     assert health_epoch.effective_state(conn, "m2", None) == {
-        "health_state": "faulty", "reset_pending_reading": True, "health_episode": 0}
+        "health_state": "faulty", "reset_pending_reading": False, "health_episode": 0}
+    health_epoch._rearm_locked(conn, "m2", now=NOW)
+    assert health_epoch.effective_state(conn, "m2", None) == {
+        "health_state": "healthy", "reset_pending_reading": True, "health_episode": 1}
 
 
 # --- concurrency -----------------------------------------------------------
