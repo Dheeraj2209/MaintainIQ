@@ -1,7 +1,8 @@
 """KPI calculations (M4).
 
-Pure functions over the M3 SQLite store (src/storage/db.py) plus the ML
-benchmark artifact (models/evaluation_report.json). One function per SRS
+Pure functions over the M3 SQLite store (src/storage/db.py) plus the active
+model's offline evaluation (model_registry.metrics_json, else
+models/xjtu_rul_evaluation.json). One function per SRS
 section 7.4 KPI category. The API layer (src/api/routes/kpis.py) only
 reshapes what these return.
 
@@ -16,15 +17,21 @@ design/DESIGN_BASELINE.md for the full decision table.
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from src.maintenance.records import days_since_last_maintenance, last_maintenance_at
 from src.observability.telemetry import _percentile
 from src.prediction import health_epoch
 from src.storage.db import table_exists
+from src.storage.model_registry import active_model
 from src.telemetry import device_health
 
-_EVAL_REPORT_PATH = Path(__file__).resolve().parents[2] / "models" / "evaluation_report.json"
+# The XJTU-SY RUL evaluation report written next to models/xjtu_rul_model.joblib
+# by src/training/xjtu_rul.py; the same content it stores in
+# model_registry.metrics_json. (models/evaluation_report.json belongs to the
+# retired NASA-IMS pipeline in src/legacy/ and is deliberately not read here.)
+_XJTU_EVAL_PATH = Path(__file__).resolve().parents[2] / "models" / "xjtu_rul_evaluation.json"
+_XJTU_EVAL_LABEL = "models/xjtu_rul_evaluation.json"
 
 # Ordered severity of the four health states; drives the risk score and the
 # "most severe wins" aggregation used across KPIs.
@@ -307,43 +314,109 @@ def maintenance_kpis(conn, machine_id: str = None) -> list:
     return [_maintenance_for_machine(conn, mid) for mid in ids]
 
 
-def prediction_kpis(conn=None) -> dict:
-    """Reshape models/evaluation_report.json into the KPI response shape.
+def _load_json(text):
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
 
-    These are model-quality KPIs measured on the held-out benchmark set, not
-    live production metrics. With `conn`, two field numbers from operator
-    feedback are added (design/2026-10-07-prediction-feedback-design.md,
+
+def _file_metrics():
+    if not _XJTU_EVAL_PATH.exists():
+        return None
+    return _load_json(_XJTU_EVAL_PATH.read_text(encoding="utf-8"))
+
+
+def _same_artifact(registry_path, report_artifact) -> bool:
+    """Whether the evaluation file was written for the registry row's artifact
+    (compared by file name: the file stores an absolute path, the registry a
+    repo-relative one)."""
+    if not registry_path or not report_artifact:
+        return False
+    # PureWindowsPath splits on both '/' and '\', whatever the host OS.
+    return PureWindowsPath(registry_path).name == PureWindowsPath(report_artifact).name
+
+
+def _active_model_metrics(conn):
+    """(registry row or None, metrics dict or None, metrics source label)."""
+    row = active_model(conn) if conn is not None else None
+    if row is not None:
+        metrics = _load_json(row["metrics_json"]) if row["metrics_json"] else None
+        if metrics is not None:
+            return row, metrics, "model_registry"
+        # POST /api/predictions/rul re-registers the active model without
+        # metrics; the on-disk report is usable only if it is for that artifact.
+        report = _file_metrics()
+        if report is not None and _same_artifact(row["artifact_path"], report.get("artifact")):
+            return row, report, _XJTU_EVAL_LABEL
+        return row, None, None
+    report = _file_metrics()
+    return None, report, (_XJTU_EVAL_LABEL if report is not None else None)
+
+
+def prediction_kpis(conn=None) -> dict:
+    """Offline model-quality KPIs of the ACTIVE model (the XJTU-SY RUL model).
+
+    The model is the active model_registry row (src/storage/model_registry.py);
+    its metrics come from that row's metrics_json, else from
+    models/xjtu_rul_evaluation.json. These are leave-one-bearing-out benchmark
+    numbers, not live production metrics. With `conn`, two field numbers from
+    operator feedback are added (design/2026-10-07-prediction-feedback-design.md,
     decision 12): a compact `real_world` block, and root_cause_accuracy once
     someone has labelled a cause — the XJTU-SY dataset itself has no
     root-cause ground truth (see rule_based.py). Keys are only ever added, so
-    the response shape is stable."""
+    the response shape is stable: the keys of the retired classifier report
+    that have no meaning for a failure-within-horizon + RUL model (accuracy,
+    mean_confidence, suggested_confidence_threshold, missed_fault_count) stay
+    present as null rather than being invented."""
     from src.feedback import accuracy as field_accuracy
 
     field = field_accuracy.real_world_accuracy(conn) if conn is not None else None
     real_world = (field_accuracy.compact_kpi(field) if field is not None
                   else field_accuracy.not_applicable_kpi())
 
-    if not _EVAL_REPORT_PATH.exists():
-        return {"status": _NOT_APPLICABLE,
-                "reason": "evaluation_report.json not found; run src/training/run_pipeline.py",
+    row, metrics, source = _active_model_metrics(conn)
+    model_version = row["model_version"] if row is not None else None
+    algorithm = row["algorithm"] if row is not None else None
+
+    if metrics is None:
+        reason = (f"active model {model_version} has no recorded evaluation metrics"
+                  if row is not None else
+                  "no active model in model_registry and models/xjtu_rul_evaluation.json "
+                  "not found; run src/training/xjtu_rul.py")
+        return {"status": _NOT_APPLICABLE, "reason": reason,
+                "model_version": model_version, "algorithm": algorithm,
                 "real_world": real_world}
 
-    with open(_EVAL_REPORT_PATH) as fh:
-        report = json.load(fh)
-
-    winner = report.get("winner")
-    stats = report.get("candidates", {}).get(winner, {})
-    threshold = report.get("confidence_threshold_analysis", {})
+    detection = metrics.get("failure_detection") or {}
+    rul = metrics.get("within_horizon_rul") or {}
 
     return {
         "status": "available",
-        "winning_model": winner,
-        "accuracy": stats.get("accuracy"),
-        "false_alarm_count": stats.get("false_alarm_count"),
-        "missed_fault_count": stats.get("missed_fault_count"),
-        "mean_confidence": stats.get("mean_confidence"),
-        "suggested_confidence_threshold": threshold.get("suggested_threshold"),
-        "evaluated_at": report.get("exported_at"),
+        "model_version": model_version,
+        "algorithm": algorithm,
+        # Same meaning as before: which model the numbers describe.
+        "winning_model": algorithm or model_version,
+        "metrics_source": source,
+        "failure_detection": {
+            key: detection.get(key)
+            for key in ("precision", "recall", "f1", "roc_auc", "average_precision")
+        },
+        "false_alarm_count": detection.get("false_alarm_count"),
+        "missed_failure_window_count": detection.get("missed_failure_window_count"),
+        "rul_mae_minutes": rul.get("mae_minutes"),
+        "rul_rmse_minutes": rul.get("rmse_minutes"),
+        "rul_error_90_minutes": rul.get("error_90_minutes"),
+        "prognostic_horizon_minutes": metrics.get("prognostic_horizon_minutes"),
+        "validation": metrics.get("validation"),
+        "bearing_count": metrics.get("bearing_count"),
+        # Retired-classifier keys with no XJTU equivalent (see docstring).
+        "accuracy": None,
+        "mean_confidence": None,
+        "suggested_confidence_threshold": None,
+        "missed_fault_count": None,
+        "evaluated_at": metrics.get("created_at"),
         "root_cause_accuracy": (field_accuracy.root_cause_block(field) if field is not None else None) or {
             "status": _NOT_APPLICABLE,
             "reason": "no labeled root-cause ground truth in the XJTU-SY dataset "

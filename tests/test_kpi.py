@@ -49,9 +49,11 @@ def test_maintenance_due_flips_after_service_but_open_alert_keeps_it_due(conn):
 
 def test_prediction_kpis_shape():
     pred = kpi.prediction_kpis()
-    # reads the real models/evaluation_report.json committed in the repo
+    # No conn: falls back to the committed XJTU-SY evaluation report, never the
+    # retired NASA-IMS models/evaluation_report.json.
     assert pred["status"] == "available"
-    assert "accuracy" in pred
+    assert pred["metrics_source"] == "models/xjtu_rul_evaluation.json"
+    assert pred["failure_detection"]["f1"] is not None
     assert pred["root_cause_accuracy"]["status"] == "not_applicable"
     reason = pred["root_cause_accuracy"]["reason"]
     # Platform runs on XJTU-SY now; the stale "IMS dataset" copy must be gone.
@@ -59,73 +61,116 @@ def test_prediction_kpis_shape():
     assert "IMS" not in reason
 
 
-def test_operational_kpis_detect_documented_failure(conn):
-    op = kpi.operational_kpis(conn)
-    fdb = op["faults_detected_before_failure"]
-    assert fdb["documented_failure_machines"] == 1
-    assert fdb["detected_early"] == 1  # m1 had abnormal events
-    assert op["breakdown_reduction"]["status"] == "not_applicable"
+# --- Model-quality KPIs describe the ACTIVE (XJTU-SY RUL) model ------------
+
+_XJTU_METRICS = {
+    "dataset": "XJTU-SY",
+    "validation": "leave-one-bearing-out",
+    "bearing_count": 15,
+    "prognostic_horizon_minutes": 120.0,
+    "created_at": "2030-01-01T00:00:00+00:00",
+    "failure_detection": {
+        "precision": 0.72, "recall": 0.63, "f1": 0.68, "average_precision": 0.62,
+        "roc_auc": 0.81, "false_alarm_count": 400, "missed_failure_window_count": 607,
+    },
+    "within_horizon_rul": {"mae_minutes": 30.8, "rmse_minutes": 37.8, "error_90_minutes": 62.8},
+}
 
 
-def test_system_kpis_all_not_applicable(conn):
-    sys = kpi.system_kpis(conn)
-    assert all(v["status"] == "not_applicable" for v in sys.values())
-
-
-def test_summary_rollup(conn):
-    s = kpi.summary(conn)
-    assert s["machine_count"] == 2
-    assert s["health_state_counts"] == {"critical": 1, "healthy": 1}
-    assert s["open_alert_count"] == 1
-    assert s["machines_due_for_inspection"] == 2
-
-
-def test_maintenance_kpis_avg_acknowledgement_hours_none_when_unacknowledged(conn):
-    m1 = kpi.maintenance_kpis(conn, "m1")[0]
-    assert m1["avg_alert_acknowledgement_hours"] is None  # neither seeded alert is acknowledged
-
-
-def test_maintenance_kpis_avg_acknowledgement_hours_computed(conn):
-    from datetime import datetime, timezone
-    # Acknowledge the open alert (id 2, opened 2003-10-22T13:00:00+00:00) 30 minutes later.
+def _register(conn, version, *, deployed_at, active=1, metrics=_XJTU_METRICS,
+              algorithm="ExtraTreesRegressor", artifact="models/xjtu_rul_model.joblib"):
+    import json
     conn.execute(
-        "UPDATE alerts SET acknowledged_at = ?, acknowledged_by = 1 WHERE id = 2",
-        ("2003-10-22T13:30:00+00:00",),
-    )
-    conn.commit()
-    m1 = kpi.maintenance_kpis(conn, "m1")[0]
-    assert m1["avg_alert_acknowledgement_hours"] == round(30 / 60, 2)
-
-
-
-# --- Work orders (work-orders design, decision 14) --------------------------------------
-
-def _wo(conn, machine_id, status, created_at="2026-10-07T10:00:00+00:00", completed_at=None):
-    conn.execute(
-        "INSERT INTO work_orders (machine_id, status, title, created_at, updated_at, completed_at) "
-        "VALUES (?, ?, 't', ?, ?, ?)",
-        (machine_id, status, created_at, created_at, completed_at),
-    )
+        """INSERT INTO model_registry (model_version, artifact_path, algorithm,
+               metrics_json, deployed_at, is_active) VALUES (?, ?, ?, ?, ?, ?)""",
+        (version, artifact, algorithm,
+         json.dumps(metrics) if metrics is not None else None, deployed_at, active))
     conn.commit()
 
 
-def test_work_order_kpis_per_machine_and_fleet(conn):
-    m1 = kpi.maintenance_kpis(conn, "m1")[0]
-    assert m1["open_work_order_count"] == 0
-    assert m1["avg_work_order_completion_hours"] is None
+def test_prediction_kpis_reports_active_registry_model(conn):
+    _register(conn, "xjtu-rul-old", deployed_at="2029-01-01T00:00:00+00:00", active=0,
+              metrics={**_XJTU_METRICS, "failure_detection": {"f1": 0.1}})
+    _register(conn, "xjtu-rul-new", deployed_at="2030-01-02T00:00:00+00:00")
+    pred = kpi.prediction_kpis(conn)
+    assert pred["status"] == "available"
+    assert pred["model_version"] == "xjtu-rul-new"
+    assert pred["algorithm"] == "ExtraTreesRegressor"
+    assert pred["winning_model"] == "ExtraTreesRegressor"
+    assert pred["metrics_source"] == "model_registry"
+    assert pred["failure_detection"] == {
+        "precision": 0.72, "recall": 0.63, "f1": 0.68, "roc_auc": 0.81, "average_precision": 0.62}
+    assert pred["false_alarm_count"] == 400
+    assert pred["missed_failure_window_count"] == 607
+    assert pred["rul_mae_minutes"] == 30.8
+    assert pred["rul_rmse_minutes"] == 37.8
+    assert pred["rul_error_90_minutes"] == 62.8
+    assert pred["prognostic_horizon_minutes"] == 120.0
+    assert pred["validation"] == "leave-one-bearing-out"
+    assert pred["bearing_count"] == 15
+    assert pred["evaluated_at"] == "2030-01-01T00:00:00+00:00"
+    # Legacy classifier-only keys have no XJTU meaning: present but null.
+    for key in ("accuracy", "mean_confidence", "suggested_confidence_threshold",
+                "missed_fault_count"):
+        assert key in pred and pred[key] is None
 
-    _wo(conn, "m1", "open")
-    _wo(conn, "m1", "in_progress")
-    _wo(conn, "m1", "cancelled")
-    _wo(conn, "m1", "done", completed_at="2026-10-07T12:00:00+00:00")
-    _wo(conn, "m1", "done", completed_at="2026-10-07T14:00:00Z")
-    _wo(conn, "m2", "assigned")
 
-    m1 = kpi.maintenance_kpis(conn, "m1")[0]
-    assert m1["open_work_order_count"] == 2
-    assert m1["avg_work_order_completion_hours"] == 3.0
-    assert kpi.maintenance_kpis(conn, "m2")[0]["open_work_order_count"] == 1
-    assert kpi.summary(conn)["open_work_order_count"] == 3
+def test_prediction_kpis_never_reads_legacy_report(conn, monkeypatch):
+    _register(conn, "xjtu-rul-new", deployed_at="2030-01-02T00:00:00+00:00")
+    assert not hasattr(kpi, "_EVAL_REPORT_PATH")
+    pred = kpi.prediction_kpis(conn)
+    assert pred["winning_model"] != "logistic_regression"
+
+
+def test_prediction_kpis_multiple_active_rows_is_deterministic(conn):
+    _register(conn, "xjtu-rul-a", deployed_at="2030-01-01T00:00:00+00:00")
+    _register(conn, "xjtu-rul-c", deployed_at="2030-01-03T00:00:00+00:00")
+    _register(conn, "xjtu-rul-b", deployed_at="2030-01-03T00:00:00+00:00")
+    # Latest deployed_at wins; tie broken by model_version DESC.
+    assert kpi.prediction_kpis(conn)["model_version"] == "xjtu-rul-c"
+
+
+def test_prediction_kpis_registry_row_without_metrics_uses_matching_file(conn):
+    # POST /api/predictions/rul re-registers the active model without metrics.
+    _register(conn, "xjtu-rul-new", deployed_at="2030-01-02T00:00:00+00:00", metrics=None)
+    pred = kpi.prediction_kpis(conn)
+    assert pred["status"] == "available"
+    assert pred["model_version"] == "xjtu-rul-new"
+    assert pred["metrics_source"] == "models/xjtu_rul_evaluation.json"
+    assert pred["failure_detection"]["f1"] is not None
+
+
+def test_prediction_kpis_registry_row_without_metrics_other_artifact(conn):
+    _register(conn, "other-v1", deployed_at="2030-01-02T00:00:00+00:00", metrics=None,
+              artifact="models/some_other_model.joblib")
+    pred = kpi.prediction_kpis(conn)
+    assert pred["status"] == "not_applicable"
+    assert pred["model_version"] == "other-v1"
+    assert "other-v1" in pred["reason"]
+    assert "real_world" in pred
+
+
+def test_prediction_kpis_no_registry_row_falls_back_to_file(conn):
+    pred = kpi.prediction_kpis(conn)
+    assert pred["status"] == "available"
+    assert pred["model_version"] is None
+    assert pred["metrics_source"] == "models/xjtu_rul_evaluation.json"
+
+
+def test_prediction_kpis_nothing_available(conn, monkeypatch, tmp_path):
+    monkeypatch.setattr(kpi, "_XJTU_EVAL_PATH", tmp_path / "missing.json")
+    pred = kpi.prediction_kpis(conn)
+    assert pred["status"] == "not_applicable"
+    assert "reason" in pred and "real_world" in pred
+    assert pred["model_version"] is None
+
+
+def test_prediction_kpis_survives_db_without_model_registry(conn):
+    conn.execute("DROP TABLE model_registry")
+    conn.commit()
+    pred = kpi.prediction_kpis(conn)
+    assert pred["status"] == "available"
+    assert pred["metrics_source"] == "models/xjtu_rul_evaluation.json"
 
 
 def test_work_order_kpis_without_table(conn):

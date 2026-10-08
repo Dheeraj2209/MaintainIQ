@@ -428,14 +428,36 @@ export interface MachineDetail {
   maintenance_history: MaintenanceRecord[]
 }
 
+// Offline quality of the ACTIVE model (the XJTU-SY RUL model in
+// model_registry; src/kpi/calculations.py prediction_kpis).
 export interface PredictionKpi {
   status: string
-  winning_model?: string
-  accuracy?: number
-  false_alarm_count?: number
-  missed_fault_count?: number
-  mean_confidence?: number
-  suggested_confidence_threshold?: number
+  reason?: string
+  model_version?: string | null
+  algorithm?: string | null
+  winning_model?: string | null
+  metrics_source?: string | null
+  failure_detection?: {
+    precision: number | null
+    recall: number | null
+    f1: number | null
+    roc_auc: number | null
+    average_precision: number | null
+  }
+  false_alarm_count?: number | null
+  missed_failure_window_count?: number | null
+  rul_mae_minutes?: number | null
+  rul_rmse_minutes?: number | null
+  rul_error_90_minutes?: number | null
+  prognostic_horizon_minutes?: number | null
+  validation?: string | null
+  bearing_count?: number | null
+  evaluated_at?: string | null
+  // Keys of the retired NASA-IMS classifier report; always null now.
+  accuracy?: number | null
+  missed_fault_count?: number | null
+  mean_confidence?: number | null
+  suggested_confidence_threshold?: number | null
   // Operator-feedback accuracy (design/2026-10-07-prediction-feedback-design.md).
   real_world?: RealWorldKpi
   root_cause_accuracy?: { status: string; accuracy?: number; labelled_count?: number; reason?: string }

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { AuthProvider } from '../auth/AuthContext'
@@ -30,8 +30,21 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByText(/fleet health distribution/i)).toBeInTheDocument()
 
     const predictionSection = within(screen.getByText(/prediction model/i).closest('.panel-notch')!)
-    expect(predictionSection.getByText('logistic_regression')).toBeInTheDocument()
-    expect(predictionSection.getByText('79.6%')).toBeInTheDocument()
+    const metric = (label: string) => predictionSection.getByText(label).parentElement!
+    expect(metric('Active model')).toHaveTextContent('xjtu-rul-20260930T164318Z')
+    expect(metric('Active model')).toHaveTextContent('ExtraTreesRegressor')
+    expect(metric('Failure-detection F1')).toHaveTextContent('67.7%')
+    expect(metric('Precision')).toHaveTextContent('72.5%')
+    expect(metric('Recall')).toHaveTextContent('63.4%')
+    expect(metric('ROC AUC')).toHaveTextContent('0.81')
+    expect(metric('RUL error (MAE)')).toHaveTextContent('30.9 min')
+    // Integer counts animate up from 0 (MetricCard count-up).
+    await waitFor(() => expect(metric('False alarms')).toHaveTextContent('400'))
+    await waitFor(() => expect(metric('Missed failure windows')).toHaveTextContent('607'))
+    // Retired classifier metrics are gone.
+    expect(predictionSection.queryByText(/^Accuracy$/)).not.toBeInTheDocument()
+    expect(predictionSection.queryByText(/mean confidence/i)).not.toBeInTheDocument()
+    expect(predictionSection.queryByText(/logistic_regression/)).not.toBeInTheDocument()
 
     const riskSection = within(screen.getByText(/top at-risk machines/i).closest('.panel-notch')!)
     const links = riskSection.getAllByRole('link')

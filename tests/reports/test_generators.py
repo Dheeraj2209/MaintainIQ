@@ -287,3 +287,13 @@ def test_model_performance_real_world_with_feedback_and_period(rconn):
                                      period_start="2030-01-01T00:00:00+00:00",
                                      period_end="2030-01-31T00:00:00+00:00")
     assert s["real_world"]["labelled_count"] == 1 and s["real_world"]["precision"] == 1.0
+
+
+def test_model_performance_active_model_tie_is_deterministic(rconn):
+    for version in ("v1", "v3", "v2"):
+        rconn.execute(
+            """INSERT INTO model_registry (model_version, artifact_path, deployed_at, is_active)
+               VALUES (?, 'models/x.joblib', '2030-01-02', 1)""", (version,))
+    rconn.commit()
+    s = generators.model_performance(rconn, scope="fleet")
+    assert s["active_model"]["model_version"] == "v3"

@@ -235,3 +235,9 @@ def test_real_world_kpi_compact_block(conn):
     kpi = accuracy.real_world_kpi(conn)
     assert kpi == {"status": "available", "reason": None, "labelled_count": 2, "precision": 0.5,
                    "false_alarm_rate": 0.5, "median_lead_minutes": 120.0, "rul_mae_minutes": 20.0}
+
+
+def test_offline_active_model_tie_is_deterministic(conn):
+    for version in ("v1", "v3", "v2"):
+        _register(conn, version, json.dumps({"failure_detection": {"precision": 0.5}}))
+    assert accuracy.offline_metrics(conn)["model_version"] == "v3"

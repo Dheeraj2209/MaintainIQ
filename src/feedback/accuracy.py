@@ -28,6 +28,7 @@ import json
 from statistics import mean, median
 
 from src.storage.db import table_exists
+from src.storage.model_registry import active_model
 from src.telemetry.device_health import parse_iso
 
 # == src.training.xjtu_rul.PROGNOSTIC_HORIZON_MINUTES (pinned by a test). Not
@@ -181,10 +182,7 @@ def offline_metrics(conn, model_version=None) -> dict | None:
             (model_version,),
         ).fetchone()
     else:
-        row = conn.execute(
-            """SELECT model_version, metrics_json FROM model_registry WHERE is_active = 1
-               ORDER BY deployed_at DESC LIMIT 1"""
-        ).fetchone()
+        row = active_model(conn)
     if row is None or not row["metrics_json"]:
         return None
     try:

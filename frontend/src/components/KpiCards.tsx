@@ -22,11 +22,12 @@ export function KpiCards({ summary }: { summary: KpiSummary }) {
   ]
 
   const pred = summary.prediction
-  if (pred.status === 'available' && typeof pred.accuracy === 'number') {
+  const f1 = pred.failure_detection?.f1
+  if (pred.status === 'available' && typeof f1 === 'number') {
     cards.push({
-      label: 'Model accuracy',
-      value: `${(pred.accuracy * 100).toFixed(1)}%`,
-      sub: pred.winning_model,
+      label: 'Failure-detection F1',
+      value: `${(f1 * 100).toFixed(1)}%`,
+      sub: pred.model_version ?? pred.algorithm ?? undefined,
       tone: 'accent',
     })
   }

@@ -126,3 +126,13 @@ def test_health_no_registry_no_inferences(conn):
     assert h["active"] is False
     assert h["last_inference_at"] is None
     assert h["seconds_since_last_inference"] is None
+
+
+def test_health_multiple_active_rows_is_deterministic(conn):
+    for version, deployed in (("v1", "2030-01-01"), ("v3", "2030-01-02"), ("v2", "2030-01-02")):
+        conn.execute(
+            """INSERT INTO model_registry (model_version, artifact_path, deployed_at, is_active)
+               VALUES (?, 'models/x.joblib', ?, 1)""", (version, deployed))
+    conn.commit()
+    h = model_health.compute_health(conn, now=NOW, stale_after_seconds=900.0)
+    assert h["model_version"] == "v3"  # latest deployed_at, tie -> model_version DESC

@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 
 from src.observability.telemetry import _percentile
 from src.prediction import health_epoch
+from src.storage import model_registry
 
 REPORT_TYPES = ("machine_prognostic", "model_performance", "fleet_summary")
 FORMATS = ("markdown", "json")
@@ -169,11 +170,7 @@ def model_performance(conn, *, scope="fleet", period_start=None, period_end=None
         ).fetchall()
     ]
 
-    active = conn.execute(
-        """SELECT model_version, algorithm, trained_at, metrics_json
-           FROM model_registry WHERE is_active = 1
-           ORDER BY deployed_at DESC LIMIT 1"""
-    ).fetchone()
+    active = model_registry.active_model(conn)
     active_model = None
     if active is not None:
         metrics = None

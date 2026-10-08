@@ -20,6 +20,9 @@ const HEALTH_ORDER: { state: HealthState; className: string }[] = [
   { state: 'unknown', className: 'bg-unknown' },
 ]
 
+const pct = (v: number | null | undefined) => (typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : '—')
+const fixed = (v: number | null | undefined, digits: number) => (typeof v === 'number' ? v.toFixed(digits) : '—')
+
 export function AnalyticsPage() {
   const [kpis, setKpis] = useState<KpiSummary | null>(null)
   const [machines, setMachines] = useState<MachineSummary[]>([])
@@ -68,6 +71,7 @@ export function AnalyticsPage() {
 
   const topRisk = [...machines].sort((a, b) => b.risk_score - a.risk_score).slice(0, 10)
   const pred = kpis.prediction
+  const detection = pred.failure_detection
 
   const healthSegments: CategorySegment[] = HEALTH_ORDER.map(({ state, className }) => ({
     label: healthLabel(state),
@@ -124,27 +128,33 @@ export function AnalyticsPage() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">Prediction model</h2>
           {pred.status === 'available' ? (
             <div className="grid grid-cols-2 gap-3">
-              <MetricCard label="Winning model" value={pred.winning_model ?? '—'} />
               <MetricCard
-                label="Accuracy"
-                value={typeof pred.accuracy === 'number' ? `${(pred.accuracy * 100).toFixed(1)}%` : '—'}
-                tone="healthy"
+                label="Active model"
+                value={pred.model_version ?? pred.algorithm ?? '—'}
+                sub={pred.model_version ? (pred.algorithm ?? undefined) : undefined}
+                className="col-span-2"
+              />
+              <MetricCard label="Failure-detection F1" value={pct(detection?.f1)} tone="healthy" />
+              <MetricCard label="ROC AUC" value={fixed(detection?.roc_auc, 2)} tone="accent" />
+              <MetricCard label="Precision" value={pct(detection?.precision)} />
+              <MetricCard label="Recall" value={pct(detection?.recall)} />
+              <MetricCard label="False alarms" value={pred.false_alarm_count ?? '—'} sub="snapshots" tone="degrading" />
+              <MetricCard
+                label="Missed failure windows"
+                value={pred.missed_failure_window_count ?? '—'}
+                sub="snapshots"
+                tone="critical"
               />
               <MetricCard
-                label="Mean confidence"
-                value={typeof pred.mean_confidence === 'number' ? `${(pred.mean_confidence * 100).toFixed(1)}%` : '—'}
-                tone="accent"
-              />
-              <MetricCard
-                label="Suggested threshold"
-                value={
-                  typeof pred.suggested_confidence_threshold === 'number'
-                    ? pred.suggested_confidence_threshold.toFixed(2)
-                    : '—'
+                label="RUL error (MAE)"
+                className="col-span-2"
+                value={typeof pred.rul_mae_minutes === 'number' ? `${pred.rul_mae_minutes.toFixed(1)} min` : '—'}
+                sub={
+                  typeof pred.prognostic_horizon_minutes === 'number'
+                    ? `within ${pred.prognostic_horizon_minutes} min horizon`
+                    : undefined
                 }
               />
-              <MetricCard label="False alarms" value={pred.false_alarm_count ?? '—'} tone="degrading" />
-              <MetricCard label="Missed faults" value={pred.missed_fault_count ?? '—'} tone="critical" />
             </div>
           ) : (
             <p className="text-sm text-text-muted">No trained model metrics available yet.</p>
